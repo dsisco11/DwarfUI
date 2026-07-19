@@ -10,14 +10,16 @@ The tooltip port reserves these downstream module paths:
 - `dwarfui/widget_extensions`
 - `dwarfui/pointer`
 - `dwarfui/tooltip`
+- `dwarfui/tooltip_registration`
 
-All modules expose stable return-table contracts. `dwarfui/text` provides
+All modules use DFHack's `--@ module=true` script-environment contract and are
+loaded with `reqscript()`. `dwarfui/text` provides
 standalone text wrapping, and importing `dwarfui/widget_extensions` installs
 the declarative tooltip and pointer attributes on DFHack's native widget
 classes. `dwarfui/pointer` provides isolated per-root pointer contexts and
 generic target/pass/block/none dispatch. `dwarfui/tooltip` provides the plain-
-widget `TooltipRenderer` and explicit per-root `TooltipAgent` used by
-screen and overlay hosts.
+widget `TooltipRenderer`, the stable singleton registration facade, and the
+explicit per-root `TooltipAgent` available to unusual screen and overlay hosts.
 
 ## Explicit tooltip integration
 
@@ -112,12 +114,26 @@ Each screen or overlay instance must construct its own agent and renderer.
 Never share a `TooltipAgent`, `PointerContext`, or `TooltipRenderer` between
 independently rendered roots.
 
-## Experimental registration evaluation
+## Automatic tooltip registration
 
-`dwarfui/tooltip_registration_experimental` is a Phase 8 lifecycle prototype,
-not yet a supported integration API. It evaluates a process-wide singleton
-tooltip service: arbitrary controls register through weak keys, while one
-transparent top-level `ZScreen` owns one renderer and displays at most one
-tooltip. It does not modify consumer roots or intercept their methods. See
-`Docs/tooltip-registration-decision.md` for the Phase 8 contract, lifecycle
-evidence, and remaining Phase 9 live gates.
+The stable high-level API is exposed by `dwarfui/tooltip`:
+
+```lua
+local tooltip = reqscript('dwarfui/tooltip')
+
+local label = widgets.Label{
+    text='Hover me',
+    tooltip='Static tooltip text',
+}
+tooltip.register(label)
+```
+
+Registration may happen before or after attachment. It is idempotent and uses
+weak keys, so ordinary widget lifetime does not require explicit cleanup.
+`tooltip.unregister(label)` is available when immediate removal is useful.
+
+One transparent top-level `ZScreen` owns exactly one renderer and displays at
+most one tooltip process-wide. It does not modify consumer roots or intercept
+their methods. Normal screens and enabled, focus-matching overlays are
+supported. The explicit `TooltipRenderer` and `TooltipAgent` API above remains
+available as a low-level path for unusual hosts.
