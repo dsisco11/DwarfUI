@@ -15,5 +15,6 @@ All modules expose stable return-table contracts. `dwarfui/text` provides
 standalone text wrapping, and importing `dwarfui/widget_extensions` installs
 the declarative tooltip and pointer attributes on DFHack's native widget
 classes. `dwarfui/pointer` provides isolated per-root pointer contexts and
-generic target/pass/block/none dispatch. `dwarfui/tooltip` remains a reserved
-placeholder until its presentation and agent phase.
+generic target/pass/block/none dispatch. `dwarfui/tooltip` provides the plain-
+widget `TooltipRenderer` and explicit per-root `TooltipAgent` used by
+screen and overlay hosts.
