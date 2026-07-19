@@ -11,7 +11,8 @@ The tooltip port reserves these downstream module paths:
 - `dwarfui/pointer`
 - `dwarfui/tooltip`
 
-The modules currently expose stable return-table contracts. Their functionality
-is implemented incrementally by the phases in
-`Docs/tooltip-system-port.todo`; placeholder modules do not claim behavior that
-has not yet been ported.
+All modules expose stable return-table contracts. `dwarfui/text` provides
+standalone text wrapping, and importing `dwarfui/widget_extensions` installs
+the declarative tooltip and pointer attributes on DFHack's native widget
+classes. `dwarfui/pointer` and `dwarfui/tooltip` remain reserved placeholders
+until their later porting phases.
