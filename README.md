@@ -111,3 +111,13 @@ end
 Each screen or overlay instance must construct its own agent and renderer.
 Never share a `TooltipAgent`, `PointerContext`, or `TooltipRenderer` between
 independently rendered roots.
+
+## Experimental registration evaluation
+
+`dwarfui/tooltip_registration_experimental` is a Phase 8 lifecycle prototype,
+not yet a supported integration API. It evaluates a process-wide singleton
+tooltip service: arbitrary controls register through weak keys, while one
+transparent top-level `ZScreen` owns one renderer and displays at most one
+tooltip. It does not modify consumer roots or intercept their methods. See
+`Docs/tooltip-registration-decision.md` for the Phase 8 contract, lifecycle
+evidence, and remaining Phase 9 live gates.
