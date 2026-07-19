@@ -14,5 +14,6 @@ The tooltip port reserves these downstream module paths:
 All modules expose stable return-table contracts. `dwarfui/text` provides
 standalone text wrapping, and importing `dwarfui/widget_extensions` installs
 the declarative tooltip and pointer attributes on DFHack's native widget
-classes. `dwarfui/pointer` and `dwarfui/tooltip` remain reserved placeholders
-until their later porting phases.
+classes. `dwarfui/pointer` provides isolated per-root pointer contexts and
+generic target/pass/block/none dispatch. `dwarfui/tooltip` remains a reserved
+placeholder until its presentation and agent phase.
