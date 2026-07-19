@@ -1,4 +1,4 @@
-☐ Port over the Tooltip widget from `SoulSearch`.
+[Resource Counts]☐ Port over the Tooltip widget from `SoulSearch`.: Add popout to the different resource counters in the top panel which shows a list of all item types (and their counts) from that resource category.
 ☐ Port over the ContextMenu widget from `DwarfDirect`.
 ☐ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level.
 ☐ [Container Contents Popover] Implement ability to hold `Alt` and hover mouse over a container to show a popout panel which shows the list of all items in that container.
@@ -8,4 +8,4 @@
 ☐ [Minecart Routes] Currently selected route should render an `X` in-world at the position of each route-stop, along with the name of the stop, to allow for easy identification of the route-stops in-world.
 ☐ [All Filters Panels] Add buttons for "Copy" and "Paste" to all filter panels to allow copying and pasting of filter settings between different panels.
 ☐ [Workshop Work Orders] Add "Copy" and "Paste" buttons to the Work Orders panel in workshops to allow copying and pasting of work order settings between different workshops.
-☐ 
+☐ [Resource Counts]: Add popout to the different resource counters in the top panel which shows a list of all item types (and their counts) from that resource category.
