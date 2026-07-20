@@ -1,7 +1,12 @@
 -- Live product contracts for the singleton tooltip service.
 
-local registration = reqscript('dwarfui/tooltip_registration')
 local tooltip = reqscript('dwarfui/tooltip')
+
+---Returns the product diagnostics registered in tests/dwarfspec/config.lua.
+---@return table
+local function diagnostics()
+    return ds.diagnostic('tooltip')
+end
 
 ---Recreates the service in the current UI stack after setting a virtual pointer.
 ---@param target table
@@ -15,7 +20,8 @@ describe('live singleton tooltip service', function()
     local screen
 
     before_each(function()
-        screen = ds.show_fixture('tooltip_screen')
+        screen = ds.show_fixture(
+            'tests/tooltip/fixtures/tooltip.fixture.lua')
     end)
 
     it('targets normal screens and presents dynamic text after real renders',
@@ -25,40 +31,43 @@ describe('live singleton tooltip service', function()
 
         restart_service_for_target(target)
 
-        local diagnostics = registration.get_diagnostics()
-        assert.equals(target, diagnostics.target)
-        assert.is_true(diagnostics.screen.renderer.visible)
+        local state = diagnostics()
+        assert.equals(target, state.target)
+        assert.is_true(state.screen.renderer.visible)
         assert.equals(('Automation dynamic tooltip %d,%d'):format(
             mouse_x - target.frame_body.x1, mouse_y - target.frame_body.y1),
-            diagnostics.screen.renderer.tooltip_text)
-        assert.equals(diagnostics.screen.frame_parent_rect,
-            diagnostics.screen.renderer.frame_parent_rect)
+            state.screen.renderer.tooltip_text)
+        assert.equals(state.screen.frame_parent_rect,
+            state.screen.renderer.frame_parent_rect)
     end)
 
     it('blocks targets covered by a modal screen through real rendering',
             function()
         ds.dismiss(screen)
-        screen = ds.show_fixture('tooltip_screen', {blocker_visible=true})
+        screen = ds.show_fixture(
+            'tests/tooltip/fixtures/tooltip.fixture.lua',
+            {blocker_visible=true})
         local target = ds.get(screen, 'tooltip_target')
         ds.move_pointer_to(target)
         restart_service_for_target(target)
-        assert.is_nil(registration.get_diagnostics().target)
-        assert.is_false(registration.get_diagnostics().screen.renderer.visible)
+        assert.is_nil(diagnostics().target)
+        assert.is_false(diagnostics().screen.renderer.visible)
     end)
 
     it('z-order recovery forwards input over a newly opened screen', function()
         local target = ds.get(screen, 'tooltip_target')
         ds.move_pointer_to(target)
         restart_service_for_target(target)
-        local diagnostics = registration.get_diagnostics()
-        assert.equals(target, diagnostics.target)
-        ds.send_input('CUSTOM_A', diagnostics.screen)
+        local state = diagnostics()
+        assert.equals(target, state.target)
+        ds.send_input('CUSTOM_A', state.screen)
         assert.equals('CUSTOM_A', screen.last_key)
-        assert.is_false(diagnostics.screen:isMouseOver())
+        assert.is_false(state.screen:isMouseOver())
 
-        local cover = ds.show_fixture('cover_screen')
+        local cover = ds.show_fixture(
+            'tests/tooltip/fixtures/cover.fixture.lua')
         ds.wait_frames(2)
-        assert.is_true(diagnostics.screen:hasFocus())
+        assert.is_true(state.screen:hasFocus())
         ds.dismiss(cover)
     end)
 end)

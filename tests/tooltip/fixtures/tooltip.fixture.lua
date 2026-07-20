@@ -4,16 +4,16 @@ local gui = require('gui')
 local widgets = require('gui.widgets')
 local tooltip = reqscript('dwarfui/tooltip')
 
----@class tests.AutomationTooltipScreen: gui.ZScreen
-local AutomationTooltipScreen = defclass(nil, gui.ZScreen)
-AutomationTooltipScreen.ATTRS{
+---@class tests.TooltipScreen: gui.ZScreen
+local TooltipScreen = defclass(nil, gui.ZScreen)
+TooltipScreen.ATTRS{
     initial_pause=false,
     pass_mouse_clicks=true,
 }
 
 ---Builds a normal-screen target and an optionally visible modal blocker.
 ---@param options table|nil
-function AutomationTooltipScreen:init(options)
+function TooltipScreen:init(options)
     options = options or {}
     self.render_generation = 0
     self.last_key = nil
@@ -36,31 +36,31 @@ function AutomationTooltipScreen:init(options)
 end
 
 ---Registers the target after the automation driver has shown this screen.
-function AutomationTooltipScreen:on_automation_shown()
+function TooltipScreen:on_automation_shown()
     tooltip.register(self.target)
 end
 
 ---Records each real screen render for automation synchronization.
-function AutomationTooltipScreen:onRender()
-    AutomationTooltipScreen.super.onRender(self)
+function TooltipScreen:onRender()
+    TooltipScreen.super.onRender(self)
     self.render_generation = self.render_generation + 1
 end
 
 ---Records a forwarded synthetic key without consuming unrelated input.
 ---@param keys table
 ---@return boolean
-function AutomationTooltipScreen:onInput(keys)
+function TooltipScreen:onInput(keys)
     if keys.CUSTOM_A then
         self.last_key = 'CUSTOM_A'
         return true
     end
-    return AutomationTooltipScreen.super.onInput(self, keys)
+    return TooltipScreen.super.onInput(self, keys)
 end
 
 ---Releases the fixture registration when DFHack dismisses this screen.
-function AutomationTooltipScreen:onDismiss()
+function TooltipScreen:onDismiss()
     tooltip.unregister(self.target)
-    AutomationTooltipScreen.super.onDismiss(self)
+    TooltipScreen.super.onDismiss(self)
 end
 
 local M = {}
@@ -69,7 +69,7 @@ local M = {}
 ---@param options table|nil
 ---@return table
 function M.new(options)
-    return AutomationTooltipScreen(options)
+    return TooltipScreen(options)
 end
 
 return M

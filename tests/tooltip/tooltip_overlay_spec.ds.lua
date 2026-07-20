@@ -1,14 +1,19 @@
--- Live product contracts for one runner-staged tooltip overlay.
+-- Live product contracts for one DwarfSpec-staged tooltip overlay.
 
-local registration = reqscript('dwarfui/tooltip_registration')
 local tooltip = reqscript('dwarfui/tooltip')
 local overlay = require('plugins.overlay')
 
----Returns the exact tooltip overlay staged by the active automation run.
+---Returns the product diagnostics registered in tests/dwarfspec/config.lua.
+---@return table
+local function diagnostics()
+    return ds.diagnostic('tooltip')
+end
+
+---Returns the exact tooltip overlay staged by the active DwarfSpec run.
 ---@return string|nil, table|nil
 local function find_staged_overlay()
     for name, entry in pairs(overlay.get_state().db) do
-        if name:find('dwarfui_automation_', 1, true) and
+        if name:find('dwarfspec_', 1, true) and
                 name:find('tooltip_probe', 1, true) then
             return name, entry
         end
@@ -17,12 +22,8 @@ local function find_staged_overlay()
 end
 
 local overlay_name, overlay_entry = find_staged_overlay()
-local active_run = assert(dfhack.dwarfspec.active_run)
 if not overlay_entry then
-    if active_run.options.spec == 'tooltip_overlay_live_spec.lua' then
-        error('tooltip overlay spec requires -OverlayFixture tooltip_probe')
-    end
-    return
+    error('tooltip overlay spec requires its explicit overlay fixture')
 end
 
 ---Returns whether an overlay accepts the live underlying DF viewscreen.
@@ -42,7 +43,8 @@ end
 
 ---Creates a genuine screen-stack transition so the service renders naturally.
 local function refresh_tooltip_service()
-    local cover = ds.show_fixture('cover_screen')
+    local cover = ds.show_fixture(
+        'tests/tooltip/fixtures/cover.fixture.lua')
     ds.wait_frames(2)
     ds.dismiss(cover)
 end
@@ -55,7 +57,8 @@ describe('live singleton tooltip overlay eligibility', function()
 
     before_each(function()
         original_viewscreens = widget.viewscreens
-        screen = ds.show_fixture('cover_screen')
+        screen = ds.show_fixture(
+            'tests/tooltip/fixtures/cover.fixture.lua')
     end)
 
     after_each(function()
@@ -77,24 +80,27 @@ describe('live singleton tooltip overlay eligibility', function()
         ds.move_pointer_to(target, 'top_left')
         tooltip.unregister(target)
         assert.is_true(tooltip.register(target))
-        ds.wait_frames(2)
+        ds.wait_until('overlay tooltip target selected', function()
+            local state = diagnostics()
+            return state.target == target and state.screen.renderer.visible
+        end)
 
-        local diagnostics = registration.get_diagnostics()
-        assert.equals(target, diagnostics.target)
-        assert.is_true(diagnostics.screen.renderer.visible)
-        assert.is_true(diagnostics.screen.renderer.frame.l +
-            diagnostics.screen.renderer.frame.w - 1 >
+        local state = diagnostics()
+        assert.equals(target, state.target)
+        assert.is_true(state.screen.renderer.visible)
+        assert.is_true(state.screen.renderer.frame.l +
+            state.screen.renderer.frame.w - 1 >
             widget.frame_body.clip_x2)
 
         widget.viewscreens = 'title'
         refresh_tooltip_service()
-        assert.is_nil(registration.get_diagnostics().target)
-        assert.is_false(diagnostics.screen.renderer.visible)
+        assert.is_nil(diagnostics().target)
+        assert.is_false(state.screen.renderer.visible)
 
         widget.viewscreens = original_viewscreens
         overlay.get_state().config[overlay_name].enabled = false
         refresh_tooltip_service()
-        assert.is_nil(registration.get_diagnostics().target)
-        assert.is_false(diagnostics.screen.renderer.visible)
+        assert.is_nil(diagnostics().target)
+        assert.is_false(state.screen.renderer.visible)
     end)
 end)

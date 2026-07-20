@@ -1,23 +1,23 @@
 --@ module=true
 
--- Test-owned overlay used only while the automation runner stages this file.
+-- Test-owned overlay used only while DwarfSpec stages this file.
 
 local overlay = require('plugins.overlay')
 local widgets = require('gui.widgets')
 local tooltip = reqscript('dwarfui/tooltip')
 
----@class tests.AutomationTooltipOverlay: plugins.overlay.OverlayWidget
-local AutomationTooltipOverlay = defclass(nil, overlay.OverlayWidget)
-AutomationTooltipOverlay.ATTRS{
+---@class tests.TooltipOverlay: plugins.overlay.OverlayWidget
+local TooltipOverlay = defclass(nil, overlay.OverlayWidget)
+TooltipOverlay.ATTRS{
     default_enabled=true,
     default_pos={x=1, y=1},
-    desc='DwarfUI automation tooltip overlay',
+    desc='DwarfUI tooltip test overlay',
     frame={w=8, h=4},
     viewscreens='dwarfmode',
 }
 
 ---Builds the registered target inside the intentionally clipped overlay root.
-function AutomationTooltipOverlay:init()
+function TooltipOverlay:init()
     self.tooltip_target = widgets.Label{
         view_id='tooltip_target',
         frame={l=0, t=0, r=0, b=0},
@@ -29,11 +29,11 @@ function AutomationTooltipOverlay:init()
 end
 
 ---Releases the overlay target when the overlay framework disposes it.
-function AutomationTooltipOverlay:onDismiss()
+function TooltipOverlay:onDismiss()
     tooltip.unregister(self.tooltip_target)
-    AutomationTooltipOverlay.super.onDismiss(self)
+    TooltipOverlay.super.onDismiss(self)
 end
 
-OVERLAY_WIDGETS = {tooltip_probe=AutomationTooltipOverlay}
+OVERLAY_WIDGETS = {tooltip_probe=TooltipOverlay}
 
 return _ENV
