@@ -149,11 +149,10 @@ the installed command:
 ```powershell
 luarocks test --prepare dwarfui-0.1.0-1.rockspec
 dwarfspec run tests/tooltip/tooltip_spec.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua `
-  --overlay-fixture tests/tooltip/fixtures/tooltip_overlay.fixture.lua
+dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua
 ```
 
-The specs, configuration, diagnostic adapter, and fixtures under `tests/` are
+The specs, configuration command, and fixtures under `tests/` are
 DwarfUI-owned consumer files. Test discovery, Busted hosting, live interaction,
 cleanup, and reporting are supplied by the installed DwarfSpec package. See
 DwarfSpec's writing-tests, configuration, and command-line documentation for

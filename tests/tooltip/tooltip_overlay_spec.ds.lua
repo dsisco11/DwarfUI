@@ -6,7 +6,7 @@ local overlay = require('plugins.overlay')
 ---Returns the product diagnostics registered in tests/dwarfspec/config.lua.
 ---@return table
 local function diagnostics()
-    return ds.diagnostic('tooltip')
+    return ds.tooltip_state()
 end
 
 ---Returns the exact tooltip overlay staged by the active DwarfSpec run.
@@ -19,11 +19,6 @@ local function find_staged_overlay()
         end
     end
     return nil, nil
-end
-
-local overlay_name, overlay_entry = find_staged_overlay()
-if not overlay_entry then
-    error('tooltip overlay spec requires its explicit overlay fixture')
 end
 
 ---Returns whether an overlay accepts the live underlying DF viewscreen.
@@ -50,12 +45,20 @@ local function refresh_tooltip_service()
 end
 
 describe('live singleton tooltip overlay eligibility', function()
-    local widget = overlay_entry.widget
-    local target = widget.tooltip_target
+    local overlay_name
+    local overlay_entry
+    local widget
+    local target
     local original_viewscreens
     local screen
 
     before_each(function()
+        ds.stage_overlay_fixture(
+            'tests/tooltip/fixtures/tooltip_overlay.fixture.lua')
+        overlay_name, overlay_entry = find_staged_overlay()
+        assert.is_truthy(overlay_entry)
+        widget = overlay_entry.widget
+        target = widget.tooltip_target
         original_viewscreens = widget.viewscreens
         screen = ds.show_fixture(
             'tests/tooltip/fixtures/cover.fixture.lua')
@@ -77,7 +80,7 @@ describe('live singleton tooltip overlay eligibility', function()
         ds.await('staged overlay layout', function()
             return target.frame_body and target.frame_body.height > 0
         end)
-        ds.move_pointer_to(target, 'top_left')
+        ds.move_pointer(target, 'top_left')
         tooltip.unregister(target)
         assert.is_true(tooltip.register(target))
         ds.await('overlay tooltip target selected', function()

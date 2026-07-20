@@ -5,7 +5,7 @@ local tooltip = reqscript('dwarfui/tooltip')
 ---Returns the product diagnostics registered in tests/dwarfspec/config.lua.
 ---@return table
 local function diagnostics()
-    return ds.diagnostic('tooltip')
+    return ds.tooltip_state()
 end
 
 ---Recreates the service in the current UI stack after setting a virtual pointer.
@@ -27,7 +27,7 @@ describe('live singleton tooltip service', function()
     it('targets normal screens and presents dynamic text after real renders',
             function()
         local target = ds.get(screen, 'tooltip_target')
-        local mouse_x, mouse_y = ds.move_pointer_to(target)
+        local mouse_x, mouse_y = ds.move_pointer(target)
 
         restart_service_for_target(target)
 
@@ -48,7 +48,7 @@ describe('live singleton tooltip service', function()
             'tests/tooltip/fixtures/tooltip.fixture.lua',
             {blocker_visible=true})
         local target = ds.get(screen, 'tooltip_target')
-        ds.move_pointer_to(target)
+        ds.move_pointer(target)
         restart_service_for_target(target)
         assert.is_nil(diagnostics().target)
         assert.is_false(diagnostics().screen.renderer.visible)
@@ -56,11 +56,11 @@ describe('live singleton tooltip service', function()
 
     it('z-order recovery forwards input over a newly opened screen', function()
         local target = ds.get(screen, 'tooltip_target')
-        ds.move_pointer_to(target)
+        ds.move_pointer(target)
         restart_service_for_target(target)
         local state = diagnostics()
         assert.equals(target, state.target)
-        ds.send_input('CUSTOM_A', state.screen)
+        ds.input('CUSTOM_A', state.screen)
         assert.equals('CUSTOM_A', screen.last_key)
         assert.is_false(state.screen:isMouseOver())
 

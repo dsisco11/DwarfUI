@@ -1,4 +1,4 @@
--- DwarfUI-wide live-test settings and product diagnostic adapters.
+-- DwarfUI-wide live-test settings and product commands.
 
 ---Returns the singleton tooltip service's current read-only diagnostics.
 ---@return table
@@ -11,7 +11,7 @@ return {
     settings={
         wait={frame_budget=300, timeout_ms=10000},
     },
-    diagnostics={
-        tooltip=tooltip_diagnostics,
+    commands={
+        tooltip_state=tooltip_diagnostics,
     },
 }
