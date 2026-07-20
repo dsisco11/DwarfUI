@@ -1,10 +1,9 @@
 -- DwarfUI-wide live-test settings and product diagnostic adapters.
 
-local registration = reqscript('dwarfui/tooltip_registration')
-
 ---Returns the singleton tooltip service's current read-only diagnostics.
 ---@return table
 local function tooltip_diagnostics()
+    local registration = reqscript('dwarfui/tooltip_registration')
     return registration.get_diagnostics()
 end
 
