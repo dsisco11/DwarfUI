@@ -12,7 +12,7 @@ description = {
     summary = "Reusable DFHack user-interface infrastructure.",
     detailed = [[
 DwarfUI provides reusable DFHack UI modules and user-facing interface
-enhancements. DwarfSpec is declared only as a development test dependency.
+enhancements.
 ]],
     homepage = "https://github.com/dsisco11/DwarfUI",
     license = "MIT",
