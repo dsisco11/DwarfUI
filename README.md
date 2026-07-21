@@ -141,18 +141,19 @@ available as a low-level path for unusual hosts.
 ## Live automation
 
 DwarfUI consumes [DwarfSpec](https://github.com/dsisco11/DwarfSpec) as the
-test-only dependency declared in `dwarfui-0.1.0-1.rockspec`. DwarfSpec is not
+test-only dependency declared in `dwarfui.rockspec`. DwarfSpec is not
 part of the DwarfUI mod payload. Install the dependency into the development
 rock tree, start Dwarf Fortress with DFHack, and run the product specs through
 the installed command:
 
 ```powershell
-luarocks test --prepare dwarfui-0.1.0-1.rockspec
+luarocks test --prepare dwarfui.rockspec
 dwarfspec run tests/tooltip/tooltip_spec.ds.lua
 dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua
+dwarfspec run tests/tooltip/tooltip_overlay_registration_integration_spec.lua
 ```
 
-The specs, configuration command, and fixtures under `tests/` are
+The component specs, registration source, and configuration under `tests/` are
 DwarfUI-owned consumer files. Test discovery, Busted hosting, live interaction,
 cleanup, and reporting are supplied by the installed DwarfSpec package. See
 DwarfSpec's writing-tests, configuration, and command-line documentation for

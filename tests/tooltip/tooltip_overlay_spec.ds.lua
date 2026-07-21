@@ -1,109 +1,65 @@
--- Live product contracts for one DwarfSpec-staged tooltip overlay.
+-- Live component contracts for tooltip behavior inside an overlay widget.
 
-local tooltip = reqscript('dwarfui/tooltip')
+local gui = require('gui')
+local widgets = require('gui.widgets')
 local overlay = require('plugins.overlay')
+local tooltip = reqscript('dwarfui/tooltip')
 
----Returns the product diagnostics registered in tests/dwarfspec/config.lua.
----@return table
-local function diagnostics()
-    return ds.tooltip_state()
+---@class tests.TooltipOverlayComponent: plugins.overlay.OverlayWidget
+local TooltipOverlayComponent = defclass(nil, overlay.OverlayWidget)
+TooltipOverlayComponent.ATTRS{
+    default_pos={x=1, y=1},
+    frame={w=8, h=4},
+    viewscreens='dwarfmode',
+}
+
+---Builds a clipped target with a root-external tooltip renderer.
+function TooltipOverlayComponent:init()
+    self.tooltip_target = widgets.Label{
+        view_id='tooltip_target',
+        frame={l=0, t=0, r=0, b=0},
+        text=' ',
+        tooltip='Automation overlay tooltip outside its narrow root.',
+    }
+    self.tooltip_renderer = tooltip.TooltipRenderer{}
+    self.tooltip_renderer.parent_view = self
+    self.tooltip_agent = tooltip.TooltipAgent.new(
+        self, self.tooltip_renderer)
+    self:addviews{self.tooltip_target}
 end
 
----Returns the exact tooltip overlay staged by the active DwarfSpec run.
----@return string|nil, table|nil
-local function find_staged_overlay()
-    for name, entry in pairs(overlay.get_state().db) do
-        if name:find('dwarfspec_', 1, true) and
-                name:find('tooltip_probe', 1, true) then
-            return name, entry
-        end
+---Updates tooltip state from the same pointer sample as this render.
+function TooltipOverlayComponent:onRenderFrame()
+    self.tooltip_agent:update()
+end
+
+---Renders the overlay and then its deliberately unclipped tooltip layer.
+---@param dc gui.Painter
+function TooltipOverlayComponent:render(dc)
+    TooltipOverlayComponent.super.render(self, dc)
+    if self.tooltip_renderer.visible then
+        self.tooltip_renderer:render(gui.Painter.new())
     end
-    return nil, nil
 end
 
----Returns whether an overlay accepts the live underlying DF viewscreen.
----@param widget table
----@return boolean
-local function matches_live_viewscreen(widget)
-    local current = dfhack.gui.getDFViewscreen(true)
-    if not current then return false end
-    for _, focus in ipairs(overlay.normalize_list(widget.viewscreens)) do
-        if focus == 'all' or dfhack.gui.matchFocusString(
-                overlay.simplify_viewscreen_name(focus), current) then
-            return true
-        end
-    end
-    return false
-end
-
----Creates a genuine screen-stack transition so the service renders naturally.
-local function refresh_tooltip_service()
-    local cover = ds.show_fixture(
-        'tests/tooltip/fixtures/cover.fixture.lua')
-    ds.wait_frames(2)
-    ds.dismiss(cover)
-end
-
-describe('live singleton tooltip overlay eligibility', function()
-    local overlay_name
-    local overlay_entry
-    local widget
-    local target
-    local original_viewscreens
-    local screen
-
-    before_each(function()
-        ds.stage_overlay_fixture(
-            'tests/tooltip/fixtures/tooltip_overlay.fixture.lua')
-        overlay_name, overlay_entry = find_staged_overlay()
-        assert.is_truthy(overlay_entry)
-        widget = overlay_entry.widget
-        target = widget.tooltip_target
-        original_viewscreens = widget.viewscreens
-        screen = ds.show_fixture(
-            'tests/tooltip/fixtures/cover.fixture.lua')
-    end)
-
-    after_each(function()
-        widget.viewscreens = original_viewscreens
-        overlay.get_state().config[overlay_name].enabled = true
-        tooltip.unregister(target)
-        if screen and screen:isActive() then ds.dismiss(screen) end
-        ds.wait_frames(2)
-    end)
-
-    it('uses enabled overlays and rejects focus-mismatched and disabled roots',
+describe('live tooltip overlay component', function()
+    it('mounts directly and presents outside the clipped overlay root',
             function()
-        assert.is_true(overlay.isOverlayEnabled(overlay_name))
-        assert.equals(widget, overlay.get_state().db[overlay_name].widget)
-        assert.is_true(matches_live_viewscreen(widget))
-        ds.await('staged overlay layout', function()
-            return target.frame_body and target.frame_body.height > 0
-        end)
-        ds.move_pointer(target, 'top_left')
-        tooltip.unregister(target)
-        assert.is_true(tooltip.register(target))
-        ds.await('overlay tooltip target selected', function()
-            local state = diagnostics()
-            return state.target == target and state.screen.renderer.visible
+        local root = ds.mount(TooltipOverlayComponent, {
+            initial_pause=false,
+            overlay_position={x=1, y=1},
+        })
+        local target = ds.get('tooltip_target')
+        target:move_pointer('top_left')
+        ds.await('overlay component tooltip visible', function()
+            return root:raw().tooltip_renderer.visible
         end)
 
-        local state = diagnostics()
-        assert.equals(target, state.target)
-        assert.is_true(state.screen.renderer.visible)
-        assert.is_true(state.screen.renderer.frame.l +
-            state.screen.renderer.frame.w - 1 >
-            widget.frame_body.clip_x2)
-
-        widget.viewscreens = 'title'
-        refresh_tooltip_service()
-        assert.is_nil(diagnostics().target)
-        assert.is_false(state.screen.renderer.visible)
-
-        widget.viewscreens = original_viewscreens
-        overlay.get_state().config[overlay_name].enabled = false
-        refresh_tooltip_service()
-        assert.is_nil(diagnostics().target)
-        assert.is_false(state.screen.renderer.visible)
+        local component = root:raw()
+        assert.equals(target:raw().tooltip,
+            component.tooltip_renderer.tooltip_text)
+        assert.is_true(component.tooltip_renderer.frame.l +
+            component.tooltip_renderer.frame.w - 1 >
+            component.frame_body.clip_x2)
     end)
 end)
