@@ -21,7 +21,7 @@ UnitCardTaskDetailsOverlay.ATTRS{
 local TASK_DESTINATION_X = 167
 local TASK_ACTION_Y = 31
 local TASK_DESTINATION_Y = 32
-local TASK_PANEL_WIDTH = 32
+local TASK_PANEL_WIDTH = 29
 
 ---Paints active haul pickup and destination details in the third Overview panel.
 ---@param dc gui.Painter

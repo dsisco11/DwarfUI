@@ -55,7 +55,7 @@ end
 function truncate_panel_text(text, width)
     if not text or #text <= width then return text end
     if width <= 3 then return text:sub(1, width) end
-    return text:sub(1, width - 3) .. '...'
+    return text:sub(1, width)
 end
 
 ---Finds the building containing a hauling destination, including stockpiles.
