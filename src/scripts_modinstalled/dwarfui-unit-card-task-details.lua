@@ -1,6 +1,6 @@
 --@ module=true
 
--- Unit-card overlay for active haul-task destination details.
+-- Unit-card overlay for active task-destination details.
 
 local overlay = require('plugins.overlay')
 local task_details = reqscript('dwarfui/unit_card_task')
@@ -19,17 +19,27 @@ UnitCardTaskDetailsOverlay.ATTRS{
 
 -- The third left-hand Overview panel reserves this cell below its task row.
 local TASK_DESTINATION_X = 167
+local TASK_ACTION_Y = 31
 local TASK_DESTINATION_Y = 32
+local TASK_PANEL_WIDTH = 32
 
----Paints the active hauling destination in the third left-hand Overview panel.
+---Paints active haul pickup and destination details in the third Overview panel.
 ---@param dc gui.Painter
 function UnitCardTaskDetailsOverlay:render(dc)
     UnitCardTaskDetailsOverlay.super.render(self, dc)
     local unit = dfhack.gui.getSelectedUnit(true)
-    local text = task_details.get_haul_destination_text(unit)
-    if not text then return end
-    dc:seek(TASK_DESTINATION_X, TASK_DESTINATION_Y):string(text,
-        COLOR_LIGHTCYAN)
+    local grab_text = task_details.truncate_panel_text(
+        task_details.get_grab_item_text(unit), TASK_PANEL_WIDTH)
+    local text = task_details.truncate_panel_text(
+        task_details.get_haul_destination_text(unit), TASK_PANEL_WIDTH)
+    if grab_text then
+        dc:seek(TASK_DESTINATION_X, TASK_ACTION_Y):string(grab_text,
+            COLOR_YELLOW)
+    end
+    if text then
+        dc:seek(TASK_DESTINATION_X, TASK_DESTINATION_Y):string(text,
+            COLOR_LIGHTCYAN)
+    end
 end
 
 OVERLAY_WIDGETS = {

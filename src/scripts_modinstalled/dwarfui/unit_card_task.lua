@@ -2,6 +2,19 @@
 
 ---Utilities for rendering destination details for native unit-card haul jobs.
 
+---Job types that move an item to a storage or delivery destination.
+local HAUL_JOB_TYPES = {
+    [df.job_type.BringItemToDepot]=true,
+    [df.job_type.BringItemToShop]=true,
+    [df.job_type.StoreItemInStockpile]=true,
+    [df.job_type.StoreItemInBag]=true,
+    [df.job_type.StoreItemInLocation]=true,
+    [df.job_type.StoreItemInBarrel]=true,
+    [df.job_type.StoreItemInBin]=true,
+    [df.job_type.StoreItemInVehicle]=true,
+    [df.job_type.DumpItem]=true,
+}
+
 ---Returns whether a job currently carries an item as a hauling task.
 ---@param job df.job|nil
 ---@return boolean
@@ -10,7 +23,39 @@ function is_haul_job(job)
     for _, item_ref in ipairs(job.items) do
         if item_ref.role == df.job_role_type.Hauled then return true end
     end
-    return false
+    return HAUL_JOB_TYPES[job.job_type] == true
+end
+
+---Returns the queued item a hauler has been assigned to collect.
+---@param job df.job|nil
+---@return df.item|nil
+function get_grab_item(job)
+    if not is_haul_job(job) then return end
+    for _, item_ref in ipairs(job.items) do
+        if item_ref.role == df.job_role_type.QueuedContainer then
+            return item_ref.item
+        end
+    end
+end
+
+---Builds the text shown while a hauler is travelling to collect an item.
+---@param unit df.unit|nil
+---@return string|nil
+function get_grab_item_text(unit)
+    local job = unit and unit.job and unit.job.current_job or nil
+    local item = get_grab_item(job)
+    if not item then return end
+    return 'Grab: ' .. dfhack.items.getDescription(item, 0, true)
+end
+
+---Truncates a task-detail row to fit within the native unit-card subpanel.
+---@param text string|nil
+---@param width integer
+---@return string|nil
+function truncate_panel_text(text, width)
+    if not text or #text <= width then return text end
+    if width <= 3 then return text:sub(1, width) end
+    return text:sub(1, width - 3) .. '...'
 end
 
 ---Finds the building containing a hauling destination, including stockpiles.
