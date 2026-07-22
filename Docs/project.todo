@@ -1,6 +1,6 @@
-[Resource Counts]☐ Port over the Tooltip widget from `SoulSearch`.: Add popout to the different resource counters in the top panel which shows a list of all item types (and their counts) from that resource category.
+✔ Port over the Tooltip widget from `SoulSearch`. @done(26-07-21 23:00)
 ☐ Port over the ContextMenu widget from `DwarfDirect`.
-☐ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level.
+☐ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level. See `Docs/mood-popover.todo`.
 ☐ [Container Contents Popover] Implement ability to hold `Alt` and hover mouse over a container to show a popout panel which shows the list of all items in that container.
 ☐ [Work Orders Panel] Add button work-order entries to allow editing the set-material of work orders.
 ☐ [Work Orders Panel] Add button work-order entries to allow setting/removing their target-workshop restriction.
