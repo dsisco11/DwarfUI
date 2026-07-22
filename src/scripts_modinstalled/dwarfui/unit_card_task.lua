@@ -74,6 +74,14 @@ function truncate_panel_text(text, width)
     return text:sub(1, width)
 end
 
+---Returns whether a task-detail row exceeds its available panel width.
+---@param text string|nil
+---@param width integer
+---@return boolean
+function is_panel_text_truncated(text, width)
+    return text ~= nil and #text > width
+end
+
 ---Finds the building containing a hauling destination, including stockpiles.
 ---@param pos df.coord
 ---@return df.building|nil
