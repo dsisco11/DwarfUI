@@ -130,6 +130,7 @@ local function load_public_module(package_path)
             globals={
                 defclass=function(class)
                     class = class or {}
+                    class.ATTRS = function() end
                     return setmetatable(class, {__call=function(class_table,
                             attributes)
                         local instance = attributes or {}

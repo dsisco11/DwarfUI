@@ -101,8 +101,11 @@ function MinecartRouteMenuLayout:find_route_header_y(hauling, route_id, focus)
     end
     local scroll_position = hauling.scroll_position or 0
     if type(scroll_position) ~= 'number' or scroll_position < 0 then return nil end
+    local count = type(hauling.view_routes) == 'table' and nil or
+        #hauling.view_routes
     local index = scroll_position
-    while hauling.view_routes[index] ~= nil do
+    while (count and index < count) or
+            (not count and hauling.view_routes[index] ~= nil) do
         local route = hauling.view_routes[index]
         local stop = hauling.view_stops and hauling.view_stops[index] or nil
         if route.id == route_id and not stop then
@@ -120,7 +123,13 @@ end
 local function find_route_by_id(routes, route_id)
     if not routes or route_id == nil then return nil end
 
-    if routes[0] ~= nil then
+    if routes[0] ~= nil and type(routes) ~= 'table' then
+        for index=0,#routes - 1 do
+            local route = routes[index]
+            if route.id == route_id then return route end
+        end
+        return nil
+    elseif routes[0] ~= nil then
         local index = 0
         while routes[index] ~= nil do
             local route = routes[index]
@@ -204,6 +213,20 @@ end
 ---@field label_x integer
 ---@field label_y integer
 MinecartRouteMarkerDescriptor = defclass(MinecartRouteMarkerDescriptor)
+MinecartRouteMarkerDescriptor.ATTRS{
+    stop_id=-1,
+    display_index=0,
+    name='',
+    world_pos=false,
+    screen_pos=false,
+    z_delta=0,
+    marker_kind='same_z',
+    marker_glyph=' ',
+    marker_pen=false,
+    label='',
+    label_x=0,
+    label_y=0,
+}
 
 ---@class dwarfui.MinecartRouteMarkerProjection: dfhack.class
 MinecartRouteMarkerProjection = defclass(MinecartRouteMarkerProjection)
@@ -214,7 +237,10 @@ MinecartRouteMarkerProjection = defclass(MinecartRouteMarkerProjection)
 local function vector_values(values)
     if not values then return {} end
     local result = {}
-    if values[0] ~= nil then
+    if values[0] ~= nil and type(values) ~= 'table' then
+        local length = #values
+        for index=0,length - 1 do table.insert(result, values[index]) end
+    elseif values[0] ~= nil then
         local index = 0
         while values[index] ~= nil do
             table.insert(result, values[index])

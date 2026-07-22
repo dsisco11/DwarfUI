@@ -6,6 +6,7 @@ local repo_root = require('support.repo_root')
 ---@return table
 local function test_defclass(class)
     class = class or {}
+    class.ATTRS = function() end
     return setmetatable(class, {__call=function(class_table, attributes)
         local instance = attributes or {}
         setmetatable(instance, {__index=class_table})
