@@ -235,7 +235,7 @@ MoodPopoverOverlay.ATTRS{
     unit_opener=default_unit_opener,
 }
 
----Constructs the fullscreen host and its persistent-scroll interactive popover.
+---Constructs the fullscreen host and its stable-scroll interactive popover.
 function MoodPopoverOverlay:init()
     self.selected_descriptor = nil
     self.refresh_ticks = 0
