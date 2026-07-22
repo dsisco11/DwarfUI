@@ -1,7 +1,7 @@
 ✔ Port over the Tooltip widget from `SoulSearch`. @done(26-07-21 23:00)
 ☐ Port over the ContextMenu widget from `DwarfDirect`.
 ✔ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level. See `Docs/mood-popover.todo`. @done(26-07-22 08:05)
-☐ [Unit Card]: Show task details in the 3rd panel down on the left side of the unit card. E.g. if a unit is currently hauling, show the the destination of that item below the existing "Haul: <item>" line.
+✔ [Unit Card]: Show task details in the 3rd panel down on the left side of the unit card. E.g. if a unit is currently hauling, show the the destination of that item below the existing "Haul: <item>" line. @done(26-07-22 09:52)
 ☐ [Minecart Routes] Implement ability to update the position of route-stops after they have already been set.
 ☐ [Minecart Routes] Currently selected route should render an `X` in-world at the position of each route-stop, along with the name of the stop, to allow for easy identification of the route-stops in-world.
 ☐ [Work Orders Panel] Add button work-order entries to allow editing the set-material of work orders.
