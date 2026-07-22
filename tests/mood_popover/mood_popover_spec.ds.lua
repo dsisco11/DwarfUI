@@ -24,9 +24,22 @@ describe('live mood popover overlay registration', function()
         assert.equals(0, widget.frame_rect.y1)
         assert.is_true(widget.active_provider())
 
-        local descriptor = widget.mood_model:get_descriptors()[1]
-        local live_rows = widget.mood_model:build_active_snapshot(descriptor)
-        assert.equals('table', type(live_rows))
+        for _, descriptor in ipairs(widget.mood_model:get_descriptors()) do
+            local live_rows = widget.mood_model:build_active_snapshot(descriptor)
+            assert.equals('table', type(live_rows))
+            for index, row in ipairs(live_rows) do
+                assert.equals(descriptor.stress_category,
+                    dfhack.units.getStressCategory(row.unit))
+                if index > 1 then
+                    local previous_stress = live_rows[index - 1].stress
+                    if descriptor.stress_descending then
+                        assert.is_true(previous_stress >= row.stress)
+                    else
+                        assert.is_true(previous_stress <= row.stress)
+                    end
+                end
+            end
+        end
 
         local old_hover = widget.hover_provider
         local old_mouse = widget.mouse_provider
@@ -88,8 +101,8 @@ describe('native DF top-bar moodlet integration', function()
             tracking_on=enabler.tracking_on,
         }
 
-        local labels = {'Ecstatic', 'Happy', 'Pleased', 'Content',
-            'Displeased', 'Unhappy', 'Miserable'}
+        local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
+            'Unhappy', 'Very Unhappy', 'Miserable'}
         local ok, failure = xpcall(function()
             enabler.mouse_focus = true
             enabler.tracking_on = 1
@@ -199,8 +212,8 @@ describe('live mood popover overlay component', function()
         for index=0,6 do
             state.rows[index] = rows_for({
                 hover_index=index,
-                label=({'Ecstatic', 'Happy', 'Pleased', 'Content',
-                    'Displeased', 'Unhappy', 'Miserable'})[index + 1],
+                label=({'Ecstatic', 'Very Happy', 'Happy', 'Content',
+                    'Unhappy', 'Very Unhappy', 'Miserable'})[index + 1],
             })
         end
         root = mount_overlay()
@@ -208,8 +221,8 @@ describe('live mood popover overlay component', function()
 
     it('renders every injected native mood heading, count, and row set',
             function()
-        local labels = {'Ecstatic', 'Happy', 'Pleased', 'Content',
-            'Displeased', 'Unhappy', 'Miserable'}
+        local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
+            'Unhappy', 'Very Unhappy', 'Miserable'}
         for index, label in ipairs(labels) do
             local hover_index = index - 1
             select_mood(hover_index, 8 + hover_index, 3)
@@ -280,7 +293,7 @@ describe('live mood popover overlay component', function()
 
         state.rows[2] = {}
         select_mood(2, 10, 3)
-        assert.equals('Pleased (0)', header:text())
+        assert.equals('Happy (0)', header:text())
         assert.is_false(list:inspect().visible)
 
         ds.viewport(30, 10)
@@ -299,7 +312,7 @@ describe('live mood popover overlay component', function()
             function()
         select_mood(4, 10, 3)
         local first = root:raw()
-        assert.equals('Displeased', first.selected_descriptor.label)
+        assert.equals('Unhappy', first.selected_descriptor.label)
         ds.unmount()
         assert.is_nil(first.selected_descriptor)
         assert.same({}, first.popover.rows)

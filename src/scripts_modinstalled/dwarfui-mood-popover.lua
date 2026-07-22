@@ -14,7 +14,7 @@ local function default_mouse_provider()
     return dfhack.screen.getMousePos()
 end
 
----Builds a fresh unit snapshot with the production mood model.
+---Builds a fresh stress-ordered unit snapshot with the production mood model.
 ---@param descriptor table
 ---@return table[]
 local function default_snapshot_provider(descriptor)

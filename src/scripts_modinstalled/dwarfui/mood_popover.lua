@@ -7,12 +7,12 @@ MoodPopoverModel = defclass(MoodPopoverModel)
 
 local MOOD_LEVELS = {
     {hover_key='INFO_STRESSED_0', hover_index=0, stress_category=6, label='Ecstatic', pen=COLOR_LIGHTGREEN},
-    {hover_key='INFO_STRESSED_1', hover_index=1, stress_category=5, label='Happy', pen=COLOR_GREEN},
-    {hover_key='INFO_STRESSED_2', hover_index=2, stress_category=4, label='Pleased', pen=COLOR_LIGHTCYAN},
+    {hover_key='INFO_STRESSED_1', hover_index=1, stress_category=5, label='Very Happy', pen=COLOR_GREEN},
+    {hover_key='INFO_STRESSED_2', hover_index=2, stress_category=4, label='Happy', pen=COLOR_LIGHTCYAN},
     {hover_key='INFO_STRESSED_3', hover_index=3, stress_category=3, label='Content', pen=COLOR_WHITE},
-    {hover_key='INFO_STRESSED_4', hover_index=4, stress_category=2, label='Displeased', pen=COLOR_YELLOW},
-    {hover_key='INFO_STRESSED_5', hover_index=5, stress_category=1, label='Unhappy', pen=COLOR_LIGHTRED},
-    {hover_key='INFO_STRESSED_6', hover_index=6, stress_category=0, label='Miserable', pen=COLOR_RED},
+    {hover_key='INFO_STRESSED_4', hover_index=4, stress_category=2, label='Unhappy', pen=COLOR_YELLOW, stress_descending=true},
+    {hover_key='INFO_STRESSED_5', hover_index=5, stress_category=1, label='Very Unhappy', pen=COLOR_LIGHTRED, stress_descending=true},
+    {hover_key='INFO_STRESSED_6', hover_index=6, stress_category=0, label='Miserable', pen=COLOR_RED, stress_descending=true},
 }
 
 ---Gets the native hover-instruction enum table.
@@ -36,6 +36,11 @@ local function default_dependencies()
         end,
         get_stress_category=function(unit)
             return dfhack.units.getStressCategory(unit)
+        end,
+        get_stress_value=function(unit)
+            local soul = unit.status and unit.status.current_soul
+            local personality = soul and soul.personality
+            return personality and personality.stress
         end,
         get_readable_name=function(unit)
             return dfhack.units.getReadableName(unit)
@@ -62,6 +67,7 @@ function MoodPopoverModel:get_descriptors(hover_instructions)
             hover_value=hover_value,
             hover_index=level.hover_index,
             stress_category=level.stress_category,
+            stress_descending=level.stress_descending == true,
             label=level.label,
             pen=level.pen,
         })
@@ -125,6 +131,8 @@ function MoodPopoverModel:build_snapshot(active_units, descriptor, dependencies)
         'dependencies.is_citizen is required')
     local get_stress_category = assert(dependencies.get_stress_category,
         'dependencies.get_stress_category is required')
+    local get_stress_value = assert(dependencies.get_stress_value,
+        'dependencies.get_stress_value is required')
     local get_readable_name = assert(dependencies.get_readable_name,
         'dependencies.get_readable_name is required')
     local rows = {}
@@ -135,16 +143,26 @@ function MoodPopoverModel:build_snapshot(active_units, descriptor, dependencies)
         then
             local id = unit.id
             if id ~= nil then
+                local stress = get_stress_value(unit)
+                assert(type(stress) == 'number',
+                    ('unit %s must have a numeric stress value'):format(id))
                 table.insert(rows, {
                     id=id,
                     unit=unit,
                     name=tostring(get_readable_name(unit) or ''),
+                    stress=stress,
                 })
             end
         end
     end
 
     table.sort(rows, function(left, right)
+        if left.stress ~= right.stress then
+            if descriptor.stress_descending then
+                return left.stress > right.stress
+            end
+            return left.stress < right.stress
+        end
         local left_name = self:normalize_name(left.name)
         local right_name = self:normalize_name(right.name)
         if left_name == right_name then return left.id < right.id end
