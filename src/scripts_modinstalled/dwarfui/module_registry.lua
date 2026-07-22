@@ -25,6 +25,11 @@ MODULES = {
         contract='MoodPopoverModel',
         contract_type='table',
     },
+    {
+        name='dwarfui/minecart_route',
+        contract='MinecartRouteSelection',
+        contract_type='table',
+    },
     {name='dwarfui/unit_card_task', contract='is_haul_job'},
     {
         name='dwarfui/tooltip',
