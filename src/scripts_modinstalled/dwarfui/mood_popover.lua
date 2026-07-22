@@ -2,7 +2,8 @@
 
 -- Pure model support for the fortress mood-icon popover.
 
-local M = {}
+---@class dwarfui.MoodPopoverModel: dfhack.class
+MoodPopoverModel = defclass(MoodPopoverModel)
 
 local MOOD_LEVELS = {
     {hover_key='INFO_STRESSED_0', hover_index=0, stress_category=6, label='Ecstatic', pen=COLOR_LIGHTGREEN},
@@ -49,7 +50,7 @@ end
 ---parsed at runtime so unsupported future enum values cannot be misclassified.
 ---@param hover_instructions? table
 ---@return table[]
-function M.get_descriptors(hover_instructions)
+function MoodPopoverModel:get_descriptors(hover_instructions)
     hover_instructions = hover_instructions or default_hover_instructions()
     local descriptors = {}
 
@@ -73,8 +74,8 @@ end
 ---@param hover_value any
 ---@param hover_instructions? table
 ---@return table|nil
-function M.resolve_hover(hover_value, hover_instructions)
-    for _, descriptor in ipairs(M.get_descriptors(hover_instructions)) do
+function MoodPopoverModel:resolve_hover(hover_value, hover_instructions)
+    for _, descriptor in ipairs(self:get_descriptors(hover_instructions)) do
         if hover_value == descriptor.hover_value then
             return descriptor
         end
@@ -90,14 +91,14 @@ end
 ---@param is_valid fun(unit: any): boolean|any
 ---@param is_citizen fun(unit: any): boolean
 ---@return boolean
-function M.is_mood_unit(unit, is_valid, is_citizen)
+function MoodPopoverModel:is_mood_unit(unit, is_valid, is_citizen)
     return unit ~= nil and is_valid(unit) and is_citizen(unit)
 end
 
 ---Normalizes a readable name for deterministic case-insensitive ordering.
 ---@param name any
 ---@return string
-function M.normalize_name(name)
+function MoodPopoverModel:normalize_name(name)
     return tostring(name or ''):lower()
 end
 
@@ -109,7 +110,7 @@ end
 ---@param descriptor table
 ---@param dependencies? table
 ---@return table[]
-function M.build_snapshot(active_units, descriptor, dependencies)
+function MoodPopoverModel:build_snapshot(active_units, descriptor, dependencies)
     assert(type(active_units) == 'table', 'active_units must be a table')
     assert(type(descriptor) == 'table' and
         type(descriptor.stress_category) == 'number',
@@ -127,7 +128,7 @@ function M.build_snapshot(active_units, descriptor, dependencies)
     local rows = {}
 
     for _, unit in ipairs(active_units) do
-        if M.is_mood_unit(unit, is_valid, is_citizen) and
+        if self:is_mood_unit(unit, is_valid, is_citizen) and
             get_stress_category(unit) == descriptor.stress_category
         then
             local id = unit.id
@@ -142,8 +143,8 @@ function M.build_snapshot(active_units, descriptor, dependencies)
     end
 
     table.sort(rows, function(left, right)
-        local left_name = M.normalize_name(left.name)
-        local right_name = M.normalize_name(right.name)
+        local left_name = self:normalize_name(left.name)
+        local right_name = self:normalize_name(right.name)
         if left_name == right_name then return left.id < right.id end
         return left_name < right_name
     end)
@@ -155,11 +156,9 @@ end
 ---@param descriptor table
 ---@param dependencies? table
 ---@return table[]
-function M.build_active_snapshot(descriptor, dependencies)
+function MoodPopoverModel:build_active_snapshot(descriptor, dependencies)
     dependencies = dependencies or default_dependencies()
     local get_active_units = assert(dependencies.get_active_units,
         'dependencies.get_active_units is required')
-    return M.build_snapshot(get_active_units(), descriptor, dependencies)
+    return self:build_snapshot(get_active_units(), descriptor, dependencies)
 end
-
-return M

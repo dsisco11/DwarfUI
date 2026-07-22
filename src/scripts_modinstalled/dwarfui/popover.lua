@@ -3,8 +3,6 @@
 local gui = require('gui')
 local widgets = require('gui.widgets')
 
-local M = {}
-
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
 end
@@ -29,7 +27,7 @@ end
 ---@field scroll_top integer
 ---@field visible_rows integer
 ---@field frame_global table|nil
-local Popover = defclass(nil, widgets.Window)
+Popover = defclass(nil, widgets.Window)
 Popover.ATTRS{
     frame={l=0, t=0, w=1, h=1},
     frame_style=gui.WINDOW_FRAME,
@@ -254,7 +252,3 @@ function Popover:onInput(keys)
         return true
     end
 end
-
-M.Popover = Popover
-
-return M

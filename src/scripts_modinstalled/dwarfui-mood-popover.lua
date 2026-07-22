@@ -3,7 +3,7 @@
 -- Fortress-mode overlay for the native dwarf mood counters.
 
 local overlay = require('plugins.overlay')
-local mood_model = reqscript('dwarfui/mood_popover')
+local MoodPopoverModel = reqscript('dwarfui/mood_popover').MoodPopoverModel
 local Popover = reqscript('dwarfui/popover').Popover
 
 ---Reads the native top-panel hover instruction when fortress UI is available.
@@ -24,7 +24,7 @@ end
 ---@param descriptor table
 ---@return table[]
 local function default_snapshot_provider(descriptor)
-    return mood_model.build_active_snapshot(descriptor)
+    return MoodPopoverModel{}:build_active_snapshot(descriptor)
 end
 
 ---Returns whether the overlay still has an active fortress map to present in.
@@ -40,6 +40,7 @@ end
 ---@field selected_descriptor table|nil
 ---@field popover dwarfui.Popover
 ---@field refresh_ticks integer
+---@field mood_model dwarfui.MoodPopoverModel
 ---@field hover_provider fun(): any|nil
 ---@field mouse_provider fun(): integer|nil, integer|nil
 ---@field snapshot_provider fun(descriptor: table): table[]
@@ -50,6 +51,7 @@ MoodPopoverOverlay.ATTRS{
     viewscreens='dwarfmode/Default',
     fullscreen=true,
     frame={l=0, t=0, w=1, h=1},
+    overlay_onupdate_max_freq_seconds=0,
     refresh_interval=10,
     hover_provider=default_hover_provider,
     mouse_provider=default_mouse_provider,
@@ -61,7 +63,10 @@ MoodPopoverOverlay.ATTRS{
 function MoodPopoverOverlay:init()
     self.selected_descriptor = nil
     self.refresh_ticks = 0
+    self.mood_model = MoodPopoverModel{}
     self.popover = Popover{view_id='mood_popover'}
+    -- DFHack invokes this lifecycle callback without an instance argument.
+    self.overlay_ondisable = function() self:clear() end
     self:addviews{self.popover}
 end
 
@@ -105,7 +110,7 @@ function MoodPopoverOverlay:update_popover()
         return
     end
 
-    local descriptor = mood_model.resolve_hover(self.hover_provider())
+    local descriptor = self.mood_model:resolve_hover(self.hover_provider())
     if descriptor then
         if not self.selected_descriptor or
                 descriptor.hover_value ~= self.selected_descriptor.hover_value then
@@ -124,8 +129,7 @@ function MoodPopoverOverlay:update_popover()
 end
 
 ---Runs the inexpensive interactive hover sample for every overlay update.
-function MoodPopoverOverlay:onUpdate()
-    MoodPopoverOverlay.super.onUpdate(self)
+function MoodPopoverOverlay:overlay_onupdate()
     if not self.active_provider() then
         self:clear()
     elseif self.frame_parent_rect then
@@ -140,15 +144,6 @@ function MoodPopoverOverlay:onInput(keys)
     return self.popover:onInput(keys)
 end
 
----Drops all retained state when DFHack disables the overlay.
-function MoodPopoverOverlay:overlay_ondisable()
-    self:clear()
-end
-
 OVERLAY_WIDGETS = {
     ['dwarfui-mood-popover']=MoodPopoverOverlay,
-}
-
-return {
-    MoodPopoverOverlay=MoodPopoverOverlay,
 }
