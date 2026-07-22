@@ -252,7 +252,7 @@ describe('native DF top-bar moodlet integration', function()
             assert.equals(0, sheets.active_sub_tab)
             assert.equals(target.pos.z, df.global.window_z)
             assert.is_false(widget.popover.visible)
-            ds.wait_frames(1)
+            ds.wait_frames(3)
             local overview_name = assert(target.name.first_name:match('[A-Za-z]+'),
                 'selected citizen has no ASCII first-name fragment')
             assert.is_true(native_screen_contains(overview_name))

@@ -172,9 +172,9 @@ the installed command:
 
 ```powershell
 luarocks test --prepare dwarfui.rockspec
-.\tools\Run-AutomationTests.ps1 tests/mood_popover/mood_popover_spec.ds.lua
-.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_spec.ds.lua
-.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_spec.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/mood_popover/mood_popover.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay.ds.lua
 .\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_registration_integration_spec.lua
 ```
 
