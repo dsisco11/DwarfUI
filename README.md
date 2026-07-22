@@ -27,7 +27,8 @@ DwarfUI includes a default-enabled `dwarfui-mood-popover` overlay for the
 default fortress screen. Hover any of the seven native mood icons beside the
 `Pop` counter in the top information bar to see every active citizen in that
 mood category. The list is ordered by readable unit name and the panel stays
-open while moving from the icon into the panel.
+open while moving from the icon into the panel. The thin-bordered panel leaves
+one clear row beneath the top information bar so it does not cover its edge.
 
 For a list that exceeds the available height, point at the panel and use the
 mouse wheel to scroll. The overlay leaves clicks, keyboard input, and wheel

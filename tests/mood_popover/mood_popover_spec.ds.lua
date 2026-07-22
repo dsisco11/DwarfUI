@@ -70,6 +70,8 @@ describe('native DF top-bar moodlet integration', function()
             ('overlay is not registered: %s'):format(name))
         local widget = assert(entry.widget, 'registered overlay has no instance')
         assert.is_true(widget.active_provider())
+        assert.equals(require('gui').FRAME_THIN,
+            widget.popover.frame_style)
 
         local display = mood_overlay.TopBarMoodDisplay{}
         local moodlets = assert(display:find_layout(),
@@ -95,19 +97,35 @@ describe('native DF top-bar moodlet integration', function()
                 local rect = moodlets[index]
                 local tile = assert(dfhack.screen.readTile(rect.x1, rect.y1))
                 assert.equals(0, tile.ch)
-                gps.mouse_x, gps.mouse_y = rect.x1, rect.y1
-                gps.precise_mouse_x = rect.x1 * gps.tile_pixel_x + 1
-                gps.precise_mouse_y = rect.y1 * gps.tile_pixel_y + 1
 
                 local expected_hover = df.main_hover_instruction[
                     'INFO_STRESSED_' .. (index - 1)]
-                assert.equals(expected_hover,
-                    display:resolve_hover(gps.mouse_x, gps.mouse_y))
+                for y=rect.y1,rect.y2 do
+                    for x=rect.x1,rect.x2 do
+                        assert.equals(expected_hover,
+                            display:resolve_hover(x, y))
+                    end
+                end
+                gps.mouse_x, gps.mouse_y = rect.x1, rect.y2
+                gps.precise_mouse_x = rect.x1 * gps.tile_pixel_x + 1
+                gps.precise_mouse_y = rect.y2 * gps.tile_pixel_y + 1
                 widget:update_popover()
                 assert.equals(expected_label,
                     widget.selected_descriptor.label)
                 assert.is_true(widget.popover.visible)
                 assert.equals(expected_label, widget.popover.title)
+                assert.equals(rect.y2 + 2, widget.popover.frame_global.y)
+
+                local displayed_count = ''
+                for x=rect.x1,rect.x2 do
+                    local count_tile = dfhack.screen.readTile(x, rect.y2)
+                    if count_tile.ch >= string.byte('0') and
+                            count_tile.ch <= string.byte('9') then
+                        displayed_count = displayed_count ..
+                            string.char(count_tile.ch)
+                    end
+                end
+                assert.equals(tonumber(displayed_count), #widget.popover.rows)
             end
         end, debug.traceback)
 

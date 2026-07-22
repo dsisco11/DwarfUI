@@ -32,7 +32,7 @@ local function default_dependencies()
             return df.isvalid(unit) ~= nil
         end,
         is_citizen=function(unit)
-            return dfhack.units.isCitizen(unit, true)
+            return dfhack.units.isCitizen(unit)
         end,
         get_stress_category=function(unit)
             return dfhack.units.getStressCategory(unit)

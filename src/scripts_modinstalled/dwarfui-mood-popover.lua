@@ -3,6 +3,7 @@
 -- Fortress-mode overlay for the native dwarf mood counters.
 
 local overlay = require('plugins.overlay')
+local gui = require('gui')
 local MoodPopoverModel = reqscript('dwarfui/mood_popover').MoodPopoverModel
 local Popover = reqscript('dwarfui/popover').Popover
 
@@ -98,7 +99,7 @@ function TopBarMoodDisplay:find_layout()
                         x1=icon_x,
                         y1=y,
                         x2=icon_x + 1,
-                        y2=y + 1,
+                        y2=y + 2,
                         hover_index=hover_index,
                     })
                 end
@@ -114,20 +115,40 @@ function TopBarMoodDisplay:find_layout()
     return nil
 end
 
+---Finds the top-bar mood column containing a screen-space pointer.
+---@param mouse_x integer|nil
+---@param mouse_y integer|nil
+---@return table|nil
+function TopBarMoodDisplay:find_hovered_rect(mouse_x, mouse_y)
+    if mouse_x == nil or mouse_y == nil then return nil end
+    for _, rect in ipairs(self:find_layout() or {}) do
+        if mouse_x >= rect.x1 and mouse_x <= rect.x2 and
+                mouse_y >= rect.y1 and mouse_y <= rect.y2 then
+            return rect
+        end
+    end
+    return nil
+end
+
 ---Maps a pointer over the rendered top-bar mood icons to a mood instruction.
 ---@param mouse_x integer|nil
 ---@param mouse_y integer|nil
 ---@return any|nil
 function TopBarMoodDisplay:resolve_hover(mouse_x, mouse_y)
-    if mouse_x == nil or mouse_y == nil then return nil end
-    for _, rect in ipairs(self:find_layout() or {}) do
-        if mouse_x >= rect.x1 and mouse_x <= rect.x2 and
-                mouse_y >= rect.y1 and mouse_y <= rect.y2 then
-            return self.hover_instructions[
-                'INFO_STRESSED_' .. rect.hover_index]
-        end
-    end
-    return nil
+    local rect = self:find_hovered_rect(mouse_x, mouse_y)
+    return rect and self.hover_instructions[
+        'INFO_STRESSED_' .. rect.hover_index] or nil
+end
+
+---Anchors a popout below the information bar at the hovered mood column.
+---@param mouse_x integer
+---@param mouse_y integer
+---@return integer
+---@return integer
+function TopBarMoodDisplay:get_popover_anchor(mouse_x, mouse_y)
+    local rect = self:find_hovered_rect(mouse_x, mouse_y)
+    if rect then return rect.x1, rect.y2 + 1 end
+    return mouse_x, mouse_y
 end
 
 local topbar_mood_display = TopBarMoodDisplay{}
@@ -138,6 +159,15 @@ local topbar_mood_display = TopBarMoodDisplay{}
 ---@return any|nil
 local function default_hover_provider(mouse_x, mouse_y)
     return topbar_mood_display:resolve_hover(mouse_x, mouse_y)
+end
+
+---Returns the stable mood-column anchor along the information bar's bottom.
+---@param mouse_x integer
+---@param mouse_y integer
+---@return integer
+---@return integer
+local function default_anchor_provider(mouse_x, mouse_y)
+    return topbar_mood_display:get_popover_anchor(mouse_x, mouse_y)
 end
 
 ---Returns whether the fortress top information bar is currently visible.
@@ -156,6 +186,7 @@ end
 ---@field mood_model dwarfui.MoodPopoverModel
 ---@field hover_provider fun(mouse_x: integer, mouse_y: integer): any|nil
 ---@field mouse_provider fun(): integer|nil, integer|nil
+---@field anchor_provider fun(mouse_x: integer, mouse_y: integer): integer, integer
 ---@field snapshot_provider fun(descriptor: table): table[]
 ---@field active_provider fun(): boolean
 MoodPopoverOverlay = defclass(MoodPopoverOverlay, overlay.OverlayWidget)
@@ -172,6 +203,7 @@ MoodPopoverOverlay.ATTRS{
     refresh_interval=10,
     hover_provider=default_hover_provider,
     mouse_provider=default_mouse_provider,
+    anchor_provider=default_anchor_provider,
     snapshot_provider=default_snapshot_provider,
     active_provider=default_active_provider,
 }
@@ -181,7 +213,10 @@ function MoodPopoverOverlay:init()
     self.selected_descriptor = nil
     self.refresh_ticks = 0
     self.mood_model = MoodPopoverModel{}
-    self.popover = Popover{view_id='mood_popover'}
+    self.popover = Popover{
+        view_id='mood_popover',
+        frame_style=gui.FRAME_THIN,
+    }
     -- DFHack invokes this lifecycle callback without an instance argument.
     self.overlay_ondisable = function() self:clear() end
     self:addviews{self.popover}
@@ -239,7 +274,8 @@ function MoodPopoverOverlay:update_popover()
     if descriptor then
         if not self.selected_descriptor or
                 descriptor.hover_value ~= self.selected_descriptor.hover_value then
-            self:select(descriptor, mouse_x, mouse_y)
+            local anchor_x, anchor_y = self.anchor_provider(mouse_x, mouse_y)
+            self:select(descriptor, anchor_x, anchor_y)
             return
         end
         self.refresh_ticks = self.refresh_ticks + 1
