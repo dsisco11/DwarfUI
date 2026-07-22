@@ -26,13 +26,29 @@ function is_haul_job(job)
     return HAUL_JOB_TYPES[job.job_type] == true
 end
 
----Returns the queued item a hauler has been assigned to collect.
+---Returns whether an assigned hauling item has not yet entered an inventory.
+---@param item df.item|nil
+---@return boolean
+local function is_uncollected_item(item)
+    return item ~= nil and (item.flags == nil or not item.flags.in_inventory)
+end
+
+---Returns the item a hauler has been assigned to collect.
 ---@param job df.job|nil
 ---@return df.item|nil
 function get_grab_item(job)
     if not is_haul_job(job) then return end
     for _, item_ref in ipairs(job.items) do
-        if item_ref.role == df.job_role_type.QueuedContainer then
+        if item_ref.role == df.job_role_type.Hauled and
+                is_uncollected_item(item_ref.item) then
+            return item_ref.item
+        end
+    end
+    -- Container-loading jobs can expose their pending contents without a
+    -- Hauled entry. Preserve that native representation as a fallback.
+    for _, item_ref in ipairs(job.items) do
+        if item_ref.role == df.job_role_type.QueuedContainer and
+                is_uncollected_item(item_ref.item) then
             return item_ref.item
         end
     end
