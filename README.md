@@ -36,8 +36,8 @@ events outside its list to Dwarf Fortress.
 The overlay can be managed with DFHack's overlay command:
 
 ```text
-gui/overlay disable dwarfui-mood-popover
-gui/overlay enable dwarfui-mood-popover
+overlay disable dwarfui-mood-popover.mood_popover
+overlay enable dwarfui-mood-popover.mood_popover
 ```
 
 The mood model and popover widget that support this feature are

@@ -4,6 +4,53 @@ local mood_overlay = reqscript('dwarfui-mood-popover')
 
 local MoodPopoverOverlay = mood_overlay.MoodPopoverOverlay
 local state
+local root
+
+describe('live mood popover overlay registration', function()
+    it('is discovered under its canonical name and fills the active screen',
+            function()
+        local overlay = require('plugins.overlay')
+        overlay.rescan()
+
+        local name = 'dwarfui-mood-popover.mood_popover'
+        local entry = assert(overlay.get_state().db[name],
+            ('overlay is not registered: %s'):format(name))
+        local widget = assert(entry.widget, 'registered overlay has no instance')
+        assert.is_true(widget.fullscreen)
+        assert.is_true(widget.hotspot)
+        assert.equals(widget.frame_parent_rect.width, widget.frame_rect.width)
+        assert.equals(widget.frame_parent_rect.height, widget.frame_rect.height)
+        assert.equals(0, widget.frame_rect.x1)
+        assert.equals(0, widget.frame_rect.y1)
+        assert.is_true(widget.active_provider())
+
+        local descriptor = widget.mood_model:get_descriptors()[1]
+        local live_rows = widget.mood_model:build_active_snapshot(descriptor)
+        assert.equals('table', type(live_rows))
+
+        local old_hover = widget.hover_provider
+        local old_mouse = widget.mouse_provider
+        local old_snapshot = widget.snapshot_provider
+        local ok, failure = xpcall(function()
+            widget.hover_provider = function()
+                return df.main_hover_instruction.INFO_STRESSED_0
+            end
+            widget.mouse_provider = function() return 10, 3 end
+            widget.snapshot_provider = function()
+                return {{id=1, name='Registered Citizen'}}
+            end
+            ds.wait_frames(2)
+            assert.equals('Ecstatic', widget.selected_descriptor.label)
+            assert.is_true(widget.popover.visible)
+            assert.equals('Ecstatic (1)', widget.popover.header.text)
+        end, debug.traceback)
+        widget.hover_provider = old_hover
+        widget.mouse_provider = old_mouse
+        widget.snapshot_provider = old_snapshot
+        widget:clear()
+        assert.is_true(ok, failure)
+    end)
+end)
 
 ---Builds readable deterministic rows for one injected mood descriptor.
 ---@param descriptor table
@@ -43,6 +90,7 @@ end
 local function select_mood(hover_index, x, y)
     state.hover = df.main_hover_instruction['INFO_STRESSED_' .. hover_index]
     state.mouse_x, state.mouse_y = x, y
+    root:raw():update_popover()
     ds.wait_frames(1)
 end
 
@@ -54,8 +102,6 @@ local function popover_controls()
 end
 
 describe('live mood popover overlay component', function()
-    local root
-
     before_each(function()
         state = {active=true, hover=nil, mouse_x=nil, mouse_y=nil, rows={}}
         for index=0,6 do
@@ -93,6 +139,7 @@ describe('live mood popover overlay component', function()
         state.mouse_x = math.floor((body.x1 + body.x2) / 2)
         state.mouse_y = math.floor((body.y1 + body.y2) / 2)
         popover:move_pointer('center')
+        root:raw():update_popover()
         ds.wait_frames(1)
 
         assert.equals('Ecstatic', root:raw().selected_descriptor.label)
@@ -109,6 +156,8 @@ describe('live mood popover overlay component', function()
         state.mouse_x = math.floor((body.x1 + body.x2) / 2)
         state.mouse_y = math.floor((body.y1 + body.y2) / 2)
         list:move_pointer('center')
+        root:raw():update_popover()
+        ds.wait_frames(1)
         for _=1,20 do root:input('STANDARDSCROLL_DOWN') end
         assert.equals(20 - root:raw().popover.visible_rows + 1,
             root:raw().popover.scroll_top)
@@ -116,6 +165,7 @@ describe('live mood popover overlay component', function()
         assert.equals('Content Unit 20', list:raw().choices[20].text)
 
         state.mouse_x, state.mouse_y = 0, 0
+        root:raw():update_popover()
         ds.wait_frames(1)
         assert.is_nil(root:raw():onInput({_MOUSE_L=true}))
         assert.is_nil(root:raw():onInput({CUSTOM_A=true}))
@@ -147,6 +197,7 @@ describe('live mood popover overlay component', function()
         assert.is_true(frame.y >= 0 and frame.y + frame.h <= 10)
 
         state.mouse_x = nil
+        root:raw():update_popover()
         ds.wait_frames(1)
         assert.is_nil(root:raw().selected_descriptor)
         assert.is_false(popover:inspect().visible)

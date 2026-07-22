@@ -31,9 +31,9 @@ end
 ---@return boolean
 local function default_active_provider()
     if df.global.world == nil then return false end
-    local gui = dfhack.gui
-    return not gui or not gui.getCurFocus or
-        gui.getCurFocus(true) == 'dwarfmode/Default'
+    local viewscreen = dfhack.gui.getDFViewscreen(true)
+    return viewscreen ~= nil and
+        dfhack.gui.matchFocusString('dwarfmode/Default', viewscreen)
 end
 
 ---@class dwarfui.MoodPopoverOverlay: plugins.overlay.OverlayWidget
@@ -47,8 +47,12 @@ end
 ---@field active_provider fun(): boolean
 MoodPopoverOverlay = defclass(MoodPopoverOverlay, overlay.OverlayWidget)
 MoodPopoverOverlay.ATTRS{
+    desc='Shows the citizens represented by a hovered fortress mood icon.',
+    version='4',
     default_enabled=true,
+    default_pos={x=1, y=1},
     viewscreens='dwarfmode/Default',
+    hotspot=true,
     fullscreen=true,
     frame={l=0, t=0, w=1, h=1},
     overlay_onupdate_max_freq_seconds=0,
@@ -68,6 +72,13 @@ function MoodPopoverOverlay:init()
     -- DFHack invokes this lifecycle callback without an instance argument.
     self.overlay_ondisable = function() self:clear() end
     self:addviews{self.popover}
+end
+
+---Expands the transparent overlay host across the current screen.
+---@param parent_rect gui.ViewRect
+function MoodPopoverOverlay:preUpdateLayout(parent_rect)
+    self.frame.w = parent_rect.width
+    self.frame.h = parent_rect.height
 end
 
 ---Clears the selected mood and all snapshot rows retained by the overlay.
@@ -128,13 +139,16 @@ function MoodPopoverOverlay:update_popover()
     if not self.popover:contains_point(mouse_x, mouse_y) then self:clear() end
 end
 
----Runs the inexpensive interactive hover sample for every overlay update.
+---Clears retained state when the fortress screen is no longer active.
 function MoodPopoverOverlay:overlay_onupdate()
-    if not self.active_provider() then
-        self:clear()
-    elseif self.frame_parent_rect then
-        self:update_popover()
-    end
+    if not self.active_provider() then self:clear() end
+end
+
+---Samples render-time native hover state and draws the current popover.
+---@param dc gui.Painter
+function MoodPopoverOverlay:render(dc)
+    if self.frame_parent_rect then self:update_popover() end
+    MoodPopoverOverlay.super.render(self, dc)
 end
 
 ---Passes input through except for popover wheel scrolling inside its list.
@@ -145,5 +159,5 @@ function MoodPopoverOverlay:onInput(keys)
 end
 
 OVERLAY_WIDGETS = {
-    ['dwarfui-mood-popover']=MoodPopoverOverlay,
+    mood_popover=MoodPopoverOverlay,
 }

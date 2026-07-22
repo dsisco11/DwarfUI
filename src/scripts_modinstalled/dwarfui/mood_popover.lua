@@ -106,12 +106,14 @@ end
 ---
 ---The returned rows are a fresh snapshot. They contain a unit only for the
 ---current refresh and therefore do not retain references from prior snapshots.
----@param active_units table
+---@param active_units table|userdata Lua rows or a DFHack container vector.
 ---@param descriptor table
 ---@param dependencies? table
 ---@return table[]
 function MoodPopoverModel:build_snapshot(active_units, descriptor, dependencies)
-    assert(type(active_units) == 'table', 'active_units must be a table')
+    local collection_type = type(active_units)
+    assert(collection_type == 'table' or collection_type == 'userdata',
+        'active_units must be an iterable Lua table or DFHack vector')
     assert(type(descriptor) == 'table' and
         type(descriptor.stress_category) == 'number',
         'descriptor must contain a stress_category')
