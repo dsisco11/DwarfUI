@@ -83,7 +83,7 @@ describe('native DF top-bar moodlet integration', function()
             ('overlay is not registered: %s'):format(name))
         local widget = assert(entry.widget, 'registered overlay has no instance')
         assert.is_true(widget.active_provider())
-        assert.equals(require('gui').FRAME_THIN,
+        assert.equals(require('gui').FRAME_INTERIOR,
             widget.popover.frame_style)
 
         local display = mood_overlay.TopBarMoodDisplay{}
@@ -251,25 +251,18 @@ describe('live mood popover overlay component', function()
         assert.is_true(popover:inspect().visible)
     end)
 
-    it('scrolls every injected row and leaves external input unhandled',
+    it('scrolls while the pointer remains on the originating moodlet',
             function()
         state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
         select_mood(3, 10, 3)
         local popover, _, list = popover_controls()
-        local body = assert(list:inspect().body)
-        state.hover = nil
-        state.mouse_x = math.floor((body.x1 + body.x2) / 2)
-        state.mouse_y = math.floor((body.y1 + body.y2) / 2)
-        list:move_pointer('center')
-        root:raw():update_popover()
-        ds.wait_frames(1)
         for _=1,20 do root:input('STANDARDSCROLL_DOWN') end
         assert.equals(20 - root:raw().popover.visible_rows + 1,
             root:raw().popover.scroll_top)
         assert.equals(root:raw().popover.scroll_top, list:raw().page_top)
         assert.equals('Content Unit 20', list:raw().choices[20].text)
 
-        state.mouse_x, state.mouse_y = 0, 0
+        state.hover, state.mouse_x, state.mouse_y = nil, 0, 0
         root:raw():update_popover()
         ds.wait_frames(1)
         assert.is_nil(root:raw():onInput({_MOUSE_L=true}))

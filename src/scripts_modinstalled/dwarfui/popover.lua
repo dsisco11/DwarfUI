@@ -3,6 +3,9 @@
 local gui = require('gui')
 local widgets = require('gui.widgets')
 
+-- widgets.Window reserves one frame cell and one inset cell on every edge.
+local FRAME_BODY_PADDING = 2
+
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
 end
@@ -30,7 +33,7 @@ end
 Popover = defclass(nil, widgets.Window)
 Popover.ATTRS{
     frame={l=0, t=0, w=1, h=1},
-    frame_style=gui.WINDOW_FRAME,
+    frame_style=gui.FRAME_INTERIOR,
     frame_inset=1,
     draggable=false,
     resizable=false,
@@ -108,7 +111,8 @@ function Popover:measure_width()
     for _, row in ipairs(self.rows) do
         width = math.max(width, #row_text(row))
     end
-    return clamp(width + 2, self.min_width, self.max_width)
+    return clamp(width + 2 * FRAME_BODY_PADDING,
+        self.min_width, self.max_width)
 end
 
 ---Returns the number of list rows that fit inside the current popover frame.
@@ -174,11 +178,12 @@ end
 function Popover:reposition(parent_rect)
     assert(self.anchor_x ~= nil and self.anchor_y ~= nil,
         'DwarfUI Popover cannot reposition before show_at().')
-    local requested_rows = math.min(#self.rows, self.max_rows)
-    local desired_height = 3 + requested_rows
+    local requested_rows = math.min(math.max(1, #self.rows), self.max_rows)
+    local desired_height = 2 * FRAME_BODY_PADDING + 1 + requested_rows
     local frame = Popover.calculate_frame(self.anchor_x, self.anchor_y,
         parent_rect, self:measure_width(), desired_height, self.margin)
-    self.visible_rows = math.max(0, frame.h - 3)
+    self.visible_rows = math.min(#self.rows,
+        math.max(0, frame.h - 2 * FRAME_BODY_PADDING - 1))
     self.frame_global = frame
     self.frame = {
         l=frame.x - parent_rect.x1,
@@ -233,17 +238,20 @@ end
 function Popover:contains_list_point(x, y)
     local frame = self.frame_global
     return self:contains_point(x, y) and #self.rows > 0 and
-        x >= frame.x + 1 and x < frame.x + frame.w - 1 and
-        y >= frame.y + 2 and y < frame.y + 2 + self.visible_rows
+        x >= frame.x + FRAME_BODY_PADDING and
+        x < frame.x + frame.w - FRAME_BODY_PADDING and
+        y >= frame.y + FRAME_BODY_PADDING + 1 and
+        y < frame.y + FRAME_BODY_PADDING + 1 + self.visible_rows
 end
 
----Consumes only standard wheel scrolling directed at an overflowing list.
+---Consumes standard wheel scrolling whenever an overflowing popover is open.
+---
+---The pointer can remain on the originating moodlet, avoiding a gap crossing
+---between the top information bar and the popover.
 ---@param keys table
 ---@return boolean|nil
 function Popover:onInput(keys)
     if not self.visible or not self:has_overflow() then return end
-    local mouse_x, mouse_y = dfhack.screen.getMousePos()
-    if not self:contains_list_point(mouse_x, mouse_y) then return end
     if keys.STANDARDSCROLL_UP then
         self:scroll(-1)
         return true

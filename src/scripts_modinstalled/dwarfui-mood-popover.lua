@@ -215,7 +215,7 @@ function MoodPopoverOverlay:init()
     self.mood_model = MoodPopoverModel{}
     self.popover = Popover{
         view_id='mood_popover',
-        frame_style=gui.FRAME_THIN,
+        frame_style=gui.FRAME_INTERIOR,
     }
     -- DFHack invokes this lifecycle callback without an instance argument.
     self.overlay_ondisable = function() self:clear() end
@@ -301,7 +301,7 @@ function MoodPopoverOverlay:render(dc)
     MoodPopoverOverlay.super.render(self, dc)
 end
 
----Passes input through except for popover wheel scrolling inside its list.
+---Passes input through except for wheel scrolling while the popover is open.
 ---@param keys table
 ---@return boolean|nil
 function MoodPopoverOverlay:onInput(keys)
