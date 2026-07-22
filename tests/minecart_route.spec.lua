@@ -21,6 +21,8 @@ local route_environment = module_loader.load(repo_root,
 
 local MinecartRouteMenuLayout = route_environment.MinecartRouteMenuLayout
 local MinecartRouteSelection = route_environment.MinecartRouteSelection
+local MinecartRouteMarkerProjection =
+    route_environment.MinecartRouteMarkerProjection
 
 ---Creates a zero-based vector fixture.
 ---@param values table[]
@@ -44,6 +46,46 @@ local function route_fixture()
         view_routes=zero_vector({first, first, second, second}),
         view_stops=zero_vector({false, first_stop, false, second_stop}),
     }, {first, second}
+end
+
+---Creates a viewport double that exposes only the documented projection API.
+---@param x1 integer
+---@param y1 integer
+---@param z integer
+---@param width integer
+---@param height integer
+---@return table
+local function viewport_fixture(x1, y1, z, width, height)
+    local calls = {visible=0, visible_xy=0, tile_to_screen=0}
+    local viewport = {x1=x1, y1=y1, z=z, width=width, height=height,
+        calls=calls}
+
+    function viewport:isVisible(pos)
+        self.calls.visible = self.calls.visible + 1
+        return pos.x >= self.x1 and pos.x < self.x1 + self.width and
+            pos.y >= self.y1 and pos.y < self.y1 + self.height and
+            pos.z == self.z
+    end
+
+    function viewport:isVisibleXY(pos)
+        self.calls.visible_xy = self.calls.visible_xy + 1
+        return pos.x >= self.x1 and pos.x < self.x1 + self.width and
+            pos.y >= self.y1 and pos.y < self.y1 + self.height
+    end
+
+    function viewport:tileToScreen(pos)
+        self.calls.tile_to_screen = self.calls.tile_to_screen + 1
+        return {x=pos.x - self.x1, y=pos.y - self.y1, z=pos.z - self.z}
+    end
+
+    return viewport
+end
+
+---Creates a native-style selected route with a zero-based stop vector.
+---@param stops table[]
+---@return table
+local function selected_route(stops)
+    return {id=99, stops=zero_vector(stops)}
 end
 
 describe('DwarfUI minecart route menu layout', function()
@@ -216,5 +258,121 @@ describe('DwarfUI minecart route selection', function()
         assert.equals(5, selection:get_selected_route_id())
         selection:clear()
         assert.is_nil(selection:get_selected_route_id())
+    end)
+end)
+
+describe('DwarfUI minecart route marker projection', function()
+    it('projects same-z stops exactly onto their map tiles in route order',
+            function()
+        local viewport = viewport_fixture(10, 20, 5, 20, 10)
+        local markers = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=7, name='North', pos={x=12, y=23, z=5}},
+            {id=8, name='South', pos={x=15, y=25, z=5}},
+        }), viewport)
+
+        assert.equals(2, #markers)
+        assert.equals(7, markers[1].stop_id)
+        assert.equals(1, markers[1].display_index)
+        assert.same({x=12, y=23, z=5}, markers[1].world_pos)
+        assert.same({x=2, y=3, z=0}, markers[1].screen_pos)
+        assert.equals(0, markers[1].z_delta)
+        assert.equals('same_z', markers[1].marker_kind)
+        assert.equals(string.char(15), markers[1].marker_glyph)
+        assert.equals('North', markers[1].label)
+        assert.equals(8, markers[2].stop_id)
+        assert.equals(2, markers[2].display_index)
+        assert.equals(2, viewport.calls.visible)
+        assert.equals(0, viewport.calls.visible_xy)
+        assert.equals(2, viewport.calls.tile_to_screen)
+    end)
+
+    it('marks visible above and below stops as directional projections',
+            function()
+        local viewport = viewport_fixture(0, 0, 10, 20, 10)
+        local markers = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=1, name='Above', pos={x=3, y=4, z=12}},
+            {id=2, name='Below', pos={x=6, y=4, z=7}},
+        }), viewport)
+
+        assert.equals('above', markers[1].marker_kind)
+        assert.equals(string.char(24), markers[1].marker_glyph)
+        assert.equals(2, markers[1].z_delta)
+        assert.equals('Above (z+2)', markers[1].label)
+        assert.equals('below', markers[2].marker_kind)
+        assert.equals(string.char(25), markers[2].marker_glyph)
+        assert.equals(-3, markers[2].z_delta)
+        assert.equals('Below (z-3)', markers[2].label)
+        assert.equals(0, viewport.calls.visible)
+        assert.equals(2, viewport.calls.visible_xy)
+    end)
+
+    it('does not emit stops outside the map viewport', function()
+        local viewport = viewport_fixture(10, 10, 3, 8, 6)
+        local markers = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=1, name='Past edge', pos={x=18, y=10, z=3}},
+            {id=2, name='Other z', pos={x=9, y=10, z=4}},
+        }), viewport)
+
+        assert.equals(0, #markers)
+        assert.equals(1, viewport.calls.visible)
+        assert.equals(1, viewport.calls.visible_xy)
+        assert.equals(0, viewport.calls.tile_to_screen)
+    end)
+
+    it('keeps full labels inside both map edges', function()
+        local viewport = viewport_fixture(0, 0, 0, 12, 4)
+        local markers = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=1, name='Left', pos={x=0, y=1, z=0}},
+            {id=2, name='Right', pos={x=11, y=2, z=0}},
+        }), viewport)
+
+        assert.equals(1, markers[1].label_x)
+        assert.equals(6, markers[2].label_x)
+        for _, marker in ipairs(markers) do
+            assert.is_true(marker.label_x >= 0)
+            assert.is_true(marker.label_x + #marker.label <= viewport.width)
+            assert.is_true(marker.label_y >= 0)
+            assert.is_true(marker.label_y < viewport.height)
+        end
+    end)
+
+    it('truncates long labels only when neither side can contain them',
+            function()
+        local viewport = viewport_fixture(0, 0, 0, 9, 3)
+        local marker = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=1, name='Very long stop name', pos={x=4, y=1, z=0}},
+        }), viewport)[1]
+
+        assert.equals('Very', marker.label)
+        assert.equals(5, marker.label_x)
+        assert.is_true(marker.label_x + #marker.label <= viewport.width)
+    end)
+
+    it('keeps empty names visible and copies mutable native positions',
+            function()
+        local viewport = viewport_fixture(0, 0, 0, 20, 5)
+        local pos = {x=2, y=2, z=0}
+        local marker = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=1, name='', pos=pos},
+        }), viewport)[1]
+        pos.x = 17
+
+        assert.equals('', marker.name)
+        assert.equals('(unnamed)', marker.label)
+        assert.equals(2, marker.world_pos.x)
+    end)
+
+    it('resolves duplicate-position label collisions without moving markers',
+            function()
+        local viewport = viewport_fixture(0, 0, 0, 20, 4)
+        local markers = MinecartRouteMarkerProjection{}:project(selected_route({
+            {id=1, name='First', pos={x=5, y=1, z=0}},
+            {id=2, name='Second', pos={x=5, y=1, z=0}},
+        }), viewport)
+
+        assert.same({x=5, y=1, z=0}, markers[1].screen_pos)
+        assert.same({x=5, y=1, z=0}, markers[2].screen_pos)
+        assert.equals(1, markers[1].label_y)
+        assert.equals(2, markers[2].label_y)
     end)
 end)
