@@ -20,6 +20,7 @@ Usage
 local MODULE_REGISTRY_SCRIPT = 'dwarfui/module_registry'
 local OVERLAY_SCRIPTS = {
     'dwarfui-mood-popover',
+    'dwarfui-minecart-route-markers',
     'dwarfui-unit-card-task-details',
 }
 

@@ -376,3 +376,16 @@ describe('DwarfUI minecart route marker projection', function()
         assert.equals(2, markers[2].label_y)
     end)
 end)
+
+describe('DwarfUI minecart route header indicator', function()
+    it('finds a selected route header after native list scrolling', function()
+        local hauling, routes = route_fixture()
+        hauling.scroll_position = 2
+        local layout = MinecartRouteMenuLayout{}
+
+        assert.equals(10, layout:find_route_header_y(hauling, routes[2].id,
+            'dwarfmode/Hauling'))
+        assert.is_nil(layout:find_route_header_y(hauling, routes[1].id,
+            'dwarfmode/Hauling'))
+    end)
+end)

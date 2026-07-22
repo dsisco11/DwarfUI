@@ -21,6 +21,11 @@ local mood_popover_payload = {
     widget='scripts_modinstalled/dwarfui/popover.lua',
 }
 
+local minecart_route_payload = {
+    registration='scripts_modinstalled/dwarfui-minecart-route-markers.lua',
+    model='scripts_modinstalled/dwarfui/minecart_route.lua',
+}
+
 local function source_path(relative_path)
     return repo_root .. separator .. 'src' .. separator ..
         relative_path:gsub('/', separator)
@@ -253,6 +258,18 @@ describe('DwarfUI package contract', function()
         local widget = read_source(mood_popover_payload.widget)
         contains(widget, '--@ module=true')
         contains(widget, 'Popover = defclass')
+    end)
+
+    it('includes the complete minecart-route marker payload and registration',
+            function()
+        local registration = read_source(minecart_route_payload.registration)
+        contains(registration, '--@ module=true')
+        contains(registration, 'OVERLAY_WIDGETS')
+        contains(registration,
+            'minecart_route_markers=MinecartRouteMarkersOverlay')
+
+        local model = read_source(minecart_route_payload.model)
+        contains(model, 'MinecartRouteMarkerProjection = defclass')
     end)
 
     it('ships the dwarfui reload command', function()

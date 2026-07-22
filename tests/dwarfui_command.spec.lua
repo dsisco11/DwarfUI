@@ -39,6 +39,7 @@ describe('dwarfui command', function()
             'dwarfui/consumer',
             'dwarfui/dependency',
             'dwarfui-mood-popover',
+            'dwarfui-minecart-route-markers',
             'dwarfui-unit-card-task-details',
         }
         for _, name in ipairs(all_names) do
@@ -90,6 +91,8 @@ describe('dwarfui command', function()
         assert.same({'overlay_rescan'}, events[7])
         assert.same({'validate', 'fresh'}, events[8])
         assert.is_nil(scripts['/scripts/dwarfui-mood-popover.lua'])
+        assert.is_nil(scripts[
+            '/scripts/dwarfui-minecart-route-markers.lua'])
         assert.is_nil(scripts[
             '/scripts/dwarfui-unit-card-task-details.lua'])
     end)

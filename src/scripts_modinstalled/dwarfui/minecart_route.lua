@@ -89,6 +89,30 @@ function MinecartRouteMenuLayout:resolve_row(mouse_x, mouse_y, hauling, focus)
     }
 end
 
+---Finds the visible screen row of a selected route's native header.
+---@param hauling table|nil
+---@param route_id integer|nil
+---@param focus string|nil
+---@return integer|nil
+function MinecartRouteMenuLayout:find_route_header_y(hauling, route_id, focus)
+    if not self:is_supported_focus(focus) or not hauling or
+            not hauling.view_routes or route_id == nil then
+        return nil
+    end
+    local scroll_position = hauling.scroll_position or 0
+    if type(scroll_position) ~= 'number' or scroll_position < 0 then return nil end
+    local index = scroll_position
+    while hauling.view_routes[index] ~= nil do
+        local route = hauling.view_routes[index]
+        local stop = hauling.view_stops and hauling.view_stops[index] or nil
+        if route.id == route_id and not stop then
+            return self.first_row_top + (index - scroll_position) *
+                self.row_height
+        end
+        index = index + 1
+    end
+end
+
 ---Finds a route by numeric ID in a zero-based DF vector or Lua sequence.
 ---@param routes table|nil
 ---@param route_id integer|nil
