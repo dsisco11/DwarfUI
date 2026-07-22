@@ -1,15 +1,15 @@
 ✔ Port over the Tooltip widget from `SoulSearch`. @done(26-07-21 23:00)
 ☐ Port over the ContextMenu widget from `DwarfDirect`.
 ✔ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level. See `Docs/mood-popover.todo`. @done(26-07-22 08:05)
-☐ [Container Contents Popover] Implement ability to hold `Alt` and hover mouse over a container to show a popout panel which shows the list of all items in that container.
-☐ [Work Orders Panel] Add button work-order entries to allow editing the set-material of work orders.
-☐ [Work Orders Panel] Add button work-order entries to allow setting/removing their target-workshop restriction.
+☐ [Unit Card]: Show task details in the 3rd panel down on the left side of the unit card. E.g. if a unit is currently hauling, show the the destination of that item below the existing "Haul: <item>" line.
 ☐ [Minecart Routes] Implement ability to update the position of route-stops after they have already been set.
 ☐ [Minecart Routes] Currently selected route should render an `X` in-world at the position of each route-stop, along with the name of the stop, to allow for easy identification of the route-stops in-world.
+☐ [Work Orders Panel] Add button work-order entries to allow editing the set-material of work orders.
+☐ [Work Orders Panel] Add button work-order entries to allow setting/removing their target-workshop restriction.
 ☐ [All Filters Panels] Add buttons for "Copy" and "Paste" to all filter panels to allow copying and pasting of filter settings between different panels.
 ☐ [Workshop Work Orders] Add "Copy" and "Paste" buttons to the Work Orders panel in workshops to allow copying and pasting of work order settings between different workshops.
 ☐ [Resource Counts]: Add popout to the different resource counters in the top panel which shows a list of all item types (and their counts) from that resource category.
-☐ [Unit Card]: Show task details in the 3rd panel down on the left side of the unit card. E.g. if a unit is currently hauling, show the the destination of that item below the existing "Haul: <item>" line.
+☐ [Container Contents Popover] Implement ability to hold `Alt` and hover mouse over a container to show a popout panel which shows the list of all items in that container.
 ☐ [Top Info Panel]: Add a bed count indicator, should show the little bedroom icon from the unit-card->rooms panel. And should only indicate if there is an issue with beds. 
         When either citizens or residents lack beds it turns red with an alert icon next to it. When there are enough beds for all citizens and residents it turns green with a checkmark next to it.
         When there are enough beds but the number of free beds for residents or citizens is low then it turns yellow.
