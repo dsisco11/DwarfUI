@@ -21,6 +21,29 @@ generic target/pass/block/none dispatch. `dwarfui/tooltip` provides the plain-
 widget `TooltipRenderer`, the stable singleton registration facade, and the
 explicit per-root `TooltipAgent` available to unusual screen and overlay hosts.
 
+## Mood icon unit popover
+
+DwarfUI includes a default-enabled `dwarfui-mood-popover` overlay for the
+fortress-mode `dwarfmode/Default` screen. Hover any of the seven native mood
+icons in the top panel to see the active citizens represented by that icon's
+current counter. The list is ordered by readable unit name and the panel stays
+open while moving from the icon into the panel.
+
+For a list that exceeds the available height, point at the panel and use the
+mouse wheel to scroll. The overlay leaves clicks, keyboard input, and wheel
+events outside its list to Dwarf Fortress.
+
+The overlay can be managed with DFHack's overlay command:
+
+```text
+gui/overlay disable dwarfui-mood-popover
+gui/overlay enable dwarfui-mood-popover
+```
+
+The mood model and popover widget that support this feature are
+project-internal implementation details in this release; their module paths
+are not downstream API contracts.
+
 ## Explicit tooltip integration
 
 The parity API intentionally requires each independently rendered root to own
@@ -148,9 +171,10 @@ the installed command:
 
 ```powershell
 luarocks test --prepare dwarfui.rockspec
-dwarfspec run tests/tooltip/tooltip_spec.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay_registration_integration_spec.lua
+.\tools\Run-AutomationTests.ps1 tests/mood_popover/mood_popover_spec.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_spec.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_spec.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_registration_integration_spec.lua
 ```
 
 The component specs, registration source, and configuration under `tests/` are
