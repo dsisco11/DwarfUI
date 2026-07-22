@@ -301,7 +301,7 @@ function MoodPopoverOverlay:render(dc)
     MoodPopoverOverlay.super.render(self, dc)
 end
 
----Passes input through except for wheel scrolling while the popover is open.
+---Consumes context-wheel scrolling while open and passes other input through.
 ---@param keys table
 ---@return boolean|nil
 function MoodPopoverOverlay:onInput(keys)

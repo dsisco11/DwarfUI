@@ -252,11 +252,17 @@ end
 ---@return boolean|nil
 function Popover:onInput(keys)
     if not self.visible or not self:has_overflow() then return end
-    if keys.STANDARDSCROLL_UP then
+    if keys.CONTEXT_SCROLL_UP or keys.STANDARDSCROLL_UP then
         self:scroll(-1)
         return true
-    elseif keys.STANDARDSCROLL_DOWN then
+    elseif keys.CONTEXT_SCROLL_DOWN or keys.STANDARDSCROLL_DOWN then
         self:scroll(1)
+        return true
+    elseif keys.CONTEXT_SCROLL_PAGEUP or keys.STANDARDSCROLL_PAGEUP then
+        self:scroll(-math.max(1, self.visible_rows))
+        return true
+    elseif keys.CONTEXT_SCROLL_PAGEDOWN or keys.STANDARDSCROLL_PAGEDOWN then
+        self:scroll(math.max(1, self.visible_rows))
         return true
     end
 end

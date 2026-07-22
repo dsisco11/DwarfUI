@@ -103,6 +103,7 @@ describe('native DF top-bar moodlet integration', function()
 
         local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
             'Unhappy', 'Very Unhappy', 'Miserable'}
+        local old_snapshot = widget.snapshot_provider
         local ok, failure = xpcall(function()
             enabler.mouse_focus = true
             enabler.tracking_on = 1
@@ -140,6 +141,30 @@ describe('native DF top-bar moodlet integration', function()
                 end
                 assert.equals(tonumber(displayed_count), #widget.popover.rows)
             end
+
+            local scroll_rows = {}
+            for index=1,20 do
+                table.insert(scroll_rows, {
+                    id=index,
+                    name=('Content Unit %02d'):format(index),
+                })
+            end
+            widget.snapshot_provider = function()
+                return scroll_rows
+            end
+            local rect = moodlets[4]
+            gps.mouse_x, gps.mouse_y = rect.x1, rect.y2
+            gps.precise_mouse_x = rect.x1 * gps.tile_pixel_x + 1
+            gps.precise_mouse_y = rect.y2 * gps.tile_pixel_y + 1
+            widget:update_popover()
+            assert.is_true(widget.popover:has_overflow())
+            local previous_z = df.global.window_z
+            require('gui').simulateInput(screen, {
+                CONTEXT_SCROLL_DOWN=true,
+                CURSOR_UP_Z=true,
+            })
+            assert.equals(2, widget.popover.scroll_top)
+            assert.equals(previous_z, df.global.window_z)
         end, debug.traceback)
 
         gps.mouse_x, gps.mouse_y = saved.mouse_x, saved.mouse_y
@@ -147,6 +172,7 @@ describe('native DF top-bar moodlet integration', function()
         gps.precise_mouse_y = saved.precise_mouse_y
         enabler.mouse_focus = saved.mouse_focus
         enabler.tracking_on = saved.tracking_on
+        widget.snapshot_provider = old_snapshot
         widget:clear()
         screen:logic()
         screen:render(df.global.cur_year_tick)
@@ -256,7 +282,7 @@ describe('live mood popover overlay component', function()
         state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
         select_mood(3, 10, 3)
         local popover, _, list = popover_controls()
-        for _=1,20 do root:input('STANDARDSCROLL_DOWN') end
+        for _=1,20 do root:input('CONTEXT_SCROLL_DOWN') end
         assert.equals(20 - root:raw().popover.visible_rows + 1,
             root:raw().popover.scroll_top)
         assert.equals(root:raw().popover.scroll_top, list:raw().page_top)
@@ -267,7 +293,7 @@ describe('live mood popover overlay component', function()
         ds.wait_frames(1)
         assert.is_nil(root:raw():onInput({_MOUSE_L=true}))
         assert.is_nil(root:raw():onInput({CUSTOM_A=true}))
-        assert.is_nil(root:raw():onInput({STANDARDSCROLL_DOWN=true}))
+        assert.is_nil(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
         assert.is_false(popover:inspect().visible)
     end)
 
