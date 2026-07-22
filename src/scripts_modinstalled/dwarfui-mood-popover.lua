@@ -179,7 +179,7 @@ local function default_active_provider()
         dfhack.gui.matchFocusString('dwarfmode/Default', viewscreen)
 end
 
----Centers the map on a unit and opens DF's native unit information card.
+---Centers the map and initializes DF's native unit information card state.
 ---@param unit df.unit
 ---@return boolean
 local function default_unit_opener(unit)
@@ -194,6 +194,12 @@ local function default_unit_opener(unit)
     sheets.active_id = unit.id
     sheets.viewing_unid:resize(0)
     sheets.viewing_unid:insert('#', unit.id)
+    sheets.viewing_x = pos.x
+    sheets.viewing_y = pos.y
+    sheets.viewing_z = pos.z
+    sheets.scroll_position = 0
+    sheets.active_sub_tab = 0
+    sheets.last_tick_update = -1
     sheets.open = true
     return true
 end

@@ -6,6 +6,24 @@ local MoodPopoverOverlay = mood_overlay.MoodPopoverOverlay
 local state
 local root
 
+---Returns whether the current native screen contains an ASCII text fragment.
+---@param text string
+---@return boolean
+local function native_screen_contains(text)
+    local width, height = dfhack.screen.getWindowSize()
+    for y=0,height - 1 do
+        local row = {}
+        for x=0,width - 1 do
+            local tile = dfhack.screen.readTile(x, y)
+            local character = tile and tile.ch or string.byte(' ')
+            table.insert(row, character >= 32 and character <= 126 and
+                string.char(character) or ' ')
+        end
+        if table.concat(row):find(text, 1, true) then return true end
+    end
+    return false
+end
+
 describe('live mood popover overlay registration', function()
     it('is discovered under its canonical name and fills the active screen',
             function()
@@ -112,6 +130,12 @@ describe('native DF top-bar moodlet integration', function()
             sheet_context=sheets.context,
             active_sheet=sheets.active_sheet,
             active_id=sheets.active_id,
+            viewing_x=sheets.viewing_x,
+            viewing_y=sheets.viewing_y,
+            viewing_z=sheets.viewing_z,
+            scroll_position=sheets.scroll_position,
+            active_sub_tab=sheets.active_sub_tab,
+            last_tick_update=sheets.last_tick_update,
             indicator_x=indicator.x,
             indicator_y=indicator.y,
             indicator_z=indicator.z,
@@ -221,9 +245,17 @@ describe('native DF top-bar moodlet integration', function()
             assert.equals(df.view_sheet_type.UNIT, sheets.active_sheet)
             assert.equals(target.id, sheets.active_id)
             assert.equals(target.id, dfhack.gui.getSelectedUnit(true).id)
+            assert.equals(target.pos.x, sheets.viewing_x)
+            assert.equals(target.pos.y, sheets.viewing_y)
+            assert.equals(target.pos.z, sheets.viewing_z)
+            assert.equals(0, sheets.scroll_position)
+            assert.equals(0, sheets.active_sub_tab)
             assert.equals(target.pos.z, df.global.window_z)
             assert.is_false(widget.popover.visible)
             ds.wait_frames(1)
+            local overview_name = assert(target.name.first_name:match('[A-Za-z]+'),
+                'selected citizen has no ASCII first-name fragment')
+            assert.is_true(native_screen_contains(overview_name))
             assert.is_true(#sheets.raw_thought_str > 0)
             assert.is_true(sheets.labor_skill_num > 0)
         end, debug.traceback)
@@ -240,6 +272,12 @@ describe('native DF top-bar moodlet integration', function()
         sheets.context = saved.sheet_context
         sheets.active_sheet = saved.active_sheet
         sheets.active_id = saved.active_id
+        sheets.viewing_x = saved.viewing_x
+        sheets.viewing_y = saved.viewing_y
+        sheets.viewing_z = saved.viewing_z
+        sheets.scroll_position = saved.scroll_position
+        sheets.active_sub_tab = saved.active_sub_tab
+        sheets.last_tick_update = saved.last_tick_update
         sheets.viewing_unid:resize(0)
         for _, unit_id in ipairs(saved_unids) do
             sheets.viewing_unid:insert('#', unit_id)
