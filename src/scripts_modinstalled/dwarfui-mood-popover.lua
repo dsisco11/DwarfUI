@@ -179,6 +179,24 @@ local function default_active_provider()
         dfhack.gui.matchFocusString('dwarfmode/Default', viewscreen)
 end
 
+---Centers the map on a unit and opens DF's native unit information card.
+---@param unit df.unit
+---@return boolean
+local function default_unit_opener(unit)
+    if not unit or not df.isvalid(unit) then return false end
+    local pos = xyz2pos(dfhack.units.getPosition(unit))
+    if not dfhack.gui.revealInDwarfmodeMap(pos, true, true) then return false end
+
+    local sheets = df.global.game.main_interface.view_sheets
+    sheets.context = df.view_sheets_context_type.REGULAR_PLAY
+    sheets.active_sheet = df.view_sheet_type.UNIT
+    sheets.active_id = unit.id
+    sheets.viewing_unid:resize(0)
+    sheets.viewing_unid:insert('#', unit.id)
+    sheets.open = true
+    return true
+end
+
 ---@class dwarfui.MoodPopoverOverlay: plugins.overlay.OverlayWidget
 ---@field selected_descriptor table|nil
 ---@field popover dwarfui.Popover
@@ -189,6 +207,7 @@ end
 ---@field anchor_provider fun(mouse_x: integer, mouse_y: integer): integer, integer
 ---@field snapshot_provider fun(descriptor: table): table[]
 ---@field active_provider fun(): boolean
+---@field unit_opener fun(unit: df.unit): boolean
 MoodPopoverOverlay = defclass(MoodPopoverOverlay, overlay.OverlayWidget)
 MoodPopoverOverlay.ATTRS{
     desc='Shows the citizens represented by a hovered fortress mood icon.',
@@ -206,6 +225,7 @@ MoodPopoverOverlay.ATTRS{
     anchor_provider=default_anchor_provider,
     snapshot_provider=default_snapshot_provider,
     active_provider=default_active_provider,
+    unit_opener=default_unit_opener,
 }
 
 ---Constructs the fullscreen transparent host and its reusable popover.
@@ -216,10 +236,21 @@ function MoodPopoverOverlay:init()
     self.popover = Popover{
         view_id='mood_popover',
         frame_style=gui.FRAME_INTERIOR,
+        on_submit=function(row) return self:open_row(row) end,
     }
     -- DFHack invokes this lifecycle callback without an instance argument.
     self.overlay_ondisable = function() self:clear() end
     self:addviews{self.popover}
+end
+
+---Opens the native unit card for a selected popover row.
+---@param row table|nil
+---@return boolean|nil
+function MoodPopoverOverlay:open_row(row)
+    if not row or not row.unit then return end
+    if not self.unit_opener(row.unit) then return false end
+    self:clear()
+    return true
 end
 
 ---Expands the transparent overlay host across the current screen.
@@ -286,7 +317,9 @@ function MoodPopoverOverlay:update_popover()
         return
     end
 
-    if not self.popover:contains_point(mouse_x, mouse_y) then self:clear() end
+    if not self.popover:contains_retention_point(mouse_x, mouse_y) then
+        self:clear()
+    end
 end
 
 ---Clears retained state when the fortress screen is no longer active.

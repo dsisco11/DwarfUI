@@ -30,6 +30,7 @@ end
 ---@field scroll_top integer
 ---@field visible_rows integer
 ---@field frame_global table|nil
+---@field on_submit false|fun(row: any, index: integer)
 Popover = defclass(nil, widgets.Window)
 Popover.ATTRS{
     frame={l=0, t=0, w=1, h=1},
@@ -45,6 +46,7 @@ Popover.ATTRS{
     max_rows=12,
     margin=1,
     empty_message='No entries',
+    on_submit=false,
 }
 
 ---Constructs the reusable heading, list, and empty-state controls.
@@ -62,6 +64,11 @@ function Popover:init()
         view_id='list',
         frame={l=0, t=1, r=0, h=1},
         choices={},
+        on_submit=function(index, choice)
+            if self.on_submit and choice then
+                return self.on_submit(choice.row, index)
+            end
+        end,
     }
     self.empty = widgets.Label{
         view_id='empty',
@@ -162,7 +169,7 @@ function Popover:set_content(title, rows, reset_scroll)
     self.header:setText(('%s (%d)'):format(self.title, #self.rows))
     local choices = {}
     for _, row in ipairs(self.rows) do
-        table.insert(choices, {text=row_text(row)})
+        table.insert(choices, {text=row_text(row), row=row})
     end
     self.list:setChoices(choices)
     self.empty.visible = #self.rows == 0
@@ -231,6 +238,17 @@ function Popover:contains_point(x, y)
         y >= frame.y and y < frame.y + frame.h
 end
 
+---Tests whether a point is inside the panel or its one-row approach bridge.
+---@param x integer|nil
+---@param y integer|nil
+---@return boolean
+function Popover:contains_retention_point(x, y)
+    if self:contains_point(x, y) then return true end
+    local frame = self.frame_global
+    return self.visible and frame and x ~= nil and y ~= nil and
+        x >= frame.x and x < frame.x + frame.w and y == frame.y - 1
+end
+
 ---Tests whether a screen-space point lies inside the visible list rows.
 ---@param x integer|nil
 ---@param y integer|nil
@@ -251,7 +269,12 @@ end
 ---@param keys table
 ---@return boolean|nil
 function Popover:onInput(keys)
-    if not self.visible or not self:has_overflow() then return end
+    if not self.visible then return end
+    local mouse_x, mouse_y = dfhack.screen.getMousePos()
+    if keys._MOUSE_L and self:contains_list_point(mouse_x, mouse_y) then
+        return self.list:onInput(keys)
+    end
+    if not self:has_overflow() then return end
     if keys.CONTEXT_SCROLL_UP or keys.STANDARDSCROLL_UP then
         self:scroll(-1)
         return true

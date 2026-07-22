@@ -92,6 +92,12 @@ describe('native DF top-bar moodlet integration', function()
         assert.equals(7, #moodlets)
         local gps = df.global.gps
         local enabler = df.global.enabler
+        local sheets = df.global.game.main_interface.view_sheets
+        local indicator = df.global.game.main_interface.recenter_indicator_m
+        local saved_unids = {}
+        for _, unit_id in ipairs(sheets.viewing_unid) do
+            table.insert(saved_unids, unit_id)
+        end
         local saved = {
             mouse_x=gps.mouse_x,
             mouse_y=gps.mouse_y,
@@ -99,6 +105,16 @@ describe('native DF top-bar moodlet integration', function()
             precise_mouse_y=gps.precise_mouse_y,
             mouse_focus=enabler.mouse_focus,
             tracking_on=enabler.tracking_on,
+            window_x=df.global.window_x,
+            window_y=df.global.window_y,
+            window_z=df.global.window_z,
+            sheet_open=sheets.open,
+            sheet_context=sheets.context,
+            active_sheet=sheets.active_sheet,
+            active_id=sheets.active_id,
+            indicator_x=indicator.x,
+            indicator_y=indicator.y,
+            indicator_z=indicator.z,
         }
 
         local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
@@ -165,6 +181,46 @@ describe('native DF top-bar moodlet integration', function()
             })
             assert.equals(2, widget.popover.scroll_top)
             assert.equals(previous_z, df.global.window_z)
+
+            local target
+            for _, unit in ipairs(df.global.world.units.active) do
+                if dfhack.units.isCitizen(unit) then
+                    target = unit
+                    break
+                end
+            end
+            assert.is_not_nil(target)
+            widget.snapshot_provider = function()
+                return {{
+                    id=target.id,
+                    unit=target,
+                    name=dfhack.units.getReadableName(target),
+                }}
+            end
+            widget:refresh()
+            local frame = widget.popover.frame_global
+            local pointer_x = frame.x + 2
+
+            gps.mouse_x, gps.mouse_y = pointer_x, frame.y - 1
+            gps.precise_mouse_x = pointer_x * gps.tile_pixel_x + 1
+            gps.precise_mouse_y = (frame.y - 1) * gps.tile_pixel_y + 1
+            widget:update_popover()
+            assert.is_true(widget.popover.visible)
+
+            gps.mouse_x, gps.mouse_y = pointer_x, frame.y + 3
+            gps.precise_mouse_x = pointer_x * gps.tile_pixel_x + 1
+            gps.precise_mouse_y = (frame.y + 3) * gps.tile_pixel_y + 1
+            widget:update_popover()
+            assert.is_true(widget.popover:contains_list_point(
+                gps.mouse_x, gps.mouse_y))
+            require('gui').simulateInput(screen, '_MOUSE_L')
+
+            assert.is_true(sheets.open)
+            assert.equals(df.view_sheet_type.UNIT, sheets.active_sheet)
+            assert.equals(target.id, sheets.active_id)
+            assert.equals(target.id, dfhack.gui.getSelectedUnit(true).id)
+            assert.equals(target.pos.z, df.global.window_z)
+            assert.is_false(widget.popover.visible)
         end, debug.traceback)
 
         gps.mouse_x, gps.mouse_y = saved.mouse_x, saved.mouse_y
@@ -172,6 +228,20 @@ describe('native DF top-bar moodlet integration', function()
         gps.precise_mouse_y = saved.precise_mouse_y
         enabler.mouse_focus = saved.mouse_focus
         enabler.tracking_on = saved.tracking_on
+        df.global.window_x = saved.window_x
+        df.global.window_y = saved.window_y
+        df.global.window_z = saved.window_z
+        sheets.open = saved.sheet_open
+        sheets.context = saved.sheet_context
+        sheets.active_sheet = saved.active_sheet
+        sheets.active_id = saved.active_id
+        sheets.viewing_unid:resize(0)
+        for _, unit_id in ipairs(saved_unids) do
+            sheets.viewing_unid:insert('#', unit_id)
+        end
+        indicator.x = saved.indicator_x
+        indicator.y = saved.indicator_y
+        indicator.z = saved.indicator_z
         widget.snapshot_provider = old_snapshot
         widget:clear()
         screen:logic()
