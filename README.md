@@ -162,6 +162,22 @@ their methods. Normal screens and enabled, focus-matching overlays are
 supported. The explicit `TooltipRenderer` and `TooltipAgent` API above remains
 available as a low-level path for unusual hosts.
 
+## Runtime validation and reload
+
+Run `dwarfui` to load the registered module graph and validate each module's
+public runtime contract. During development, run `dwarfui reload` to clear the
+current module generation, rebuild it in dependency order, and have DFHack
+rescan the mood-popover and unit-card overlays.
+
+```text
+dwarfui
+dwarfui reload
+```
+
+The registry at `dwarfui/module_registry` is the authoritative manifest for
+reload ordering. New DwarfUI modules must be added there with a representative
+function or class contract.
+
 ## Live automation
 
 DwarfUI consumes [DwarfSpec](https://github.com/dsisco11/DwarfSpec) as the
