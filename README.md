@@ -24,9 +24,9 @@ explicit per-root `TooltipAgent` available to unusual screen and overlay hosts.
 ## Mood icon unit popover
 
 DwarfUI includes a default-enabled `dwarfui-mood-popover` overlay for the
-fortress-mode `dwarfmode/Default` screen. Hover any of the seven native mood
-icons in the top panel to see the active citizens represented by that icon's
-current counter. The list is ordered by readable unit name and the panel stays
+default fortress screen. Hover any of the seven native mood icons beside the
+`Pop` counter in the top information bar to see every active citizen in that
+mood category. The list is ordered by readable unit name and the panel stays
 open while moving from the icon into the panel.
 
 For a list that exceeds the available height, point at the panel and use the

@@ -31,7 +31,9 @@ describe('live mood popover overlay registration', function()
         local old_hover = widget.hover_provider
         local old_mouse = widget.mouse_provider
         local old_snapshot = widget.snapshot_provider
+        local old_active = widget.active_provider
         local ok, failure = xpcall(function()
+            widget.active_provider = function() return true end
             widget.hover_provider = function()
                 return df.main_hover_instruction.INFO_STRESSED_0
             end
@@ -47,7 +49,76 @@ describe('live mood popover overlay registration', function()
         widget.hover_provider = old_hover
         widget.mouse_provider = old_mouse
         widget.snapshot_provider = old_snapshot
+        widget.active_provider = old_active
         widget:clear()
+        assert.is_true(ok, failure)
+    end)
+end)
+
+describe('native DF top-bar moodlet integration', function()
+    it('detects pointer hover over every rendered native moodlet', function()
+        local screen = assert(dfhack.gui.getDFViewscreen(true),
+            'native fortress viewscreen is unavailable')
+        assert.is_true(dfhack.gui.matchFocusString(
+            'dwarfmode/Default', screen))
+        local overlay = require('plugins.overlay')
+        overlay.rescan()
+        ds.wait_frames(2)
+
+        local name = 'dwarfui-mood-popover.mood_popover'
+        local entry = assert(overlay.get_state().db[name],
+            ('overlay is not registered: %s'):format(name))
+        local widget = assert(entry.widget, 'registered overlay has no instance')
+        assert.is_true(widget.active_provider())
+
+        local display = mood_overlay.TopBarMoodDisplay{}
+        local moodlets = assert(display:find_layout(),
+            'rendered top information-bar moodlets are unavailable')
+        assert.equals(7, #moodlets)
+        local gps = df.global.gps
+        local enabler = df.global.enabler
+        local saved = {
+            mouse_x=gps.mouse_x,
+            mouse_y=gps.mouse_y,
+            precise_mouse_x=gps.precise_mouse_x,
+            precise_mouse_y=gps.precise_mouse_y,
+            mouse_focus=enabler.mouse_focus,
+            tracking_on=enabler.tracking_on,
+        }
+
+        local labels = {'Ecstatic', 'Happy', 'Pleased', 'Content',
+            'Displeased', 'Unhappy', 'Miserable'}
+        local ok, failure = xpcall(function()
+            enabler.mouse_focus = true
+            enabler.tracking_on = 1
+            for index, expected_label in ipairs(labels) do
+                local rect = moodlets[index]
+                local tile = assert(dfhack.screen.readTile(rect.x1, rect.y1))
+                assert.equals(0, tile.ch)
+                gps.mouse_x, gps.mouse_y = rect.x1, rect.y1
+                gps.precise_mouse_x = rect.x1 * gps.tile_pixel_x + 1
+                gps.precise_mouse_y = rect.y1 * gps.tile_pixel_y + 1
+
+                local expected_hover = df.main_hover_instruction[
+                    'INFO_STRESSED_' .. (index - 1)]
+                assert.equals(expected_hover,
+                    display:resolve_hover(gps.mouse_x, gps.mouse_y))
+                widget:update_popover()
+                assert.equals(expected_label,
+                    widget.selected_descriptor.label)
+                assert.is_true(widget.popover.visible)
+                assert.equals(expected_label, widget.popover.title)
+            end
+        end, debug.traceback)
+
+        gps.mouse_x, gps.mouse_y = saved.mouse_x, saved.mouse_y
+        gps.precise_mouse_x = saved.precise_mouse_x
+        gps.precise_mouse_y = saved.precise_mouse_y
+        enabler.mouse_focus = saved.mouse_focus
+        enabler.tracking_on = saved.tracking_on
+        widget:clear()
+        screen:logic()
+        screen:render(df.global.cur_year_tick)
         assert.is_true(ok, failure)
     end)
 end)
@@ -68,9 +139,10 @@ local function rows_for(descriptor, count)
 end
 
 ---Creates one mounted overlay with entirely injected live-test providers.
+---@param overrides? table
 ---@return table
-local function mount_overlay()
-    return ds.mount(MoodPopoverOverlay, {
+local function mount_overlay(overrides)
+    local attributes = {
         initial_pause=false,
         viewport={width=80, height=25},
         hover_provider=function() return state.hover end,
@@ -80,7 +152,9 @@ local function mount_overlay()
         end,
         active_provider=function() return state.active end,
         refresh_interval=1,
-    })
+    }
+    for key, value in pairs(overrides or {}) do attributes[key] = value end
+    return ds.mount(MoodPopoverOverlay, attributes)
 end
 
 ---Selects one injected native mood icon at a deterministic screen position.

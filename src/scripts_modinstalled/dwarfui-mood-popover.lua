@@ -6,13 +6,6 @@ local overlay = require('plugins.overlay')
 local MoodPopoverModel = reqscript('dwarfui/mood_popover').MoodPopoverModel
 local Popover = reqscript('dwarfui/popover').Popover
 
----Reads the native top-panel hover instruction when fortress UI is available.
----@return any|nil
-local function default_hover_provider()
-    local interface = df.global.game and df.global.game.main_interface
-    return interface and interface.current_hover or nil
-end
-
 ---Reads the current screen-space mouse position.
 ---@return integer|nil x
 ---@return integer|nil y
@@ -27,7 +20,127 @@ local function default_snapshot_provider(descriptor)
     return MoodPopoverModel{}:build_active_snapshot(descriptor)
 end
 
----Returns whether the overlay still has an active fortress map to present in.
+---@class dwarfui.TopBarMoodDisplay: dfhack.class
+---@field layout_width integer|nil
+---@field layout_height integer|nil
+---@field mood_rects table[]|nil
+TopBarMoodDisplay = defclass(TopBarMoodDisplay)
+TopBarMoodDisplay.ATTRS{
+    read_tile=dfhack.screen.readTile,
+    dimensions_provider=function()
+        return df.global.gps.dimx, df.global.gps.dimy
+    end,
+    hover_instructions=df.main_hover_instruction,
+}
+
+---Clears the cached top information-bar layout.
+function TopBarMoodDisplay:clear_layout()
+    self.layout_width = nil
+    self.layout_height = nil
+    self.mood_rects = nil
+end
+
+---Returns whether a screen cell contains the expected ASCII character.
+---@param x integer
+---@param y integer
+---@param expected integer
+---@return boolean
+function TopBarMoodDisplay:has_character(x, y, expected)
+    local tile = self.read_tile(x, y)
+    return tile ~= nil and tile.ch == expected
+end
+
+---Returns whether a two-by-two native mood icon occupies this location.
+---@param x integer
+---@param y integer
+---@return boolean
+function TopBarMoodDisplay:has_mood_icon(x, y)
+    local separator = self.read_tile(x - 1, y)
+    if separator == nil then return false end
+    for icon_y=y,y + 1 do
+        for icon_x=x,x + 1 do
+            local tile = self.read_tile(icon_x, icon_y)
+            if tile == nil or tile.ch ~= 0 or tile.tile == separator.tile then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+---Discovers the seven rendered mood-icon rectangles beside the Pop heading.
+---@return table[]|nil
+function TopBarMoodDisplay:find_layout()
+    local width, height = self.dimensions_provider()
+    if width == self.layout_width and height == self.layout_height and
+            self.mood_rects ~= nil then
+        return self.mood_rects
+    end
+    self:clear_layout()
+    if width == nil or height == nil or width < 25 or height < 3 then
+        return nil
+    end
+
+    for y=0,math.min(4, height - 3) do
+        for x=0,width - 22 do
+            if self:has_character(x, y, string.byte('P')) and
+                    self:has_character(x + 1, y, string.byte('o')) and
+                    self:has_character(x + 2, y, string.byte('p')) then
+                local rects = {}
+                local valid = true
+                for hover_index=0,6 do
+                    local icon_x = x + 4 + hover_index * 3
+                    if not self:has_mood_icon(icon_x, y) then
+                        valid = false
+                        break
+                    end
+                    table.insert(rects, {
+                        x1=icon_x,
+                        y1=y,
+                        x2=icon_x + 1,
+                        y2=y + 1,
+                        hover_index=hover_index,
+                    })
+                end
+                if valid then
+                    self.layout_width = width
+                    self.layout_height = height
+                    self.mood_rects = rects
+                    return rects
+                end
+            end
+        end
+    end
+    return nil
+end
+
+---Maps a pointer over the rendered top-bar mood icons to a mood instruction.
+---@param mouse_x integer|nil
+---@param mouse_y integer|nil
+---@return any|nil
+function TopBarMoodDisplay:resolve_hover(mouse_x, mouse_y)
+    if mouse_x == nil or mouse_y == nil then return nil end
+    for _, rect in ipairs(self:find_layout() or {}) do
+        if mouse_x >= rect.x1 and mouse_x <= rect.x2 and
+                mouse_y >= rect.y1 and mouse_y <= rect.y2 then
+            return self.hover_instructions[
+                'INFO_STRESSED_' .. rect.hover_index]
+        end
+    end
+    return nil
+end
+
+local topbar_mood_display = TopBarMoodDisplay{}
+
+---Resolves the pointer against DF's rendered top information-bar mood icons.
+---@param mouse_x integer|nil
+---@param mouse_y integer|nil
+---@return any|nil
+local function default_hover_provider(mouse_x, mouse_y)
+    return topbar_mood_display:resolve_hover(mouse_x, mouse_y)
+end
+
+---Returns whether the fortress top information bar is currently visible.
 ---@return boolean
 local function default_active_provider()
     if df.global.world == nil then return false end
@@ -41,14 +154,14 @@ end
 ---@field popover dwarfui.Popover
 ---@field refresh_ticks integer
 ---@field mood_model dwarfui.MoodPopoverModel
----@field hover_provider fun(): any|nil
+---@field hover_provider fun(mouse_x: integer, mouse_y: integer): any|nil
 ---@field mouse_provider fun(): integer|nil, integer|nil
 ---@field snapshot_provider fun(descriptor: table): table[]
 ---@field active_provider fun(): boolean
 MoodPopoverOverlay = defclass(MoodPopoverOverlay, overlay.OverlayWidget)
 MoodPopoverOverlay.ATTRS{
     desc='Shows the citizens represented by a hovered fortress mood icon.',
-    version='4',
+    version='6',
     default_enabled=true,
     default_pos={x=1, y=1},
     viewscreens='dwarfmode/Default',
@@ -108,7 +221,7 @@ function MoodPopoverOverlay:refresh()
         self.snapshot_provider(self.selected_descriptor), false)
 end
 
----Samples native hover and pointer state, then applies the retention rules.
+---Samples top-bar hover and pointer state, then applies the retention rules.
 function MoodPopoverOverlay:update_popover()
     if not self.active_provider() then
         self:clear()
@@ -121,7 +234,8 @@ function MoodPopoverOverlay:update_popover()
         return
     end
 
-    local descriptor = self.mood_model:resolve_hover(self.hover_provider())
+    local descriptor = self.mood_model:resolve_hover(
+        self.hover_provider(mouse_x, mouse_y))
     if descriptor then
         if not self.selected_descriptor or
                 descriptor.hover_value ~= self.selected_descriptor.hover_value then
