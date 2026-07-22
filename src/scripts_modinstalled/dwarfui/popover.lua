@@ -27,7 +27,6 @@ end
 ---@field anchor_x integer|nil
 ---@field anchor_y integer|nil
 ---@field rows table[]
----@field scroll_top integer
 ---@field visible_rows integer
 ---@field frame_global table|nil
 ---@field on_submit false|fun(row: any, index: integer)
@@ -53,7 +52,6 @@ Popover.ATTRS{
 function Popover:init()
     self.rows = {}
     self.title = ''
-    self.scroll_top = 1
     self.visible_rows = 0
     self.header = widgets.Label{
         view_id='header',
@@ -134,36 +132,12 @@ function Popover:has_overflow()
     return #self.rows > self.visible_rows
 end
 
----Resets the list to its first row.
-function Popover:reset_scroll()
-    self.scroll_top = 1
-    self.list.page_top = 1
-end
-
----Clamps the current scroll position to the available visible list region.
-function Popover:clamp_scroll()
-    local maximum = math.max(1, #self.rows - self.visible_rows + 1)
-    self.scroll_top = clamp(self.scroll_top, 1, maximum)
-    self.list.page_top = self.scroll_top
-end
-
----Moves the visible list window by a number of rows.
----@param delta integer
----@return boolean changed
-function Popover:scroll(delta)
-    if not self:has_overflow() then return false end
-    local previous = self.scroll_top
-    self.scroll_top = self.scroll_top + delta
-    self:clamp_scroll()
-    if self.scroll_top ~= previous and self.invalidate then self:invalidate() end
-    return self.scroll_top ~= previous
-end
-
 ---Sets the popover heading and all current list rows.
 ---@param title string
 ---@param rows table[]|nil
 ---@param reset_scroll? boolean Set false when refreshing the same subject.
 function Popover:set_content(title, rows, reset_scroll)
+    local preserved_page_top = reset_scroll == false and self.list.page_top or nil
     self.title = tostring(title or '')
     self.rows = rows or {}
     self.header:setText(('%s (%d)'):format(self.title, #self.rows))
@@ -171,10 +145,13 @@ function Popover:set_content(title, rows, reset_scroll)
     for _, row in ipairs(self.rows) do
         table.insert(choices, {text=row_text(row), row=row})
     end
-    self.list:setChoices(choices)
+    self.list:setChoices(choices, reset_scroll ~= false and 1 or nil)
+    if preserved_page_top and self.list.on_scrollbar then
+        -- Let the native list clamp its prior page and update its scrollbar.
+        self.list:on_scrollbar(preserved_page_top)
+    end
     self.empty.visible = #self.rows == 0
     self.list.visible = #self.rows > 0
-    if reset_scroll ~= false then self:reset_scroll() end
     if self.visible and self.frame_parent_rect then
         self:reposition(self.frame_parent_rect)
     end
@@ -201,7 +178,6 @@ function Popover:reposition(parent_rect)
     self.header.frame = {l=0, t=0, r=0, h=1}
     self.list.frame = {l=0, t=1, r=0, h=math.max(1, self.visible_rows)}
     self.empty.frame = {l=0, t=1, r=0, h=1}
-    self:clamp_scroll()
     self:updateLayout(parent_rect)
 end
 
@@ -216,6 +192,10 @@ function Popover:show_at(anchor_x, anchor_y, parent_rect)
     self.anchor_y = anchor_y
     self.visible = true
     self:reposition(parent_rect)
+    if self.list.visible and self.list.scrollbar and
+            self.list.scrollbar.setFocus then
+        self.list.scrollbar:setFocus(true)
+    end
     if self.invalidate then self:invalidate() end
 end
 
@@ -262,10 +242,10 @@ function Popover:contains_list_point(x, y)
         y < frame.y + FRAME_BODY_PADDING + 1 + self.visible_rows
 end
 
----Consumes standard wheel scrolling whenever an overflowing popover is open.
+---Forwards wheel input to the focused scrollbar whenever the popover is open.
 ---
----The pointer can remain on the originating moodlet, avoiding a gap crossing
----between the top information bar and the popover.
+---The scrollbar owns the list's page position. The pointer can remain on the
+---originating moodlet instead of crossing the gap to the popover.
 ---@param keys table
 ---@return boolean|nil
 function Popover:onInput(keys)
@@ -274,18 +254,22 @@ function Popover:onInput(keys)
     if keys._MOUSE_L and self:contains_list_point(mouse_x, mouse_y) then
         return self.list:onInput(keys)
     end
-    if not self:has_overflow() then return end
+    local scroll_spec
     if keys.CONTEXT_SCROLL_UP or keys.STANDARDSCROLL_UP then
-        self:scroll(-1)
-        return true
+        scroll_spec = 'up_small'
     elseif keys.CONTEXT_SCROLL_DOWN or keys.STANDARDSCROLL_DOWN then
-        self:scroll(1)
-        return true
+        scroll_spec = 'down_small'
     elseif keys.CONTEXT_SCROLL_PAGEUP or keys.STANDARDSCROLL_PAGEUP then
-        self:scroll(-math.max(1, self.visible_rows))
-        return true
+        scroll_spec = 'up_large'
     elseif keys.CONTEXT_SCROLL_PAGEDOWN or keys.STANDARDSCROLL_PAGEDOWN then
-        self:scroll(math.max(1, self.visible_rows))
-        return true
+        scroll_spec = 'down_large'
+    else
+        return
     end
+    if self.list.visible and self.list.scrollbar and
+            self.list.scrollbar.on_scroll then
+        self.list.scrollbar.on_scroll(scroll_spec)
+    end
+    -- Consume wheel input even for an empty or fully visible list.
+    return true
 end

@@ -188,6 +188,7 @@ local function default_unit_opener(unit)
     if not dfhack.gui.revealInDwarfmodeMap(pos, true, true) then return false end
 
     local sheets = df.global.game.main_interface.view_sheets
+    df.global.game.main_interface.view.have_calced_info = false
     sheets.context = df.view_sheets_context_type.REGULAR_PLAY
     sheets.active_sheet = df.view_sheet_type.UNIT
     sheets.active_id = unit.id
@@ -228,7 +229,7 @@ MoodPopoverOverlay.ATTRS{
     unit_opener=default_unit_opener,
 }
 
----Constructs the fullscreen transparent host and its reusable popover.
+---Constructs the fullscreen host and its persistent-scroll interactive popover.
 function MoodPopoverOverlay:init()
     self.selected_descriptor = nil
     self.refresh_ticks = 0

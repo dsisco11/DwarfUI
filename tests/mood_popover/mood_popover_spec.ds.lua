@@ -179,12 +179,14 @@ describe('native DF top-bar moodlet integration', function()
                 CONTEXT_SCROLL_DOWN=true,
                 CURSOR_UP_Z=true,
             })
-            assert.equals(2, widget.popover.scroll_top)
+            assert.equals(2, widget.popover.list.page_top)
             assert.equals(previous_z, df.global.window_z)
 
             local target
             for _, unit in ipairs(df.global.world.units.active) do
-                if dfhack.units.isCitizen(unit) then
+                local soul = unit.status and unit.status.current_soul
+                if dfhack.units.isCitizen(unit) and soul and
+                        #soul.skills > 0 then
                     target = unit
                     break
                 end
@@ -221,6 +223,9 @@ describe('native DF top-bar moodlet integration', function()
             assert.equals(target.id, dfhack.gui.getSelectedUnit(true).id)
             assert.equals(target.pos.z, df.global.window_z)
             assert.is_false(widget.popover.visible)
+            ds.wait_frames(1)
+            assert.is_true(#sheets.raw_thought_str > 0)
+            assert.is_true(sheets.labor_skill_num > 0)
         end, debug.traceback)
 
         gps.mouse_x, gps.mouse_y = saved.mouse_x, saved.mouse_y
@@ -347,15 +352,27 @@ describe('live mood popover overlay component', function()
         assert.is_true(popover:inspect().visible)
     end)
 
-    it('scrolls while the pointer remains on the originating moodlet',
+    it('focuses the scrollbar and lets DFHack move it from the moodlet',
             function()
         state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
         select_mood(3, 10, 3)
         local popover, _, list = popover_controls()
-        for _=1,20 do root:input('CONTEXT_SCROLL_DOWN') end
+        local scrollbar = list:raw().scrollbar
+        local initial_offset = scrollbar.bar_offset
+        assert.is_true(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
+        assert.equals(2, list:raw().page_top)
+        assert.equals(2, scrollbar.top_elem)
+        assert.is_true(scrollbar.bar_offset > initial_offset)
+        root:raw():update_popover()
+        assert.equals(2, list:raw().page_top)
+        assert.equals(2, scrollbar.top_elem)
+        for _=1,20 do
+            assert.is_true(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
+        end
         assert.equals(20 - root:raw().popover.visible_rows + 1,
-            root:raw().popover.scroll_top)
-        assert.equals(root:raw().popover.scroll_top, list:raw().page_top)
+            list:raw().page_top)
+        assert.equals(list:raw().page_top, scrollbar.top_elem)
+        assert.is_true(scrollbar.bar_offset > initial_offset)
         assert.equals('Content Unit 20', list:raw().choices[20].text)
 
         state.hover, state.mouse_x, state.mouse_y = nil, 0, 0
@@ -384,6 +401,8 @@ describe('live mood popover overlay component', function()
         select_mood(2, 10, 3)
         assert.equals('Happy (0)', header:text())
         assert.is_false(list:inspect().visible)
+        assert.is_true(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
+        assert.equals(1, list:raw().page_top)
 
         ds.viewport(30, 10)
         frame = root:raw().popover.frame_global
@@ -412,7 +431,7 @@ describe('live mood popover overlay component', function()
         assert.is_nil(root:raw().selected_descriptor)
         assert.equals(' (0)', header:text())
         assert.is_false(popover:inspect().visible)
-        assert.equals(1, root:raw().popover.scroll_top)
+        assert.equals(1, list:raw().page_top)
         assert.same({}, list:raw().choices)
     end)
 end)
