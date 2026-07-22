@@ -1,6 +1,6 @@
 ✔ Port over the Tooltip widget from `SoulSearch`. @done(26-07-21 23:00)
 ☐ Port over the ContextMenu widget from `DwarfDirect`.
-☐ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level. See `Docs/mood-popover.todo`.
+✔ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level. See `Docs/mood-popover.todo`. @done(26-07-22 08:05)
 ☐ [Container Contents Popover] Implement ability to hold `Alt` and hover mouse over a container to show a popout panel which shows the list of all items in that container.
 ☐ [Work Orders Panel] Add button work-order entries to allow editing the set-material of work orders.
 ☐ [Work Orders Panel] Add button work-order entries to allow setting/removing their target-workshop restriction.
