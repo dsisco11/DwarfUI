@@ -27,6 +27,10 @@ local function load_overlay(state)
     }
     local layout = {
         list_x1=0,
+        is_supported_focus=function(_, focus)
+            return type(focus) == 'table' and
+                focus[1] == 'dwarfmode/Hauling'
+        end,
         find_route_header_y=function(_, _, route_id)
             return route_id and 10 or nil
         end,
@@ -83,7 +87,7 @@ describe('DwarfUI minecart route markers overlay', function()
     it('registers a fullscreen Hauling overlay and passes native input through',
             function()
         local state = {
-            focus='dwarfmode/Hauling', mouse_x=6, mouse_y=11, markers={},
+            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11, markers={},
             map_calls={}, viewport={},
             hauling={routes={[0]={id=8}}, view_routes={[0]={id=8}}},
         }
@@ -93,7 +97,7 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals('dwarfmode/Hauling', overlay.viewscreens)
         assert.is_false(overlay:onInput({_MOUSE_L=true}))
         assert.equals(8, selection.selected_route_id)
-        assert.same('dwarfmode/Hauling', selection.input.focus)
+        assert.same({'dwarfmode/Hauling'}, selection.input.focus)
     end)
 
     it('renders map markers and labels from the current selected route only',
@@ -103,7 +107,7 @@ describe('DwarfUI minecart route markers overlay', function()
             marker_glyph=string.char(15), label='Depot', label_x=5, label_y=7,
         }
         local state = {
-            focus='dwarfmode/Hauling', mouse_x=0, mouse_y=0,
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
             markers={marker}, map_calls={}, viewport={},
             hauling={routes={[0]={id=8}}, view_routes={[0]={id=8}}},
         }
@@ -124,13 +128,13 @@ describe('DwarfUI minecart route markers overlay', function()
     it('clears selection when the Hauling screen closes or the overlay disables',
             function()
         local state = {
-            focus='dwarfmode/Hauling', mouse_x=0, mouse_y=0, markers={},
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0, markers={},
             map_calls={}, viewport={},
             hauling={routes={[0]={id=8}}, view_routes={[0]={id=8}}},
         }
         local overlay, selection = load_overlay(state)
         selection.selected_route_id = 8
-        state.focus = 'dwarfmode/Default'
+        state.focus = {'dwarfmode/Default'}
 
         overlay:overlay_onupdate()
         assert.is_nil(selection.selected_route_id)

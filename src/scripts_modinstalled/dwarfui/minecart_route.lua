@@ -41,10 +41,17 @@ function MinecartRouteMenuLayout:init()
 end
 
 ---Returns whether native route rows are interactive for this focus path.
----@param focus string|nil
+---DFHack exposes the current focus as a list, while focused model tests may
+---supply one focus string directly.
+---@param focus string|string[]|nil
 ---@return boolean
 function MinecartRouteMenuLayout:is_supported_focus(focus)
-    return focus == HAULING_FOCUS
+    if type(focus) == 'string' then return focus == HAULING_FOCUS end
+    if type(focus) ~= 'table' then return false end
+    for _, focus_string in ipairs(focus) do
+        if focus_string == HAULING_FOCUS then return true end
+    end
+    return false
 end
 
 ---Returns whether a pointer lies within the native route-list column.
@@ -61,7 +68,7 @@ end
 ---@param mouse_x number|nil
 ---@param mouse_y number|nil
 ---@param hauling table|nil
----@param focus string|nil
+---@param focus string|string[]|nil
 ---@return dwarfui.MinecartRouteMenuRow|nil
 function MinecartRouteMenuLayout:resolve_row(mouse_x, mouse_y, hauling, focus)
     if not self:is_supported_focus(focus) or
@@ -92,7 +99,7 @@ end
 ---Finds the visible screen row of a selected route's native header.
 ---@param hauling table|nil
 ---@param route_id integer|nil
----@param focus string|nil
+---@param focus string|string[]|nil
 ---@return integer|nil
 function MinecartRouteMenuLayout:find_route_header_y(hauling, route_id, focus)
     if not self:is_supported_focus(focus) or not hauling or
@@ -188,7 +195,7 @@ end
 ---@param mouse_x number|nil
 ---@param mouse_y number|nil
 ---@param hauling table|nil
----@param focus string|nil
+---@param focus string|string[]|nil
 ---@return false
 function MinecartRouteSelection:observe_input(
         keys, mouse_x, mouse_y, hauling, focus)

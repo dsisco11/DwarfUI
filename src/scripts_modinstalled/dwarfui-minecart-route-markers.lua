@@ -14,8 +14,8 @@ local function get_hauling()
     return df.global.plotinfo and df.global.plotinfo.hauling or nil
 end
 
----Returns the current DFHack focus string.
----@return string|nil
+---Returns the current DFHack focus strings.
+---@return string[]
 local function get_focus()
     return dfhack.gui.getCurFocus()
 end
@@ -25,7 +25,7 @@ end
 ---@field layout dwarfui.MinecartRouteMenuLayout
 ---@field projection dwarfui.MinecartRouteMarkerProjection
 ---@field hauling_provider fun(): df.hauling_handlerst|nil
----@field focus_provider fun(): string|nil
+---@field focus_provider fun(): string[]
 ---@field mouse_provider fun(): integer|nil, integer|nil
 ---@field viewport_provider fun(): gui.dwarfmode.Viewport
 ---@field map_overlay_renderer fun(callback: fun(pos: table): any, bounds: table)
@@ -70,7 +70,8 @@ end
 ---@return df.hauling_route|nil
 function MinecartRouteMarkersOverlay:resolve_selected_route()
     local hauling = self.hauling_provider()
-    if self.focus_provider() ~= HAULING_FOCUS or not hauling then
+    if not self.layout:is_supported_focus(self.focus_provider()) or
+            not hauling then
         self:clear_selection()
         return nil
     end

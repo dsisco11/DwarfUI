@@ -109,7 +109,7 @@ describe('DwarfUI minecart route menu layout', function()
     it('maps a stop row to its owning route', function()
         local hauling, routes = route_fixture()
         local row = MinecartRouteMenuLayout{}:resolve_row(6, 14, hauling,
-            'dwarfmode/Hauling')
+            {'dwarfmode/Hauling'})
 
         assert.equals(1, row.index)
         assert.is_equal(routes[1], row.route)
@@ -164,10 +164,13 @@ describe('DwarfUI minecart route menu layout', function()
         local layout = MinecartRouteMenuLayout{}
 
         for _, focus in ipairs({
-                'dwarfmode/Default',
-                'dwarfmode/Hauling/DefineStop',
-                'dwarfmode/Hauling/AssignVehicle',
-            }) do
+            'dwarfmode/Default',
+            'dwarfmode/Hauling/DefineStop',
+            'dwarfmode/Hauling/AssignVehicle',
+            {'dwarfmode/Default'},
+            {'dwarfmode/Hauling/DefineStop'},
+            {},
+        }) do
             assert.is_nil(layout:resolve_row(6, 10, hauling, focus))
         end
         assert.is_nil(layout:resolve_row(6, 10, hauling, nil))
@@ -192,7 +195,7 @@ describe('DwarfUI minecart route selection', function()
         local selection = MinecartRouteSelection{}
 
         assert.is_false(selection:observe_input({_MOUSE_L=true}, 6, 11,
-            hauling, 'dwarfmode/Hauling'))
+            hauling, {'dwarfmode/Hauling'}))
         assert.equals(routes[1].id, selection:get_selected_route_id())
     end)
 
