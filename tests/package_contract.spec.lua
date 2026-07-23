@@ -107,6 +107,7 @@ local function load_public_module(package_path)
                 defclass=widget_harness.defclass,
             },
             require_modules={
+                gui={paint_frame=function() end},
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },
         }

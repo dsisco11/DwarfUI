@@ -1,5 +1,6 @@
 --@ module=true
 
+local gui = require('gui')
 local widgets = require('gui.widgets')
 
 ---Returns whether a value is an integer.
@@ -203,6 +204,54 @@ local function copy_inset(inset)
     return result
 end
 
+---Returns four normalized per-edge content inset values.
+---@param inset integer|table
+---@return integer left
+---@return integer top
+---@return integer right
+---@return integer bottom
+local function inset_edges(inset)
+    if type(inset) == 'number' then return inset, inset, inset, inset end
+    return inset.l or inset.x or 0,
+        inset.t or inset.y or 0,
+        inset.r or inset.x or 0,
+        inset.b or inset.y or 0
+end
+
+---Returns a copy of one widget frame with supplied body-relative coordinates.
+---@param frame table|nil
+---@param left integer
+---@param top integer
+---@param width integer
+---@param height integer
+---@return table
+local function placed_frame(frame, left, top, width, height)
+    local result = {}
+    for key, value in pairs(frame or {}) do result[key] = value end
+    result.l, result.t, result.w, result.h = left, top, width, height
+    result.r, result.b = nil, nil
+    return result
+end
+
+---Returns a callback result or a static presentation value.
+---@param value any
+---@param target dwarfui.HoverActionTarget
+---@return any
+local function resolve_presentation_value(value, target)
+    if type(value) == 'function' then return value(target) end
+    return value
+end
+
+---Parses a nontransparent rail background through DFHack's pen API.
+---@param value any
+---@return dfhack.pen|false
+local function parse_background(value)
+    if value == false then return false end
+    assert(dfhack and dfhack.pen and type(dfhack.pen.parse) == 'function',
+        'HoverActionRail requires dfhack.pen.parse for a background pen')
+    return dfhack.pen.parse(value)
+end
+
 ---Validates a static, target-sensitive, or disabled presentation value.
 ---@param value any
 ---@param field_name string
@@ -210,6 +259,35 @@ local function validate_presentation_value(value, field_name)
     assert(value == false or type(value) == 'function' or
             (value ~= nil and type(value) ~= 'boolean'),
         field_name .. ' must be false, a callback, or a static value')
+end
+
+---Validates a value returned by a target-sensitive presentation callback.
+---@param value any
+---@param field_name string
+local function validate_resolved_presentation_value(value, field_name)
+    assert(value == false or (value ~= nil and type(value) ~= 'boolean' and
+            type(value) ~= 'function'),
+        field_name .. ' callback returned an invalid presentation value')
+end
+
+---@class dwarfui.HoverActionRailSurface: widgets.Panel
+---@field super widgets.Panel
+---@field ATTRS table
+local HoverActionRailSurface = defclass(nil, widgets.Panel)
+HoverActionRailSurface.ATTRS{
+    frame={l=0, t=0, w=1, h=1},
+    frame_background=false,
+    frame_style=false,
+    frame_inset=0,
+    visible=false,
+}
+
+---Paints background first, frame second, and leaves action painting to Panel.
+---@param dc gui.Painter
+---@param rect gui.ViewRect
+function HoverActionRailSurface:onRenderFrame(dc, rect)
+    if self.frame_background then dc:fill(rect, self.frame_background) end
+    if self.frame_style then gui.paint_frame(dc, rect, self.frame_style) end
 end
 
 ---@class dwarfui.HoverActionRail.attrs: widgets.Widget.attrs
@@ -235,6 +313,7 @@ end
 ---@overload fun(init_table: dwarfui.HoverActionRail.attrs): self
 HoverActionRail = defclass(HoverActionRail, widgets.Widget)
 HoverActionRail.ATTRS{
+    frame={l=0, t=0, r=0, b=0},
     actions=DEFAULT_NIL,
     target_at=DEFAULT_NIL,
     validate_target=DEFAULT_NIL,
@@ -276,8 +355,13 @@ function HoverActionRail:init()
         end)
         assert(is_widget_instance(widget),
             'HoverAction.widget_factory must return a widgets.Widget')
+        widget.visible = false
+        widget.enabled = false
         table.insert(self.action_widgets, widget)
     end
+    self.surface = HoverActionRailSurface{}
+    self.surface:addviews(self.action_widgets)
+    self:addviews{self.surface}
     self.active_target = nil
     self.rail_bounds = nil
 end
@@ -286,6 +370,80 @@ end
 ---@return dwarfui.HoverActionTarget|nil
 function HoverActionRail:get_target()
     return self.active_target
+end
+
+---Recomputes presentation and body-relative action frames for the current target.
+---
+---Hover ownership assigns `active_target` in a later lifecycle layer. Keeping
+---the presentation refresh separate lets that layer update a target without
+---recreating any action widgets.
+function HoverActionRail:refresh_surface()
+    local target = self.active_target
+    if not target then
+        self.surface.visible = false
+        self.rail_bounds = nil
+        for _, widget in ipairs(self.action_widgets) do
+            widget.visible = false
+            widget.enabled = false
+        end
+        return
+    end
+
+    local background = resolve_presentation_value(self.background_pen, target)
+    local border = resolve_presentation_value(self.border_style, target)
+    validate_resolved_presentation_value(background,
+        'HoverActionRail.background_pen')
+    validate_resolved_presentation_value(border,
+        'HoverActionRail.border_style')
+    self.surface.frame_background = parse_background(background)
+    self.surface.frame_style = border
+    self.surface.frame_inset = self.content_inset
+
+    local content_width, content_height, last_gap_after = 0, 0, 0
+    for index, action in ipairs(self.actions) do
+        local widget = self.action_widgets[index]
+        local visible = action.visible(target)
+        assert(type(visible) == 'boolean',
+            'HoverAction.visible must return a boolean')
+        local enabled = action.enabled(target)
+        assert(type(enabled) == 'boolean',
+            'HoverAction.enabled must return a boolean')
+        widget.visible = visible
+        widget.enabled = visible and enabled
+        if widget.visible then
+            local frame = widget.frame or {}
+            local width = frame.w or 1
+            local height = frame.h or 1
+            assert(is_nonnegative_integer(width) and width > 0,
+                'HoverAction widget frame width must be a positive integer')
+            assert(is_nonnegative_integer(height) and height > 0,
+                'HoverAction widget frame height must be a positive integer')
+            widget.frame = placed_frame(frame, content_width, 0, width, height)
+            content_width = content_width + width + action.gap_after +
+                self.action_gap
+            content_height = math.max(content_height, height)
+            last_gap_after = action.gap_after
+        end
+    end
+
+    if content_width == 0 then
+        self.surface.visible = false
+        self.rail_bounds = nil
+        return
+    end
+    content_width = content_width - self.action_gap - last_gap_after
+    local inset_left, inset_top, inset_right, inset_bottom = inset_edges(
+        self.content_inset)
+    self.surface.frame = placed_frame(self.surface.frame, 0, 0,
+        content_width + inset_left + inset_right,
+        content_height + inset_top + inset_bottom)
+    self.surface.visible = true
+    self.rail_bounds = {
+        x1=self.surface.frame.l,
+        y1=self.surface.frame.t,
+        x2=self.surface.frame.l + self.surface.frame.w - 1,
+        y2=self.surface.frame.t + self.surface.frame.h - 1,
+    }
 end
 
 ---Temporarily provides the public activation entrypoint before input ownership.

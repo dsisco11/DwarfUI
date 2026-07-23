@@ -10,19 +10,57 @@ local module_path =
 local function make_context()
     local default_nil = widget_harness.default_nil()
     local widgets = widget_harness.widgets(nil, default_nil)
+    widgets.Widget.ATTRS{visible=true, enabled=true, disabled=false}
+    local parsed_backgrounds = {}
+    local gui = {
+        FRAME_THIN='thin',
+        FRAME_INTERIOR='interior',
+        FRAME_INTERIOR_MEDIUM='interior_medium',
+        paint_frame=function(dc, rect, style)
+            table.insert(dc.events, {kind='border', rect=rect, style=style})
+        end,
+    }
     local _, module = module_loader.load(repo_root, module_path, {
         globals={
             DEFAULT_NIL=default_nil,
             defclass=widget_harness.defclass,
+            dfhack={pen={parse=function(value)
+                table.insert(parsed_backgrounds, value)
+                return {parsed=value}
+            end}},
         },
-        require_modules={['gui.widgets']=widgets},
+        require_modules={gui=gui, ['gui.widgets']=widgets},
     })
     return {
         HoverAction=module.HoverAction,
         HoverActionRail=module.HoverActionRail,
         HoverActionTarget=module.HoverActionTarget,
+        gui=gui,
+        parsed_backgrounds=parsed_backgrounds,
         widgets=widgets,
     }
+end
+
+---Builds a valid target for rail presentation tests.
+---@param context table
+---@param key? string|integer
+---@return dwarfui.HoverActionTarget
+local function target(context, key)
+    return context.HoverActionTarget{
+        key=key or 'target',
+        anchor={x1=5, y1=6, x2=9, y2=6},
+        payload={name='opaque'},
+    }
+end
+
+---Builds a painter that records ordered surface and action rendering.
+---@return table
+local function painter()
+    local result = {events={}}
+    function result:fill(rect, pen)
+        table.insert(self.events, {kind='background', rect=rect, pen=pen})
+    end
+    return result
 end
 
 ---Builds one valid action definition for a test rail.
@@ -289,5 +327,254 @@ describe('DwarfUI HoverActionRail construction', function()
                 widget_factory=function() return {} end,
             })}})
         end)
+    end)
+end)
+
+describe('DwarfUI HoverActionRail surface', function()
+    it('keeps the full-parent controller transparent and hides its surface without a target',
+            function()
+        local context = make_context()
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context)},
+        })
+
+        assert.same({l=0, t=0, r=0, b=0}, rail.frame)
+        assert.equals(1, #rail.subviews)
+        assert.is.equal(rail.surface, rail.subviews[1])
+        assert.is.equal(rail.action_widgets[1], rail.surface.subviews[1])
+        assert.is_false(rail.surface.visible)
+        assert.is_false(rail.action_widgets[1].visible)
+        assert.is_nil(rail.rail_bounds)
+
+        rail.active_target = target(context)
+        rail:refresh_surface()
+        rail.active_target = nil
+        rail:refresh_surface()
+
+        assert.is_false(rail.surface.visible)
+        assert.is_false(rail.action_widgets[1].visible)
+        assert.is_false(rail.action_widgets[1].enabled)
+        assert.is_nil(rail.rail_bounds)
+    end)
+
+    it('applies transparent, static, and target-sensitive backgrounds only for the current target',
+            function()
+        local context = make_context()
+        local seen_key
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context)},
+            background_pen=function(current_target)
+                seen_key = current_target.key
+                return {keep_lower=true, fg='yellow'}
+            end,
+        })
+        rail:refresh_surface()
+        assert.equals(0, #context.parsed_backgrounds)
+
+        rail.active_target = target(context, 'current')
+        rail:refresh_surface()
+        assert.equals('current', seen_key)
+        assert.same({parsed={keep_lower=true, fg='yellow'}},
+            rail.surface.frame_background)
+        assert.same({{keep_lower=true, fg='yellow'}}, context.parsed_backgrounds)
+
+        local transparent = context.HoverActionRail(rail_options{
+            actions={action(context)}, background_pen=false,
+        })
+        transparent.active_target = target(context)
+        transparent:refresh_surface()
+        assert.is_false(transparent.surface.frame_background)
+
+        local static = context.HoverActionRail(rail_options{
+            actions={action(context)}, background_pen='opaque',
+        })
+        static.active_target = target(context)
+        static:refresh_surface()
+        assert.same({parsed='opaque'}, static.surface.frame_background)
+        assert.same({
+            {keep_lower=true, fg='yellow'},
+            'opaque',
+        }, context.parsed_backgrounds)
+    end)
+
+    it('supports frameless, standard, custom, and target-sensitive borders',
+            function()
+        local context = make_context()
+        local custom = {tl='[', t='=', tr=']', pen='cyan'}
+        local seen_key
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context)},
+            border_style=function(current_target)
+                seen_key = current_target.key
+                return custom
+            end,
+        })
+        rail.active_target = target(context, 42)
+        rail:refresh_surface()
+        assert.equals(42, seen_key)
+        assert.is.equal(custom, rail.surface.frame_style)
+
+        local frameless = context.HoverActionRail(rail_options{
+            actions={action(context)}, border_style=false,
+        })
+        frameless.active_target = target(context)
+        frameless:refresh_surface()
+        assert.is_false(frameless.surface.frame_style)
+
+        for _, style in ipairs({
+                context.gui.FRAME_THIN,
+                context.gui.FRAME_INTERIOR,
+                context.gui.FRAME_INTERIOR_MEDIUM,
+            }) do
+            local standard = context.HoverActionRail(rail_options{
+                actions={action(context)}, border_style=style,
+            })
+            standard.active_target = target(context)
+            standard:refresh_surface()
+            assert.equals(style, standard.surface.frame_style)
+        end
+    end)
+
+    it('uses scalar and asymmetric insets while compacting visible action widgets',
+            function()
+        local context = make_context()
+        local created = 0
+        local first = action(context, {
+            id='first',
+            gap_after=1,
+            widget_factory=function()
+                created = created + 1
+                return context.widgets.Widget{frame={w=2, h=1}}
+            end,
+        })
+        local second_visible = false
+        local second = action(context, {
+            id='second',
+            widget_factory=function()
+                created = created + 1
+                return context.widgets.Widget{frame={w=3, h=2}}
+            end,
+            visible=function() return second_visible end,
+            enabled=function() return false end,
+        })
+        local rail = context.HoverActionRail(rail_options{
+            actions={first, second},
+            action_gap=2,
+            content_inset={l=1, t=2, r=3, b=4},
+        })
+        rail.active_target = target(context)
+        rail:refresh_surface()
+        assert.equals(2, created)
+        assert.same({0, 0, 2, 1}, {
+            rail.action_widgets[1].frame.l,
+            rail.action_widgets[1].frame.t,
+            rail.action_widgets[1].frame.w,
+            rail.action_widgets[1].frame.h,
+        })
+        assert.is_false(rail.action_widgets[2].visible)
+        assert.same({6, 7}, {rail.surface.frame.w, rail.surface.frame.h})
+        assert.same({0, 0, 5, 6}, {
+            rail.rail_bounds.x1,
+            rail.rail_bounds.y1,
+            rail.rail_bounds.x2,
+            rail.rail_bounds.y2,
+        })
+
+        second_visible = true
+        rail:refresh_surface()
+        assert.equals(2, created)
+        assert.is_true(rail.action_widgets[2].visible)
+        assert.is_false(rail.action_widgets[2].enabled)
+        assert.same({5, 0}, {
+            rail.action_widgets[2].frame.l,
+            rail.action_widgets[2].frame.t,
+        })
+        assert.same({12, 8}, {rail.surface.frame.w, rail.surface.frame.h})
+
+        local scalar = context.HoverActionRail(rail_options{
+            actions={action(context, {widget_factory=function()
+                return context.widgets.Widget{frame={w=2, h=1}}
+            end})},
+            content_inset=2,
+        })
+        scalar.active_target = target(context)
+        scalar:refresh_surface()
+        assert.same({6, 5}, {scalar.surface.frame.w, scalar.surface.frame.h})
+    end)
+
+    it('renders background, border, and action widgets in deterministic order',
+            function()
+        local context = make_context()
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context, {widget_factory=function()
+                return context.widgets.Widget{
+                    frame={w=1, h=1},
+                    onRenderFrame=function(_, dc)
+                        table.insert(dc.events, {kind='action'})
+                    end,
+                }
+            end})},
+            background_pen='opaque',
+            border_style=context.gui.FRAME_INTERIOR,
+            content_inset=1,
+        })
+        rail.active_target = target(context)
+        rail:refresh_surface()
+        rail:updateLayout(widget_harness.rect(0, 0, 20, 10))
+        local dc = painter()
+        rail:render(dc)
+
+        assert.same({'background', 'border', 'action'}, {
+            dc.events[1].kind,
+            dc.events[2].kind,
+            dc.events[3].kind,
+        })
+        assert.is.equal(rail.surface.frame_rect, dc.events[1].rect)
+        assert.is.equal(rail.surface.frame_rect, dc.events[2].rect)
+    end)
+
+    it('rejects invalid target-sensitive presentation and action-state results',
+            function()
+        local context = make_context()
+        local invalid_background = context.HoverActionRail(rail_options{
+            actions={action(context)},
+            background_pen=function() return true end,
+        })
+        invalid_background.active_target = target(context)
+        expect_error('background_pen callback returned an invalid presentation value',
+            function() invalid_background:refresh_surface() end)
+
+        local invalid_visible = context.HoverActionRail(rail_options{
+            actions={action(context, {visible=function() return 'yes' end})},
+        })
+        invalid_visible.active_target = target(context)
+        expect_error('HoverAction.visible must return a boolean',
+            function() invalid_visible:refresh_surface() end)
+    end)
+
+    it('reuses action widgets when target-sensitive presentation changes',
+            function()
+        local context = make_context()
+        local background = 'first'
+        local border = context.gui.FRAME_THIN
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context, {widget_factory=function()
+                return context.widgets.Widget{frame={w=2, h=1}}
+            end})},
+            background_pen=function() return background end,
+            border_style=function() return border end,
+        })
+        rail.active_target = target(context, 'first')
+        rail:refresh_surface()
+        local widget = rail.action_widgets[1]
+        background = 'second'
+        border = context.gui.FRAME_INTERIOR_MEDIUM
+        rail.active_target = target(context, 'second')
+        rail:refresh_surface()
+
+        assert.is.equal(widget, rail.action_widgets[1])
+        assert.same({parsed='second'}, rail.surface.frame_background)
+        assert.equals(context.gui.FRAME_INTERIOR_MEDIUM,
+            rail.surface.frame_style)
     end)
 end)
