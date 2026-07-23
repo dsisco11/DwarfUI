@@ -16,6 +16,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/widgets/hover_action_rail',
+        contract='HoverActionRail',
+        contract_type='table',
+    },
+    {
         name='dwarfui/minecart_stop_actions',
         contract='MinecartStopActionLayout',
         contract_type='table',

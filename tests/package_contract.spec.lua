@@ -7,6 +7,7 @@ local shipped_modules = {
     'dwarfui/text.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/widgets/asset_button.lua',
+    'dwarfui/widgets/hover_action_rail.lua',
     'dwarfui/minecart_stop_actions.lua',
     'dwarfui/pointer.lua',
     'dwarfui/minecart_route.lua',
@@ -94,6 +95,19 @@ local function load_public_module(package_path)
             },
             reqscript={
                 ['dwarfui/widget_extensions']={},
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua' then
+        local widget_harness = require('support.widget_harness')
+        local default_nil = widget_harness.default_nil()
+        options = {
+            globals={
+                DEFAULT_NIL=default_nil,
+                defclass=widget_harness.defclass,
+            },
+            require_modules={
+                ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },
         }
     elseif package_path ==
@@ -305,6 +319,23 @@ describe('DwarfUI package contract', function()
         local _, module = load_public_module(
             'scripts_modinstalled/dwarfui/widgets/asset_button.lua')
         assert.equals('table', type(module.AssetButton))
+    end)
+
+    it('ships the reusable hover-action rail class contracts', function()
+        local package_path =
+            'scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua'
+        local source = read_source(package_path)
+        for _, class_name in ipairs({
+                'HoverActionTarget',
+                'HoverAction',
+                'HoverActionRail',
+            }) do
+            contains(source, class_name .. ' = defclass')
+        end
+        local _, module = load_public_module(package_path)
+        assert.equals('table', type(module.HoverActionTarget))
+        assert.equals('table', type(module.HoverAction))
+        assert.equals('table', type(module.HoverActionRail))
     end)
 
     it('ships the reusable minecart stop-action class contracts', function()
