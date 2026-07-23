@@ -275,7 +275,17 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.same({3, 3}, {action.width, action.height})
         assert.same({page='INTERFACE_BITS', x=32, y=0}, action.asset)
         assert.equals(string.char(26) .. 'X ', action.chars[2])
-        assert.same({3, 4, 0}, action.pens[2])
+        assert.same({3, 4, 0}, {
+            action.pens[2][1].fg,
+            action.pens[2][2].fg,
+            action.pens[2][3].fg,
+        })
+        for _, row in ipairs(action.pens) do
+            for _, pen in ipairs(row) do
+                assert.is_true(pen.keep_lower,
+                    'recenter asset cells must preserve the native panel')
+            end
+        end
         assert.equals(string.char(26) .. ' X', action.tooltip)
 
         local buttons = overlay.stop_action_pool:get_buttons('recenter')

@@ -114,8 +114,8 @@ end
 ---@field asset_hover? {page: string, x: integer, y: integer}
 ---@field chars (string|string[])[]
 ---@field chars_hover? (string|string[])[]
----@field pens? dfhack.color|dfhack.color[][]
----@field pens_hover? dfhack.color|dfhack.color[][]
+---@field pens? dfhack.color|dfhack.pen|(dfhack.color|dfhack.pen)[][]
+---@field pens_hover? dfhack.color|dfhack.pen|(dfhack.color|dfhack.pen)[][]
 ---@field visible? boolean|fun(): boolean
 ---@field enabled? boolean|fun(): boolean
 ---@field disabled? boolean|fun(): boolean

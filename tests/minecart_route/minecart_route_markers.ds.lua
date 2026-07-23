@@ -132,7 +132,7 @@ local function get_visible_native_rows(hauling, layout)
 end
 
 ---Verifies that production recenter buttons exist only on real stop rows and
----that all nine cells use the corresponding vanilla interface graphics tile.
+---that all nine cells use the vanilla graphic over the native panel background.
 ---@param component dwarfui.MinecartRouteMarkersOverlay
 ---@param hauling df.hauling_handlerst
 ---@param AssetButton dwarfui.AssetButton
@@ -184,6 +184,21 @@ local function assert_rendered_stop_buttons(
         assert.equals(native_row.y1, descriptor.bounds.y1)
         assert.equals(native_row.y2, descriptor.bounds.y2)
         covered_stop_rows[descriptor.row_index] = true
+
+        local button_cell_count = 0
+        for _, token in ipairs(button.text) do
+            if type(token) == 'table' then
+                button_cell_count = button_cell_count + 1
+                assert.is_true(token.tile.keep_lower,
+                    description ..
+                        ': normal button pen does not preserve the native panel')
+                assert.is_true(token.htile.keep_lower,
+                    description ..
+                        ': hover button pen does not preserve the native panel')
+            end
+        end
+        assert.equals(9, button_cell_count,
+            description .. ': production button does not contain nine cells')
 
         if verify_graphics ~= false then
             for dy=0,2 do

@@ -17,10 +17,18 @@ local STOCKS_RECENTER_CHARS = {
     string.char(26) .. 'X ',
     '   ',
 }
+
+---Returns a foreground pen that preserves the native panel underneath it.
+---@param foreground dfhack.color
+---@return dfhack.pen
+local function transparent_pen(foreground)
+    return {fg=foreground, bg=0, keep_lower=true}
+end
+
 local STOCKS_RECENTER_PENS = {
-    {0, 0, 0},
-    {3, 4, 0},
-    {0, 0, 0},
+    {transparent_pen(0), transparent_pen(0), transparent_pen(0)},
+    {transparent_pen(3), transparent_pen(4), transparent_pen(0)},
+    {transparent_pen(0), transparent_pen(0), transparent_pen(0)},
 }
 local STOCKS_RECENTER_TOOLTIP = string.char(26) .. ' X'
 
