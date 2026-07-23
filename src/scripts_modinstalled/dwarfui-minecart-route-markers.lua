@@ -5,8 +5,24 @@
 local overlay = require('plugins.overlay')
 local guidm = require('gui.dwarfmode')
 local route_model = reqscript('dwarfui/minecart_route')
+local stop_action_model = reqscript('dwarfui/minecart_stop_actions')
 
 local HAULING_FOCUS = 'dwarfmode/Hauling'
+local ZOOM_ACTION_ID = 'recenter'
+
+-- Vanilla's classic STOCKS_RECENTER graphic is a cyan right arrow followed
+-- by a red X. Premium replaces the same three-cell action with a 3-by-3 asset.
+local STOCKS_RECENTER_CHARS = {
+    '   ',
+    string.char(26) .. 'X ',
+    '   ',
+}
+local STOCKS_RECENTER_PENS = {
+    {0, 0, 0},
+    {3, 4, 0},
+    {0, 0, 0},
+}
+local STOCKS_RECENTER_TOOLTIP = string.char(26) .. ' X'
 
 ---Returns the active native Hauling state.
 ---@return df.hauling_handlerst|nil
@@ -68,11 +84,16 @@ end
 ---@field selection dwarfui.MinecartRouteSelection
 ---@field layout dwarfui.MinecartRouteMenuLayout
 ---@field projection dwarfui.MinecartRouteMarkerProjection
+---@field stop_actions dwarfui.MinecartStopActionDefinition[]
+---@field stop_action_layout dwarfui.MinecartStopActionLayout
+---@field stop_action_pool dwarfui.MinecartStopActionPool
+---@field extra_stop_actions dwarfui.MinecartStopActionDefinition[]|false
 ---@field hauling_provider fun(): df.hauling_handlerst|nil
 ---@field focus_provider fun(): string[]
 ---@field mouse_provider fun(): integer|nil, integer|nil
 ---@field viewport_provider fun(): gui.dwarfmode.Viewport
 ---@field map_overlay_renderer fun(callback: fun(pos: table): any, bounds: table)
+---@field reveal_provider fun(pos: table, center: boolean, highlight: boolean)
 ---@field bounds_provider fun(sample_y: integer): table|nil
 ---@field bounds_screen_width integer|nil
 ---@field bounds_screen_height integer|nil
@@ -91,20 +112,51 @@ MinecartRouteMarkersOverlay.ATTRS{
     mouse_provider=dfhack.screen.getMousePos,
     viewport_provider=guidm.Viewport.get,
     map_overlay_renderer=guidm.renderMapOverlay,
+    reveal_provider=dfhack.gui.revealInDwarfmodeMap,
     bounds_provider=read_hauling_menu_bounds,
+    extra_stop_actions=false,
 }
 
----Constructs the selection, native-layout, and marker-projection models.
+---Constructs route-marker models and the visible stop-action button pool.
 function MinecartRouteMarkersOverlay:init()
     self.layout = route_model.MinecartRouteMenuLayout{}
     self.selection = route_model.MinecartRouteSelection{layout=self.layout}
     self.projection = route_model.MinecartRouteMarkerProjection{}
-    self.overlay_ondisable = function() self:clear_selection() end
+    self.stop_actions = {
+        stop_action_model.MinecartStopActionDefinition{
+            id=ZOOM_ACTION_ID,
+            width=3,
+            height=3,
+            asset={page='INTERFACE_BITS', x=32, y=0},
+            chars=STOCKS_RECENTER_CHARS,
+            pens=STOCKS_RECENTER_PENS,
+            tooltip=STOCKS_RECENTER_TOOLTIP,
+            on_activate=function(descriptor)
+                self:activate_zoom_action(descriptor)
+            end,
+        },
+    }
+    for _, action in ipairs(self.extra_stop_actions or {}) do
+        table.insert(self.stop_actions, action)
+    end
+    self.stop_action_layout = stop_action_model.MinecartStopActionLayout{
+        actions=self.stop_actions,
+    }
+    self.stop_action_pool = stop_action_model.MinecartStopActionPool{
+        on_button_created=function(button) self:addviews{button} end,
+    }
+    self.overlay_ondisable = function() self:clear_overlay_state() end
 end
 
 ---Clears selected-route state without mutating native route data.
 function MinecartRouteMarkersOverlay:clear_selection()
     self.selection:clear()
+end
+
+---Clears selection and every pooled stop-row binding.
+function MinecartRouteMarkersOverlay:clear_overlay_state()
+    self:clear_selection()
+    self.stop_action_pool:clear()
 end
 
 ---Expands the transparent hit-test and render host across the parent screen.
@@ -128,6 +180,65 @@ function MinecartRouteMarkersOverlay:ensure_menu_bounds()
         self.bounds_screen_width = width
         self.bounds_screen_height = height
     end
+end
+
+---Rebuilds current visible stop actions and rebinds their pooled buttons.
+---@param hauling df.hauling_handlerst|nil
+function MinecartRouteMarkersOverlay:refresh_stop_actions(hauling)
+    if not self.layout:is_supported_focus(self.focus_provider()) then
+        self.stop_action_pool:clear()
+        return
+    end
+    local descriptors = self.stop_action_layout:build(hauling, self.layout)
+    self.stop_action_pool:bind(descriptors, self.frame_body)
+end
+
+---Resolves a bound descriptor against the current flattened native row.
+---@param descriptor dwarfui.MinecartStopActionDescriptor|nil
+---@return {x: integer, y: integer, z: integer}|nil
+function MinecartRouteMarkersOverlay:resolve_stop_action_position(descriptor)
+    if not descriptor or
+            not self.layout:is_supported_focus(self.focus_provider()) then
+        return nil
+    end
+    local hauling = self.hauling_provider()
+    if not hauling or not hauling.view_routes or not hauling.view_stops then
+        return nil
+    end
+
+    local scroll_position = hauling.scroll_position or 0
+    if type(scroll_position) ~= 'number' then return nil end
+    local visible_index = descriptor.row_index - scroll_position
+    if visible_index < 0 or
+            descriptor.bounds.y1 ~= self.layout.first_row_top +
+                visible_index * self.layout.row_height or
+            not self.layout.bounds or
+            descriptor.bounds.y2 > self.layout.bounds.y2 then
+        return nil
+    end
+
+    local route = hauling.view_routes[descriptor.row_index]
+    local stop = hauling.view_stops[descriptor.row_index]
+    if not route or not stop or route.id ~= descriptor.route_id or
+            stop.id ~= descriptor.stop_id then
+        return nil
+    end
+    local pos = stop.pos
+    if not pos or type(pos.x) ~= 'number' or type(pos.y) ~= 'number' or
+            type(pos.z) ~= 'number' then
+        return nil
+    end
+    return {x=pos.x, y=pos.y, z=pos.z}
+end
+
+---Centers and highlights the current position of a validated stop action.
+---@param descriptor dwarfui.MinecartStopActionDescriptor
+---@return boolean activated
+function MinecartRouteMarkersOverlay:activate_zoom_action(descriptor)
+    local pos = self:resolve_stop_action_position(descriptor)
+    if not pos then return false end
+    self.reveal_provider(pos, true, true)
+    return true
 end
 
 ---Resolves the current selected route and clears it when its context vanished.
@@ -176,34 +287,45 @@ function MinecartRouteMarkersOverlay:render_selection_indicator(dc, hauling)
     end
 end
 
----Renders the native overlay frame, then selection UI and selected stop map data.
+---Renders selected stop map data, then draws action buttons as the top layer.
 ---@param dc gui.Painter
 function MinecartRouteMarkersOverlay:render(dc)
-    MinecartRouteMarkersOverlay.super.render(self, dc)
     self:ensure_menu_bounds()
     local hauling = self.hauling_provider()
+    self:refresh_stop_actions(hauling)
     local route = self:resolve_selected_route()
-    if not hauling or not route then return end
-    self:render_selection_indicator(dc, hauling)
-    local markers = self.projection:project(route, self.viewport_provider())
-    for _, marker in ipairs(markers) do self:render_marker(marker) end
-    self:render_labels(dc, markers)
+    if hauling and route then
+        self:render_selection_indicator(dc, hauling)
+        local markers = self.projection:project(route, self.viewport_provider())
+        for _, marker in ipairs(markers) do self:render_marker(marker) end
+        self:render_labels(dc, markers)
+    end
+    MinecartRouteMarkersOverlay.super.render(self, dc)
 end
 
----Observes a native route-list click while leaving all native input unconsumed.
+---Consumes owned button clicks before observing pass-through native row input.
 ---@param keys table
----@return false
+---@return boolean
 function MinecartRouteMarkersOverlay:onInput(keys)
     self:ensure_menu_bounds()
+    local hauling = self.hauling_provider()
+    self:refresh_stop_actions(hauling)
+    if self:inputToSubviews(keys) then return true end
     local mouse_x, mouse_y = self.mouse_provider()
     self.selection:observe_input(keys, mouse_x, mouse_y,
-        self.hauling_provider(), self.focus_provider())
+        hauling, self.focus_provider())
     return false
 end
 
 ---Clears selection when the Hauling screen closes or the world unloads.
 function MinecartRouteMarkersOverlay:overlay_onupdate()
-    self:resolve_selected_route()
+    local hauling = self.hauling_provider()
+    if not self.layout:is_supported_focus(self.focus_provider()) or
+            not hauling then
+        self:clear_overlay_state()
+        return
+    end
+    self.selection:resolve_selected_route(hauling.routes)
 end
 
 OVERLAY_WIDGETS = {
