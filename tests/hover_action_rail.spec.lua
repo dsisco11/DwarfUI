@@ -999,3 +999,57 @@ describe('DwarfUI HoverActionRail hover lifecycle', function()
         assert.is_nil(rail.retention_bridge)
     end)
 end)
+
+describe('DwarfUI HoverActionRail input', function()
+    it('activates only a freshly validated target and rejects stale keys', function()
+        local context = make_context()
+        local current, called = nil, nil
+        local definition = action(context, {activate=function(target)
+            called = target
+            return true
+        end})
+        local rail = context.HoverActionRail(rail_options{
+            actions={definition},
+            validate_target=function() return current end,
+        })
+        rail.active_target = target(context, 'same')
+        current = context.HoverActionTarget{
+            key='same', anchor={x1=2, y1=2, x2=2, y2=2}, payload={fresh=true},
+        }
+        assert.is_true(rail:activate(definition))
+        assert.is.equal(current, called)
+        assert.is.equal(current, rail:get_target())
+        current = context.HoverActionTarget{
+            key='other', anchor={x1=2, y1=2, x2=2, y2=2},
+        }
+        assert.is_false(rail:activate(definition))
+        assert.is_nil(rail:get_target())
+    end)
+
+    it('owns visible rail clicks and configured wheel input only', function()
+        local context = make_context()
+        local mouse_x, mouse_y = 5, 5
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context, {enabled=function() return false end,
+                widget_factory=function() return context.widgets.Widget{frame={w=1,h=1}} end})},
+            placement_order={'right'}, mouse_provider=function() return mouse_x, mouse_y end,
+            target_at=function(x, y)
+                if x == 5 and y == 5 then
+                    return context.HoverActionTarget{
+                        key='input', anchor={x1=5, y1=5, x2=5, y2=5},
+                    }
+                end
+            end,
+            consume_scroll=true,
+        })
+        rail:updateLayout(widget_harness.rect(0, 0, 20, 10))
+        rail:update_hover()
+        mouse_x = rail.rail_bounds.x1
+        assert.is_true(rail:onInput({_MOUSE_L=true}))
+        assert.is_true(rail:onInput({CONTEXT_SCROLL_DOWN=true}))
+        rail.consume_scroll = false
+        assert.is_false(rail:onInput({CONTEXT_SCROLL_DOWN=true}))
+        mouse_x = 19
+        assert.is_false(rail:onInput({_MOUSE_L=true}))
+    end)
+end)

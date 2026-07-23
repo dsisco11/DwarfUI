@@ -702,11 +702,38 @@ function HoverActionRail:render(dc)
     HoverActionRail.super.render(self, dc)
 end
 
----Temporarily provides the public activation entrypoint before input ownership.
+---Revalidates and invokes one action against the current target snapshot.
 ---@param action dwarfui.HoverAction
 ---@return boolean activated
 function HoverActionRail:activate(action)
     assert(is_instance_of(action, HoverAction),
         'HoverActionRail.activate requires a HoverAction')
-    return false
+    local target = self.active_target
+    if not target then return false end
+    local fresh = self.validate_target(target)
+    if not fresh or not is_instance_of(fresh, HoverActionTarget) or
+            fresh.key ~= target.key then
+        self:clear()
+        return false
+    end
+    self:bind_target(fresh)
+    if not action.visible(fresh) or not action.enabled(fresh) then return false end
+    return action.activate(fresh) ~= false
+end
+
+---Consumes input owned by the visible rail while passing unrelated input through.
+---@param keys table|nil
+---@return boolean
+function HoverActionRail:onInput(keys)
+    self:update_hover()
+    if not self.surface.visible then return false end
+    local x, y = self:get_local_pointer()
+    if not contains_point(self.rail_bounds, x, y) then return false end
+    if self.surface:inputToSubviews(keys or {}) then return true end
+    local scroll = keys and (keys.CONTEXT_SCROLL_UP or keys.CONTEXT_SCROLL_DOWN or
+        keys.STANDARDSCROLL_UP or keys.STANDARDSCROLL_DOWN or
+        keys.CONTEXT_SCROLL_PAGEUP or keys.CONTEXT_SCROLL_PAGEDOWN or
+        keys.STANDARDSCROLL_PAGEUP or keys.STANDARDSCROLL_PAGEDOWN)
+    if scroll then return self.consume_scroll end
+    return keys and keys._MOUSE_L or false
 end
