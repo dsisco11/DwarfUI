@@ -8,7 +8,6 @@ local shipped_modules = {
     'dwarfui/widget_extensions.lua',
     'dwarfui/widgets/asset_button.lua',
     'dwarfui/widgets/hover_action_rail.lua',
-    'dwarfui/minecart_stop_actions.lua',
     'dwarfui/pointer.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
@@ -109,26 +108,6 @@ local function load_public_module(package_path)
             require_modules={
                 gui={paint_frame=function() end},
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
-            },
-        }
-    elseif package_path ==
-            'scripts_modinstalled/dwarfui/minecart_stop_actions.lua' then
-        options = {
-            globals={
-                defclass=function(class)
-                    class = class or {}
-                    class.ATTRS = function() end
-                    return setmetatable(class, {__call=function(class_table,
-                            attributes)
-                        local instance = attributes or {}
-                        setmetatable(instance, {__index=class_table})
-                        if instance.init then instance:init() end
-                        return instance
-                    end})
-                end,
-            },
-            reqscript={
-                ['dwarfui/widgets/asset_button']={AssetButton={}},
             },
         }
     elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
@@ -337,27 +316,6 @@ describe('DwarfUI package contract', function()
         assert.equals('table', type(module.HoverActionTarget))
         assert.equals('table', type(module.HoverAction))
         assert.equals('table', type(module.HoverActionRail))
-    end)
-
-    it('ships the reusable minecart stop-action class contracts', function()
-        local package_path =
-            'scripts_modinstalled/dwarfui/minecart_stop_actions.lua'
-        local source = read_source(package_path)
-        for _, class_name in ipairs({
-                'MinecartStopActionDefinition',
-                'MinecartStopActionDescriptor',
-                'MinecartStopActionLayout',
-                'MinecartStopActionPool',
-            }) do
-            contains(source, class_name .. ' = defclass')
-        end
-        local _, module = load_public_module(package_path)
-        assert.equals('table',
-            type(module.MinecartStopActionDefinition))
-        assert.equals('table',
-            type(module.MinecartStopActionDescriptor))
-        assert.equals('table', type(module.MinecartStopActionLayout))
-        assert.equals('table', type(module.MinecartStopActionPool))
     end)
 
     it('includes the complete mood-popover payload and registration', function()

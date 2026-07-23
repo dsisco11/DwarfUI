@@ -91,11 +91,16 @@ local function load_overlay(state)
                 ['dwarfui/widget_extensions']={},
             },
         })
-    local _, stop_actions = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/minecart_stop_actions.lua', {
-            globals={defclass=test_defclass},
-            reqscript={
-                ['dwarfui/widgets/asset_button']=asset_button,
+    local _, hover_action_rail = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua', {
+            globals={
+                DEFAULT_NIL=default_nil,
+                defclass=widget_harness.defclass,
+                dfhack={pen={parse=function(value) return value end}},
+            },
+            require_modules={
+                gui={paint_frame=function() end},
+                ['gui.widgets']=widgets,
             },
         })
     local _, module = module_loader.load(repo_root,
@@ -144,19 +149,16 @@ local function load_overlay(state)
                     MinecartRouteSelection=function() return selection end,
                     MinecartRouteMarkerProjection=function() return projection end,
                 },
-                ['dwarfui/minecart_stop_actions']=stop_actions,
+                ['dwarfui/widgets/asset_button']=asset_button,
+                ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
             },
         })
-    local extra_stop_actions = state.extra_stop_actions and
-        state.extra_stop_actions(stop_actions) or false
-    local instance = module.MinecartRouteMarkersOverlay{
-        extra_stop_actions=extra_stop_actions,
-    }
+    local instance = module.MinecartRouteMarkersOverlay{}
     instance.bounds_provider = function()
         state.bounds_reads = (state.bounds_reads or 0) + 1
         return state.bounds or {x1=4, y1=4, x2=59, y2=74}
     end
-    return instance, selection, stop_actions
+    return instance, selection, hover_action_rail
 end
 
 ---Lays out a fullscreen overlay so pooled buttons have real hit regions.
@@ -170,7 +172,7 @@ end
 ---Creates a painter double that records screen-space label and indicator text.
 ---@return table
 local function painter()
-    local dc = {strings={}, chars={}}
+    local dc = {strings={}, chars={}, fills={}}
     function dc:seek(x, y) self.x, self.y = x, y return self end
     function dc:string(text, pen)
         table.insert(self.strings, {x=self.x, y=self.y, text=text, pen=pen})
@@ -178,6 +180,10 @@ local function painter()
     end
     function dc:char(char, pen)
         table.insert(self.chars, {x=self.x, y=self.y, char=char, pen=pen})
+        return self
+    end
+    function dc:fill(rect, pen)
+        table.insert(self.fills, {rect=rect, pen=pen})
         return self
     end
     return dc
@@ -237,22 +243,33 @@ describe('DwarfUI minecart route markers overlay', function()
     it('clears selection when the Hauling screen closes or the overlay disables',
             function()
         local state = {
-            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0, markers={},
+            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11, markers={},
             map_calls={}, reveals={}, viewport={},
-            hauling={routes={[0]={id=8}}, view_routes={[0]={id=8}}},
+            bounds={x1=4, y1=4, x2=59, y2=12},
+            hauling={
+                routes={[0]={id=8}}, view_routes={[0]={id=8}},
+                view_stops={[0]={id=80, pos={x=17, y=29, z=4}}},
+            },
         }
         local overlay, selection = load_overlay(state)
+        layout_overlay(overlay)
+        overlay:render(painter())
+        assert.is_not_nil(overlay.stop_rail:get_target())
         selection.selected_route_id = 8
         state.focus = {'dwarfmode/Default'}
 
         overlay:overlay_onupdate()
         assert.is_nil(selection.selected_route_id)
+        assert.is_nil(overlay.stop_rail:get_target())
         selection.selected_route_id = 8
+        state.focus = {'dwarfmode/Hauling'}
+        overlay:render(painter())
         overlay.overlay_ondisable()
         assert.is_nil(selection.selected_route_id)
+        assert.is_nil(overlay.stop_rail:get_target())
     end)
 
-    it('renders the vanilla recenter action beside every visible stop row',
+    it('shows one left-side hover rail only for a current stop entry',
             function()
         local state = {
             focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
@@ -275,14 +292,16 @@ describe('DwarfUI minecart route markers overlay', function()
         layout_overlay(overlay)
         overlay:render(painter())
 
-        local action = overlay.stop_actions[1]
-        assert.equals('recenter', action.id)
-        assert.same({3, 3}, {action.width, action.height})
+        assert.is_false(overlay.stop_rail.surface.visible)
+        state.mouse_x, state.mouse_y = 6, 11
+        overlay:render(painter())
+        local action = overlay.stop_rail.action_widgets[1]
+        assert.equals('recenter', overlay.stop_rail.actions[1].id)
+        assert.same({3, 3}, {action.frame.w, action.frame.h})
         assert.same({page='INTERFACE_BITS', x=32, y=0}, action.asset)
         assert.equals(string.char(26) .. 'X ', action.chars[2])
         assert.same({3, 4, 0}, {
-            action.pens[2][1].fg,
-            action.pens[2][2].fg,
+            action.pens[2][1].fg, action.pens[2][2].fg,
             action.pens[2][3].fg,
         })
         for _, row in ipairs(action.pens) do
@@ -292,19 +311,25 @@ describe('DwarfUI minecart route markers overlay', function()
             end
         end
         assert.equals(string.char(26) .. ' X', action.tooltip)
-
-        local buttons = overlay.stop_action_pool:get_buttons('recenter')
-        assert.equals(2, #buttons)
-        assert.same({60, 10, 3, 3}, {
-            buttons[1].frame.l,
-            buttons[1].frame.t,
-            buttons[1].frame.w,
-            buttons[1].frame.h,
-        })
-        assert.same({60, 13}, {
-            buttons[2].frame.l,
-            buttons[2].frame.t,
-        })
+        assert.is_true(overlay.stop_rail.surface.visible)
+        assert.equals('left', overlay.stop_rail.placement)
+        assert.same({fg=0, bg=0, keep_lower=true},
+            overlay.stop_rail.surface.frame_background)
+        assert.same({0, 0, 3, 3}, {action.frame.l, action.frame.t,
+            action.frame.w, action.frame.h})
+        assert.same({1, 10, 3, 3}, {overlay.stop_rail.surface.frame.l,
+            overlay.stop_rail.surface.frame.t, overlay.stop_rail.surface.frame.w,
+            overlay.stop_rail.surface.frame.h})
+        assert.equals(3, overlay.stop_rail.rail_bounds.x2)
+        assert.equals(4, overlay.stop_rail.active_target.anchor.x1)
+        assert.equals('8:80', overlay:target_at_stop(4, 11).key)
+        assert.equals('8:80', overlay:target_at_stop(58, 11).key)
+        state.mouse_x, state.mouse_y = 4, 9
+        overlay:render(painter())
+        assert.is_false(overlay.stop_rail.surface.visible,
+            'route headers must not create a stop rail')
+        assert.is_nil(overlay:target_at_stop(59, 11),
+            'the native scrollbar column must not create a stop target')
     end)
 
     it('consumes a zoom click and reveals a copied current stop position',
@@ -313,7 +338,7 @@ describe('DwarfUI minecart route markers overlay', function()
         local route = {id=8}
         local stop = {id=80, pos=stop_pos}
         local state = {
-            focus={'dwarfmode/Hauling'}, mouse_x=61, mouse_y=11,
+            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11,
             markers={}, map_calls={}, reveals={}, viewport={},
             bounds={x1=4, y1=4, x2=59, y2=12},
             hauling={
@@ -334,6 +359,8 @@ describe('DwarfUI minecart route markers overlay', function()
             pos={x=stop.pos.x, y=stop.pos.y, z=stop.pos.z},
         }
 
+        overlay:render(painter())
+        state.mouse_x = 2
         assert.is_true(overlay:onInput({_MOUSE_L=true}))
 
         assert.equals(1, #state.reveals)
@@ -368,10 +395,8 @@ describe('DwarfUI minecart route markers overlay', function()
         local overlay, selection = load_overlay(state)
         selection.selected_route_id = 77
         layout_overlay(overlay)
-        overlay:ensure_menu_bounds()
-        overlay:refresh_stop_actions(state.hauling)
-        local button =
-            overlay.stop_action_pool:get_buttons('recenter')[1]
+        overlay:render(painter())
+        local button = overlay.stop_rail.action_widgets[1]
 
         stop.id = 81
         assert.has_no.errors(function() button:activate() end)
@@ -415,58 +440,63 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals(0, #state.reveals)
     end)
 
-    it('adds a second action without changing stop-row layout code',
+    it('rejects incomplete or invalid native list state without raising',
             function()
-        local synthetic_activations = {}
-        local route = {id=8}
         local state = {
-            focus={'dwarfmode/Hauling'}, mouse_x=63, mouse_y=11,
+            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11,
             markers={}, map_calls={}, reveals={}, viewport={},
             bounds={x1=4, y1=4, x2=59, y2=12},
+            hauling={view_routes={[0]={id=8}}},
+        }
+        local overlay = load_overlay(state)
+        layout_overlay(overlay)
+        overlay:ensure_menu_bounds()
+        assert.has_no.errors(function() overlay:render(painter()) end)
+        assert.is_nil(overlay:target_at_stop(6, 11))
+
+        state.hauling.view_stops = {[0]={id=80, pos={x=17, y=29, z=4}}}
+        state.hauling.scroll_position = 'not a row'
+        assert.has_no.errors(function() overlay:render(painter()) end)
+        assert.is_nil(overlay:target_at_stop(6, 11))
+    end)
+
+    it('consumes wheel input over the rail but refreshes after native list scrolling',
+            function()
+        local route = {id=8}
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11,
+            markers={}, map_calls={}, reveals={}, viewport={},
+            bounds={x1=4, y1=4, x2=59, y2=15},
             hauling={
-                routes={[0]=route},
-                view_routes={[0]=route},
+                routes={[0]=route, [1]=route},
+                view_routes={[0]=route, [1]=route},
                 view_stops={
                     [0]={id=80, pos={x=17, y=29, z=4}},
+                    [1]={id=81, pos={x=18, y=30, z=4}},
                 },
                 scroll_position=0,
             },
-            extra_stop_actions=function(stop_actions)
-                return {
-                    stop_actions.MinecartStopActionDefinition{
-                        id='synthetic',
-                        width=1,
-                        height=3,
-                        chars={'S', 'S', 'S'},
-                        tooltip='S',
-                        on_activate=function(descriptor)
-                            table.insert(
-                                synthetic_activations, descriptor.stop_id)
-                        end,
-                    },
-                }
-            end,
         }
         local overlay = load_overlay(state)
         layout_overlay(overlay)
         overlay:render(painter())
-        local active = overlay.stop_action_pool:get_active_buttons()
+        assert.equals('8:80', overlay.stop_rail:get_target().key)
 
-        assert.equals(2, #active)
-        assert.same({'recenter', 'synthetic'}, {
-            active[1].action_descriptor.action_id,
-            active[2].action_descriptor.action_id,
-        })
-        assert.same({60, 63}, {
-            active[1].frame.l,
-            active[2].frame.l,
-        })
-        assert.is_true(overlay:onInput({_MOUSE_L=true}))
-        assert.same({80}, synthetic_activations)
-        assert.equals(0, #state.reveals)
+        state.mouse_x = 2
+        assert.is_true(overlay:onInput({CONTEXT_SCROLL_DOWN=true}),
+            'the rail must own wheel input over its surface')
+        assert.equals(0, state.hauling.scroll_position)
+
+        state.mouse_x = 6
+        assert.is_false(overlay:onInput({CONTEXT_SCROLL_DOWN=true}),
+            'wheel input over the native list must pass through')
+        state.hauling.scroll_position = 1
+        overlay:render(painter())
+        assert.equals('8:81', overlay.stop_rail:get_target().key,
+            'the rail must bind the stop now under the pointer after scrolling')
     end)
 
-    it('renders stop action buttons above map markers', function()
+    it('draws the hover rail after selected route markers', function()
         local route = {id=8}
         local state = {
             focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
@@ -489,9 +519,9 @@ describe('DwarfUI minecart route markers overlay', function()
         local overlay, selection = load_overlay(state)
         selection.selected_route_id = 8
         layout_overlay(overlay)
+        state.mouse_x, state.mouse_y = 6, 11
         overlay:render(painter())
-        local button =
-            overlay.stop_action_pool:get_buttons('recenter')[1]
+        local button = overlay.stop_rail.action_widgets[1]
         button.onRenderBody = function()
             table.insert(state.render_events, 'button')
         end
