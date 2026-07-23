@@ -132,6 +132,7 @@ DFHack layout and input contracts.
 ---@field placement_bounds_provider fun(): table
 ---@field placement_order string[]
 ---@field action_gap integer
+---@field target_gap integer
 ---@field consume_scroll boolean
 ---@field background_pen dfhack.pen|fun(target: dwarfui.HoverActionTarget): dfhack.pen|false
 ---@field border_style gui.Frame|fun(target: dwarfui.HoverActionTarget): gui.Frame|false
@@ -191,6 +192,11 @@ coordinates before calling `target_at`. Action frames and target anchors use
 that same local coordinate space. This allows the widget to live in a
 fullscreen overlay or another laid-out root without assuming that its parent
 begins at screen coordinate `0,0`.
+
+`target_gap` controls the number of cells between the target anchor and the
+outer rail surface. It defaults to zero. A nonzero gap produces the retention
+bridge described below; consumers that need a directly adjacent action rail
+leave it at zero.
 
 Presentation attributes apply only to the moving rail surface:
 
@@ -275,6 +281,7 @@ The Hauling consumer uses:
 ```lua
 placement_order={'left'}
 action_gap=0
+target_gap=0
 ```
 
 Its target anchor is the full three-row native stop entry, excluding the native

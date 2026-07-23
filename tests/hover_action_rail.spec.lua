@@ -96,6 +96,7 @@ local function rail_options(values)
             function() return {x1=0, y1=0, x2=79, y2=24} end,
         placement_order=values.placement_order,
         action_gap=values.action_gap,
+        target_gap=values.target_gap,
         consume_scroll=values.consume_scroll,
         background_pen=values.background_pen,
         border_style=values.border_style,
@@ -306,6 +307,11 @@ describe('DwarfUI HoverActionRail construction', function()
                 actions={action(context)}, action_gap=1.5,
             })
         end)
+        expect_error('target_gap must be a nonnegative integer', function()
+            context.HoverActionRail(rail_options{
+                actions={action(context)}, target_gap=-1,
+            })
+        end)
         expect_error('consume_scroll must be a boolean', function()
             context.HoverActionRail(rail_options{
                 actions={action(context)}, consume_scroll=1,
@@ -473,7 +479,7 @@ describe('DwarfUI HoverActionRail surface', function()
         })
         assert.is_false(rail.action_widgets[2].visible)
         assert.same({6, 7}, {rail.surface.frame.w, rail.surface.frame.h})
-        assert.same({0, 0, 5, 6}, {
+        assert.same({10, 3, 15, 9}, {
             rail.rail_bounds.x1,
             rail.rail_bounds.y1,
             rail.rail_bounds.x2,
@@ -576,5 +582,357 @@ describe('DwarfUI HoverActionRail surface', function()
         assert.same({parsed='second'}, rail.surface.frame_background)
         assert.equals(context.gui.FRAME_INTERIOR_MEDIUM,
             rail.surface.frame_style)
+    end)
+end)
+
+describe('DwarfUI HoverActionRail placement', function()
+    ---Builds a visible two-action rail with mixed dimensions.
+    ---@param context table
+    ---@param placement_order string[]
+    ---@param bounds table
+    ---@return dwarfui.HoverActionRail
+    local function mixed_rail(context, placement_order, bounds)
+        local first = action(context, {
+            id='first',
+            gap_after=1,
+            widget_factory=function()
+                return context.widgets.Widget{frame={w=2, h=1}}
+            end,
+        })
+        local second = action(context, {
+            id='second',
+            widget_factory=function()
+                return context.widgets.Widget{frame={w=3, h=3}}
+            end,
+        })
+        return context.HoverActionRail(rail_options{
+            actions={first, second},
+            action_gap=1,
+            placement_order=placement_order,
+            placement_bounds_provider=function() return bounds end,
+            content_inset=1,
+        })
+    end
+
+    ---Builds a target whose anchor is already in rail-local coordinates.
+    ---@param context table
+    ---@param anchor table
+    ---@return dwarfui.HoverActionTarget
+    local function anchored_target(context, anchor)
+        return context.HoverActionTarget{
+            key='anchor',
+            anchor=anchor,
+        }
+    end
+
+    it('places every direction exactly and preserves the nearest action order',
+            function()
+        local cases = {
+            left={surface={1, 9, 9, 13}, actions={5, 1, 0, 0}},
+            right={surface={13, 9, 21, 13}, actions={0, 1, 4, 0}},
+            above={surface={7, 5, 15, 9}, actions={0, 1, 4, 0}},
+            below={surface={7, 13, 15, 17}, actions={0, 1, 4, 0}},
+        }
+        for placement, expected in pairs(cases) do
+            local context = make_context()
+            local rail = mixed_rail(context, {placement},
+                {x1=0, y1=0, x2=29, y2=29})
+            rail.active_target = anchored_target(context,
+                {x1=10, y1=10, x2=12, y2=12})
+            rail:refresh_surface()
+
+            assert.equals(placement, rail.placement)
+            assert.same(expected.surface, {
+                rail.rail_bounds.x1,
+                rail.rail_bounds.y1,
+                rail.rail_bounds.x2,
+                rail.rail_bounds.y2,
+            })
+            assert.is_true(rail.rail_bounds.x1 >= 0)
+            assert.is_true(rail.rail_bounds.y1 >= 0)
+            assert.is_true(rail.rail_bounds.x2 <= 29)
+            assert.is_true(rail.rail_bounds.y2 <= 29)
+            assert.same(expected.actions, {
+                rail.action_widgets[1].frame.l,
+                rail.action_widgets[1].frame.t,
+                rail.action_widgets[2].frame.l,
+                rail.action_widgets[2].frame.t,
+            })
+            if placement == 'left' then
+                assert.is_true(rail.action_widgets[1].frame.l >
+                    rail.action_widgets[2].frame.l)
+            elseif placement == 'right' then
+                assert.is_true(rail.action_widgets[1].frame.l <
+                    rail.action_widgets[2].frame.l)
+            end
+        end
+    end)
+
+    it('tries placement order without clamping across the target or bounds',
+            function()
+        local context = make_context()
+        local rail = mixed_rail(context, {'left', 'right'},
+            {x1=0, y1=0, x2=29, y2=29})
+        rail.active_target = anchored_target(context,
+            {x1=0, y1=10, x2=2, y2=12})
+        rail:refresh_surface()
+        assert.equals('right', rail.placement)
+        assert.same({3, 9, 11, 13}, {
+            rail.rail_bounds.x1,
+            rail.rail_bounds.y1,
+            rail.rail_bounds.x2,
+            rail.rail_bounds.y2,
+        })
+        assert.is_true(rail.rail_bounds.x1 > rail.active_target.anchor.x2)
+
+        local no_fit = mixed_rail(context, {'left', 'right', 'above', 'below'},
+            {x1=9, y1=9, x2=13, y2=13})
+        no_fit.active_target = anchored_target(context,
+            {x1=10, y1=10, x2=12, y2=12})
+        no_fit:refresh_surface()
+        assert.is_false(no_fit.surface.visible)
+        assert.is_nil(no_fit.placement)
+        assert.is_nil(no_fit.rail_bounds)
+    end)
+
+    it('fits adjacent rails at each placement-bound edge without clipping',
+            function()
+        local cases = {
+            {placement='right', anchor={x1=0, y1=2, x2=0, y2=2},
+                bounds={1, 2, 1, 2}},
+            {placement='left', anchor={x1=4, y1=2, x2=4, y2=2},
+                bounds={3, 2, 3, 2}},
+            {placement='below', anchor={x1=2, y1=0, x2=2, y2=0},
+                bounds={2, 1, 2, 1}},
+            {placement='above', anchor={x1=2, y1=4, x2=2, y2=4},
+                bounds={2, 3, 2, 3}},
+        }
+        for _, case in ipairs(cases) do
+            local context = make_context()
+            local rail = context.HoverActionRail(rail_options{
+                actions={action(context, {widget_factory=function()
+                    return context.widgets.Widget{frame={w=1, h=1}}
+                end})},
+                placement_order={case.placement},
+                placement_bounds_provider=function()
+                    return {x1=0, y1=0, x2=4, y2=4}
+                end,
+            })
+            rail.active_target = anchored_target(context, case.anchor)
+            rail:refresh_surface()
+            assert.same(case.bounds, {
+                rail.rail_bounds.x1,
+                rail.rail_bounds.y1,
+                rail.rail_bounds.x2,
+                rail.rail_bounds.y2,
+            })
+        end
+    end)
+
+    it('keeps ordered actions stable as additional outward actions are added',
+            function()
+        local context = make_context()
+        local make_action = function(id, width)
+            return action(context, {id=id, widget_factory=function()
+                return context.widgets.Widget{frame={w=width, h=1}}
+            end})
+        end
+        local rail = context.HoverActionRail(rail_options{
+            actions={
+                make_action('first', 2),
+                make_action('second', 3),
+                make_action('third', 1),
+            },
+            placement_order={'left'},
+            placement_bounds_provider=function()
+                return {x1=0, y1=0, x2=29, y2=29}
+            end,
+        })
+        rail.active_target = anchored_target(context,
+            {x1=10, y1=10, x2=10, y2=10})
+        rail:refresh_surface()
+
+        assert.same({4, 1, 0}, {
+            rail.action_widgets[1].frame.l,
+            rail.action_widgets[2].frame.l,
+            rail.action_widgets[3].frame.l,
+        })
+        assert.same({4, 9}, {
+            rail.rail_bounds.x1,
+            rail.rail_bounds.x2,
+        })
+        assert.equals(rail.active_target.anchor.x1 - 1,
+            rail.rail_bounds.x1 + rail.action_widgets[1].frame.l +
+                rail.action_widgets[1].frame.w - 1)
+    end)
+
+    it('converts the screen pointer to local coordinates without mixing spaces',
+            function()
+        local context = make_context()
+        local mouse_x, mouse_y = 14, 26
+        local resolved_x, resolved_y
+        local resolved_target = target(context, 'resolved')
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context)},
+            mouse_provider=function() return mouse_x, mouse_y end,
+            target_at=function(x, y)
+                resolved_x, resolved_y = x, y
+                return resolved_target
+            end,
+            placement_order={'right'},
+            placement_bounds_provider=function()
+                return {x1=0, y1=0, x2=19, y2=9}
+            end,
+        })
+        rail:updateLayout(widget_harness.rect(10, 20, 20, 10))
+        assert.same({4, 6}, {rail:get_local_pointer()})
+        assert.is.equal(resolved_target, rail:resolve_target_at_pointer())
+        assert.same({4, 6}, {resolved_x, resolved_y})
+
+        rail.active_target = anchored_target(context,
+            {x1=4, y1=6, x2=4, y2=6})
+        rail:refresh_surface()
+        assert.same({5, 6, 5, 6}, {
+            rail.rail_bounds.x1,
+            rail.rail_bounds.y1,
+            rail.rail_bounds.x2,
+            rail.rail_bounds.y2,
+        })
+    end)
+
+    it('remeasures visibility, dimensions, insets, and border edges without recreating widgets',
+            function()
+        local context = make_context()
+        local visible = true
+        local created = 0
+        local rail = context.HoverActionRail(rail_options{
+            actions={
+                action(context, {widget_factory=function()
+                    created = created + 1
+                    return context.widgets.Widget{frame={w=2, h=1}}
+                end}),
+                action(context, {
+                    id='conditional',
+                    visible=function() return visible end,
+                    widget_factory=function()
+                        created = created + 1
+                        return context.widgets.Widget{frame={w=3, h=2}}
+                    end,
+                }),
+            },
+            placement_order={'right'},
+            placement_bounds_provider=function()
+                return {x1=0, y1=0, x2=29, y2=29}
+            end,
+            content_inset=1,
+            border_style=context.gui.FRAME_THIN,
+        })
+        rail.active_target = anchored_target(context,
+            {x1=10, y1=10, x2=12, y2=12})
+        rail:refresh_surface()
+        local first_widget, second_widget = rail.action_widgets[1],
+            rail.action_widgets[2]
+        assert.same({9, 6}, {rail.surface.frame.w, rail.surface.frame.h})
+
+        visible = false
+        first_widget.frame.w = 4
+        rail.content_inset = {l=2, t=0, r=1, b=3}
+        rail:refresh_surface()
+        assert.equals(2, created)
+        assert.is.equal(first_widget, rail.action_widgets[1])
+        assert.is.equal(second_widget, rail.action_widgets[2])
+        assert.same({9, 6}, {rail.surface.frame.w, rail.surface.frame.h})
+        assert.is_false(second_widget.visible)
+    end)
+
+    it('reevaluates anchors, placement bounds, and parent layouts from current state',
+            function()
+        local context = make_context()
+        local bounds = {x1=0, y1=0, x2=29, y2=29}
+        local bounds_reads = 0
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context, {widget_factory=function()
+                return context.widgets.Widget{frame={w=2, h=1}}
+            end})},
+            placement_order={'right'},
+            placement_bounds_provider=function()
+                bounds_reads = bounds_reads + 1
+                return bounds
+            end,
+        })
+        rail.active_target = anchored_target(context,
+            {x1=5, y1=5, x2=5, y2=5})
+        rail:refresh_surface()
+        assert.same({6, 5}, {rail.rail_bounds.x1, rail.rail_bounds.y1})
+
+        rail.active_target = anchored_target(context,
+            {x1=12, y1=8, x2=12, y2=8})
+        rail:refresh_surface()
+        assert.same({13, 8}, {rail.rail_bounds.x1, rail.rail_bounds.y1})
+
+        bounds = {x1=0, y1=0, x2=13, y2=8}
+        rail:refresh_surface()
+        assert.is_false(rail.surface.visible)
+        local reads_before_layout = bounds_reads
+        bounds = {x1=0, y1=0, x2=29, y2=29}
+        rail:updateLayout(widget_harness.rect(30, 40, 30, 20))
+        assert.is_true(bounds_reads > reads_before_layout)
+        assert.is_true(rail.surface.visible)
+        assert.same({13, 8}, {rail.rail_bounds.x1, rail.rail_bounds.y1})
+    end)
+
+    it('includes border and asymmetric inset edges when centering and fitting',
+            function()
+        local context = make_context()
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context, {widget_factory=function()
+                return context.widgets.Widget{frame={w=2, h=1}}
+            end})},
+            placement_order={'above'},
+            border_style=context.gui.FRAME_THIN,
+            content_inset={l=2, t=3, r=1, b=0},
+            placement_bounds_provider=function()
+                return {x1=8, y1=4, x2=14, y2=9}
+            end,
+        })
+        rail.active_target = anchored_target(context,
+            {x1=10, y1=10, x2=12, y2=12})
+        rail:refresh_surface()
+
+        assert.same({7, 6}, {rail.surface.frame.w, rail.surface.frame.h})
+        assert.same({8, 4, 14, 9}, {
+            rail.rail_bounds.x1,
+            rail.rail_bounds.y1,
+            rail.rail_bounds.x2,
+            rail.rail_bounds.y2,
+        })
+    end)
+
+    it('records empty and nonempty retention bridges exactly', function()
+        local context = make_context()
+        local build = function(target_gap)
+            local rail = context.HoverActionRail(rail_options{
+                actions={action(context, {widget_factory=function()
+                    return context.widgets.Widget{frame={w=2, h=1}}
+                end})},
+                placement_order={'left'},
+                target_gap=target_gap,
+                placement_bounds_provider=function()
+                    return {x1=0, y1=0, x2=29, y2=29}
+                end,
+            })
+            rail.active_target = anchored_target(context,
+                {x1=15, y1=10, x2=15, y2=10})
+            rail:refresh_surface()
+            return rail
+        end
+        assert.is_nil(build(0).retention_bridge)
+        local spaced = build(2)
+        assert.same({13, 10, 14, 10}, {
+            spaced.retention_bridge.x1,
+            spaced.retention_bridge.y1,
+            spaced.retention_bridge.x2,
+            spaced.retention_bridge.y2,
+        })
     end)
 end)

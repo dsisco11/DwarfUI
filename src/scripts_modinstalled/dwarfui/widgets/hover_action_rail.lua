@@ -270,6 +270,87 @@ local function validate_resolved_presentation_value(value, field_name)
         field_name .. ' callback returned an invalid presentation value')
 end
 
+---Returns a copied rail-local rectangle after validating its inclusive edges.
+---@param bounds table|nil
+---@return {x1: integer, y1: integer, x2: integer, y2: integer}
+local function copy_bounds(bounds)
+    assert(type(bounds) == 'table',
+        'HoverActionRail.placement_bounds_provider must return a rectangle')
+    for _, field in ipairs({'x1', 'y1', 'x2', 'y2'}) do
+        assert(is_integer(bounds[field]),
+            'HoverActionRail placement bound ' .. field .. ' must be an integer')
+    end
+    assert(bounds.x2 >= bounds.x1 and bounds.y2 >= bounds.y1,
+        'HoverActionRail placement bounds must have nonnegative dimensions')
+    return {x1=bounds.x1, y1=bounds.y1, x2=bounds.x2, y2=bounds.y2}
+end
+
+---Returns whether one complete outer rectangle fits inside placement bounds.
+---@param bounds table
+---@param rectangle table
+---@return boolean
+local function fits_bounds(bounds, rectangle)
+    return rectangle.x1 >= bounds.x1 and rectangle.y1 >= bounds.y1 and
+        rectangle.x2 <= bounds.x2 and rectangle.y2 <= bounds.y2
+end
+
+---Returns one candidate outer surface rectangle for a supported placement.
+---@param placement string
+---@param anchor table
+---@param width integer
+---@param height integer
+---@param target_gap integer
+---@return table
+local function placement_rectangle(
+        placement, anchor, width, height, target_gap)
+    local left, top
+    if placement == 'left' then
+        left = anchor.x1 - target_gap - width
+        top = math.floor((anchor.y1 + anchor.y2 - height + 1) / 2)
+    elseif placement == 'right' then
+        left = anchor.x2 + target_gap + 1
+        top = math.floor((anchor.y1 + anchor.y2 - height + 1) / 2)
+    elseif placement == 'above' then
+        left = math.floor((anchor.x1 + anchor.x2 - width + 1) / 2)
+        top = anchor.y1 - target_gap - height
+    else
+        left = math.floor((anchor.x1 + anchor.x2 - width + 1) / 2)
+        top = anchor.y2 + target_gap + 1
+    end
+    return {x1=left, y1=top, x2=left + width - 1, y2=top + height - 1}
+end
+
+---Returns the gap cells directly connecting a target anchor and rail surface.
+---@param placement string
+---@param anchor table
+---@param surface_bounds table
+---@param target_gap integer
+---@return table|nil
+local function retention_bridge(placement, anchor, surface_bounds, target_gap)
+    if target_gap == 0 then return nil end
+    local bridge
+    if placement == 'left' or placement == 'right' then
+        local y1 = math.max(anchor.y1, surface_bounds.y1)
+        local y2 = math.min(anchor.y2, surface_bounds.y2)
+        if y1 > y2 then return nil end
+        bridge = placement == 'left' and {
+            x1=surface_bounds.x2 + 1, x2=anchor.x1 - 1, y1=y1, y2=y2,
+        } or {
+            x1=anchor.x2 + 1, x2=surface_bounds.x1 - 1, y1=y1, y2=y2,
+        }
+    else
+        local x1 = math.max(anchor.x1, surface_bounds.x1)
+        local x2 = math.min(anchor.x2, surface_bounds.x2)
+        if x1 > x2 then return nil end
+        bridge = placement == 'above' and {
+            x1=x1, x2=x2, y1=surface_bounds.y2 + 1, y2=anchor.y1 - 1,
+        } or {
+            x1=x1, x2=x2, y1=anchor.y2 + 1, y2=surface_bounds.y1 - 1,
+        }
+    end
+    return bridge.x1 <= bridge.x2 and bridge.y1 <= bridge.y2 and bridge or nil
+end
+
 ---@class dwarfui.HoverActionRailSurface: widgets.Panel
 ---@field super widgets.Panel
 ---@field ATTRS table
@@ -299,6 +380,7 @@ end
 ---@field placement_bounds_provider fun(): table Supplies the rail-local placement bounds.
 ---@field placement_order string[] Preferred placements in order.
 ---@field action_gap integer Additional cells between every visible action.
+---@field target_gap integer Cells between the target anchor and the outer rail surface.
 ---@field consume_scroll boolean Whether later input handling consumes wheel events in the rail.
 ---@field background_pen any|fun(target: dwarfui.HoverActionTarget): any|false Surface background configuration.
 ---@field border_style any|fun(target: dwarfui.HoverActionTarget): any|false Surface border configuration.
@@ -310,6 +392,7 @@ end
 ---@field action_widgets widgets.Widget[] Stable widgets, one for every action definition.
 ---@field active_target dwarfui.HoverActionTarget|nil Currently retained target snapshot.
 ---@field rail_bounds table|nil Current visible rail rectangle.
+---@field retention_bridge table|nil Gap cells connecting the target and rail.
 ---@overload fun(init_table: dwarfui.HoverActionRail.attrs): self
 HoverActionRail = defclass(HoverActionRail, widgets.Widget)
 HoverActionRail.ATTRS{
@@ -322,6 +405,7 @@ HoverActionRail.ATTRS{
     placement_bounds_provider=DEFAULT_NIL,
     placement_order={'left', 'right', 'above', 'below'},
     action_gap=0,
+    target_gap=0,
     consume_scroll=false,
     background_pen=false,
     border_style=false,
@@ -340,6 +424,8 @@ function HoverActionRail:init()
     self.placement_order = copy_placement_order(self.placement_order)
     assert(is_nonnegative_integer(self.action_gap),
         'HoverActionRail.action_gap must be a nonnegative integer')
+    assert(is_nonnegative_integer(self.target_gap),
+        'HoverActionRail.target_gap must be a nonnegative integer')
     assert(type(self.consume_scroll) == 'boolean',
         'HoverActionRail.consume_scroll must be a boolean')
     validate_presentation_value(self.background_pen,
@@ -364,12 +450,84 @@ function HoverActionRail:init()
     self:addviews{self.surface}
     self.active_target = nil
     self.rail_bounds = nil
+    self.retention_bridge = nil
 end
 
 ---Returns the currently retained target without refreshing its validity.
 ---@return dwarfui.HoverActionTarget|nil
 function HoverActionRail:get_target()
     return self.active_target
+end
+
+---Converts the current screen pointer cell into this rail's local coordinates.
+---@return integer|nil x
+---@return integer|nil y
+function HoverActionRail:get_local_pointer()
+    local screen_x, screen_y = self.mouse_provider()
+    if screen_x == nil or screen_y == nil or not self.frame_body then
+        return nil, nil
+    end
+    return self.frame_body:localXY(screen_x, screen_y)
+end
+
+---Resolves one fresh target using the current pointer in rail-local space.
+---@return dwarfui.HoverActionTarget|nil
+function HoverActionRail:resolve_target_at_pointer()
+    local x, y = self:get_local_pointer()
+    if x == nil or y == nil then return nil end
+    local target = self.target_at(x, y)
+    assert(target == nil or is_instance_of(target, HoverActionTarget),
+        'HoverActionRail.target_at must return a HoverActionTarget or nil')
+    return target
+end
+
+---Places visible action widgets within the current surface body.
+---@param placement string
+function HoverActionRail:layout_actions(placement)
+    local cursor = placement == 'left' and self.content_width or 0
+    for _, item in ipairs(self.visible_actions) do
+        if placement == 'left' then
+            cursor = cursor - item.width
+            item.widget.frame = placed_frame(item.widget.frame, cursor,
+                math.floor((self.content_height - item.height) / 2),
+                item.width, item.height)
+            cursor = cursor - item.action.gap_after - self.action_gap
+        else
+            item.widget.frame = placed_frame(item.widget.frame, cursor,
+                math.floor((self.content_height - item.height) / 2),
+                item.width, item.height)
+            cursor = cursor + item.width + item.action.gap_after +
+                self.action_gap
+        end
+    end
+end
+
+---Recomputes the rail placement and its complete outer ownership rectangle.
+---@return boolean placed
+function HoverActionRail:refresh_placement()
+    if not self.active_target or not self.content_width then return false end
+    local bounds = copy_bounds(self.placement_bounds_provider())
+    local width, height = self.surface.frame.w, self.surface.frame.h
+    for _, placement in ipairs(self.placement_order) do
+        local candidate = placement_rectangle(placement, self.active_target.anchor,
+            width, height, self.target_gap)
+        if fits_bounds(bounds, candidate) then
+            self.surface.frame = placed_frame(self.surface.frame,
+                candidate.x1, candidate.y1, width, height)
+            self:layout_actions(placement)
+            self.surface.visible = true
+            self.rail_bounds = candidate
+            self.retention_bridge = retention_bridge(placement,
+                self.active_target.anchor, candidate, self.target_gap)
+            self.placement = placement
+            return true
+        end
+    end
+    self.surface.visible = false
+    self.rail_bounds = nil
+    self.retention_bridge = nil
+    self.placement = nil
+    return false
 end
 
 ---Recomputes presentation and body-relative action frames for the current target.
@@ -382,6 +540,10 @@ function HoverActionRail:refresh_surface()
     if not target then
         self.surface.visible = false
         self.rail_bounds = nil
+        self.retention_bridge = nil
+        self.visible_actions = nil
+        self.content_width = nil
+        self.content_height = nil
         for _, widget in ipairs(self.action_widgets) do
             widget.visible = false
             widget.enabled = false
@@ -400,6 +562,7 @@ function HoverActionRail:refresh_surface()
     self.surface.frame_inset = self.content_inset
 
     local content_width, content_height, last_gap_after = 0, 0, 0
+    self.visible_actions = {}
     for index, action in ipairs(self.actions) do
         local widget = self.action_widgets[index]
         local visible = action.visible(target)
@@ -418,7 +581,12 @@ function HoverActionRail:refresh_surface()
                 'HoverAction widget frame width must be a positive integer')
             assert(is_nonnegative_integer(height) and height > 0,
                 'HoverAction widget frame height must be a positive integer')
-            widget.frame = placed_frame(frame, content_width, 0, width, height)
+            table.insert(self.visible_actions, {
+                action=action,
+                widget=widget,
+                width=width,
+                height=height,
+            })
             content_width = content_width + width + action.gap_after +
                 self.action_gap
             content_height = math.max(content_height, height)
@@ -429,21 +597,28 @@ function HoverActionRail:refresh_surface()
     if content_width == 0 then
         self.surface.visible = false
         self.rail_bounds = nil
+        self.retention_bridge = nil
+        self.content_width = nil
+        self.content_height = nil
         return
     end
     content_width = content_width - self.action_gap - last_gap_after
+    self.content_width = content_width
+    self.content_height = content_height
     local inset_left, inset_top, inset_right, inset_bottom = inset_edges(
         self.content_inset)
+    local border_extent = self.surface.frame_style and 1 or 0
     self.surface.frame = placed_frame(self.surface.frame, 0, 0,
-        content_width + inset_left + inset_right,
-        content_height + inset_top + inset_bottom)
-    self.surface.visible = true
-    self.rail_bounds = {
-        x1=self.surface.frame.l,
-        y1=self.surface.frame.t,
-        x2=self.surface.frame.l + self.surface.frame.w - 1,
-        y2=self.surface.frame.t + self.surface.frame.h - 1,
-    }
+        content_width + inset_left + inset_right + 2 * border_extent,
+        content_height + inset_top + inset_bottom + 2 * border_extent)
+    self:refresh_placement()
+end
+
+---Refreshes local placement before forwarding a parent layout change.
+---@param parent_rect gui.ViewRect|nil
+function HoverActionRail:updateLayout(parent_rect)
+    if self.active_target then self:refresh_surface() end
+    HoverActionRail.super.updateLayout(self, parent_rect)
 end
 
 ---Temporarily provides the public activation entrypoint before input ownership.
