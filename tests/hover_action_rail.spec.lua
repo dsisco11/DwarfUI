@@ -89,7 +89,9 @@ local function rail_options(values)
     return {
         actions=values.actions,
         target_at=values.target_at or function() return nil end,
-        validate_target=values.validate_target or function() return nil end,
+        validate_target=values.validate_target or function(current_target)
+            return current_target
+        end,
         context_active=values.context_active or function() return true end,
         mouse_provider=values.mouse_provider or function() return nil, nil end,
         placement_bounds_provider=values.placement_bounds_provider or
@@ -523,6 +525,7 @@ describe('DwarfUI HoverActionRail surface', function()
             background_pen='opaque',
             border_style=context.gui.FRAME_INTERIOR,
             content_inset=1,
+            mouse_provider=function() return 5, 6 end,
         })
         rail.active_target = target(context)
         rail:refresh_surface()
@@ -934,5 +937,65 @@ describe('DwarfUI HoverActionRail placement', function()
             spaced.retention_bridge.x2,
             spaced.retention_bridge.y2,
         })
+    end)
+end)
+
+describe('DwarfUI HoverActionRail hover lifecycle', function()
+    it('binds, switches, retains across rail and bridge, then clears immediately',
+            function()
+        local context = make_context()
+        local mouse_x, mouse_y = 5, 5
+        local context_active, valid = true, true
+        local first = context.HoverActionTarget{
+            key='first', anchor={x1=5, y1=5, x2=5, y2=5},
+        }
+        local second = context.HoverActionTarget{
+            key='second', anchor={x1=10, y1=5, x2=10, y2=5},
+        }
+        local rail = context.HoverActionRail(rail_options{
+            actions={action(context, {widget_factory=function()
+                return context.widgets.Widget{frame={w=1, h=1}}
+            end})},
+            placement_order={'right'}, target_gap=1,
+            mouse_provider=function() return mouse_x, mouse_y end,
+            context_active=function() return context_active end,
+            target_at=function(x, y)
+                if y ~= 5 then return nil end
+                if x == 5 then return first end
+                if x == 10 then return second end
+            end,
+            validate_target=function(target)
+                return valid and target or nil
+            end,
+        })
+        rail:updateLayout(widget_harness.rect(0, 0, 30, 15))
+        rail:update_hover()
+        assert.equals('first', rail:get_target().key)
+        assert.same({7, 5, 7, 5}, {
+            rail.rail_bounds.x1, rail.rail_bounds.y1,
+            rail.rail_bounds.x2, rail.rail_bounds.y2,
+        })
+        mouse_x = 6 -- bridge cell
+        assert.is_false(rail:update_hover())
+        assert.equals('first', rail:get_target().key)
+        mouse_x = 7 -- rail cell
+        assert.is_false(rail:update_hover())
+        assert.equals('first', rail:get_target().key)
+        mouse_x = 10
+        assert.is_true(rail:update_hover())
+        assert.equals('second', rail:get_target().key)
+        valid = false
+        mouse_x = 20
+        assert.is_true(rail:update_hover())
+        assert.is_nil(rail:get_target())
+        assert.is_false(rail.surface.visible)
+
+        valid, mouse_x = true, 5
+        rail:update_hover()
+        context_active = false
+        assert.is_true(rail:update_hover())
+        assert.is_nil(rail:get_target())
+        assert.is_nil(rail.rail_bounds)
+        assert.is_nil(rail.retention_bridge)
     end)
 end)

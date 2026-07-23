@@ -459,6 +459,75 @@ function HoverActionRail:get_target()
     return self.active_target
 end
 
+---Returns whether a local point lies in an inclusive rectangle.
+---@param rectangle table|nil
+---@param x integer|nil
+---@param y integer|nil
+---@return boolean
+local function contains_point(rectangle, x, y)
+    return rectangle and x ~= nil and y ~= nil and x >= rectangle.x1 and
+        x <= rectangle.x2 and y >= rectangle.y1 and y <= rectangle.y2
+end
+
+---Clears presentation, geometry, and retained-target state.
+function HoverActionRail:clear()
+    self.active_target = nil
+    self.retention_bridge = nil
+    self.rail_bounds = nil
+    self.placement = nil
+    self.visible_actions = nil
+    self.content_width = nil
+    self.content_height = nil
+    self.surface.visible = false
+    for _, widget in ipairs(self.action_widgets) do
+        widget.visible = false
+        widget.enabled = false
+    end
+end
+
+---Binds a fresh target snapshot and updates its rendered surface.
+---@param target dwarfui.HoverActionTarget
+function HoverActionRail:bind_target(target)
+    assert(is_instance_of(target, HoverActionTarget),
+        'HoverActionRail.bind_target requires a HoverActionTarget')
+    self.active_target = target
+    self:refresh_surface()
+end
+
+---Updates the current target from context, pointer, and retained-region state.
+---@return boolean changed
+function HoverActionRail:update_hover()
+    if not self.context_active() then
+        local changed = self.active_target ~= nil
+        self:clear()
+        return changed
+    end
+    local x, y = self:get_local_pointer()
+    local resolved = self:resolve_target_at_pointer(x, y)
+    if resolved then
+        local changed = not self.active_target or self.active_target.key ~= resolved.key
+        self:bind_target(resolved)
+        return changed
+    end
+    local retained = self.active_target
+    if not retained then return false end
+    local fresh = self.validate_target(retained)
+    assert(fresh == nil or is_instance_of(fresh, HoverActionTarget),
+        'HoverActionRail.validate_target must return a HoverActionTarget or nil')
+    if not fresh or fresh.key ~= retained.key then
+        self:clear()
+        return true
+    end
+    self:bind_target(fresh)
+    if contains_point(fresh.anchor, x, y) or
+            contains_point(self.rail_bounds, x, y) or
+            contains_point(self.retention_bridge, x, y) then
+        return false
+    end
+    self:clear()
+    return true
+end
+
 ---Converts the current screen pointer cell into this rail's local coordinates.
 ---@return integer|nil x
 ---@return integer|nil y
@@ -470,10 +539,12 @@ function HoverActionRail:get_local_pointer()
     return self.frame_body:localXY(screen_x, screen_y)
 end
 
----Resolves one fresh target using the current pointer in rail-local space.
+---Resolves one fresh target using supplied or current rail-local coordinates.
+---@param x? integer
+---@param y? integer
 ---@return dwarfui.HoverActionTarget|nil
-function HoverActionRail:resolve_target_at_pointer()
-    local x, y = self:get_local_pointer()
+function HoverActionRail:resolve_target_at_pointer(x, y)
+    if x == nil or y == nil then x, y = self:get_local_pointer() end
     if x == nil or y == nil then return nil end
     local target = self.target_at(x, y)
     assert(target == nil or is_instance_of(target, HoverActionTarget),
@@ -619,6 +690,16 @@ end
 function HoverActionRail:updateLayout(parent_rect)
     if self.active_target then self:refresh_surface() end
     HoverActionRail.super.updateLayout(self, parent_rect)
+end
+
+---Refreshes hover state before drawing the current surface and action widgets.
+---@param dc gui.Painter
+function HoverActionRail:render(dc)
+    local changed = self:update_hover()
+    if changed and self.frame_parent_rect then
+        self:updateLayout(self.frame_parent_rect)
+    end
+    HoverActionRail.super.render(self, dc)
 end
 
 ---Temporarily provides the public activation entrypoint before input ownership.
