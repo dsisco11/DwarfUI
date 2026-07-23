@@ -11,6 +11,11 @@ MODULES = {
     {name='dwarfui/text', contract='wrap_text'},
     {name='dwarfui/widget_extensions', contract='install_pointer_attributes'},
     {
+        name='dwarfui/widgets/asset_button',
+        contract='AssetButton',
+        contract_type='table',
+    },
+    {
         name='dwarfui/pointer',
         contract='PointerDispatcher',
         contract_type='table',

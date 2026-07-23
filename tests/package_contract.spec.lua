@@ -6,6 +6,7 @@ local shipped_modules = {
     'dwarfui/module_registry.lua',
     'dwarfui/text.lua',
     'dwarfui/widget_extensions.lua',
+    'dwarfui/widgets/asset_button.lua',
     'dwarfui/pointer.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
@@ -62,6 +63,36 @@ local function load_public_module(package_path)
             globals={DEFAULT_NIL=default_nil},
             require_modules={
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/widgets/asset_button.lua' then
+        local widget_harness = require('support.widget_harness')
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        widgets.Widget.ATTRS{
+            visible=true,
+            enabled=true,
+            disabled=false,
+            tooltip=default_nil,
+        }
+        widgets.Label.makeButtonLabelText = function(spec)
+            return spec.chars
+        end
+        options = {
+            globals={
+                DEFAULT_NIL=default_nil,
+                defclass=widget_harness.defclass,
+            },
+            require_modules={
+                utils={getval=function(value)
+                    if type(value) == 'function' then return value() end
+                    return value
+                end},
+                ['gui.widgets']=widgets,
+            },
+            reqscript={
+                ['dwarfui/widget_extensions']={},
             },
         }
     elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
@@ -244,6 +275,15 @@ describe('DwarfUI package contract', function()
                 'scripts_modinstalled/' .. relative_path), 'rb'))
             file:close()
         end
+    end)
+
+    it('ships the reusable asset-button class contract', function()
+        local source = read_source(
+            'scripts_modinstalled/dwarfui/widgets/asset_button.lua')
+        contains(source, 'AssetButton = defclass')
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/widgets/asset_button.lua')
+        assert.equals('table', type(module.AssetButton))
     end)
 
     it('includes the complete mood-popover payload and registration', function()

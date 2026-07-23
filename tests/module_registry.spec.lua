@@ -20,7 +20,11 @@ describe('DwarfUI module registry', function()
 
         assert.equals(#registry.MODULES, #calls)
         assert.equals('dwarfui/text', calls[1])
+        assert.equals('dwarfui/widget_extensions', calls[2])
+        assert.equals('dwarfui/widgets/asset_button', calls[3])
         assert.equals('dwarfui/tooltip_registration', calls[#calls])
+        assert.equals('table',
+            type(loaded['dwarfui/widgets/asset_button']))
         assert.equals('table', type(loaded['dwarfui/tooltip']))
     end)
 
@@ -40,6 +44,9 @@ describe('DwarfUI module registry', function()
         assert.equals(#registry.MODULES + 1, #names)
         assert.equals('dwarfui/module_registry', names[1])
         assert.equals('dwarfui/tooltip_registration', names[2])
+        assert.equals('dwarfui/widgets/asset_button',
+            names[#names - 2])
+        assert.equals('dwarfui/widget_extensions', names[#names - 1])
         assert.equals('dwarfui/text', names[#names])
     end)
 end)
