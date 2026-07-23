@@ -4,19 +4,24 @@
 
 local DEFAULT_LIST_X1 = 0
 local DEFAULT_LIST_X2 = 71
+local DEFAULT_INDICATOR_X = 1
 local DEFAULT_FIRST_ROW_TOP = 10
+local DEFAULT_FIRST_ROW_OFFSET = 6
 local DEFAULT_ROW_HEIGHT = 3
 local HAULING_FOCUS = 'dwarfmode/Hauling'
 
 -- CP437 glyphs render natively in both DF text mode and graphics-mode text.
-local CP437_STOP = string.char(15)
-local CP437_UP = string.char(24)
-local CP437_DOWN = string.char(25)
+local CP437_STOP = string.char(9)
+local CP437_UP = string.char(30)
+local CP437_DOWN = string.char(31)
 
 local MARKER_STYLES = {
-    same_z={kind='same_z', glyph=CP437_STOP, pen={fg=10}},
-    above={kind='above', glyph=CP437_UP, pen={fg=14}},
-    below={kind='below', glyph=CP437_DOWN, pen={fg=12}},
+    same_z={kind='same_z', glyph=CP437_STOP,
+        pen={ch=CP437_STOP:byte(), fg=10, keep_lower=true}},
+    above={kind='above', glyph=CP437_UP,
+        pen={ch=CP437_UP:byte(), fg=14, keep_lower=true}},
+    below={kind='below', glyph=CP437_DOWN,
+        pen={ch=CP437_DOWN:byte(), fg=12, keep_lower=true}},
 }
 
 ---@class dwarfui.MinecartRouteMenuRow
@@ -28,16 +33,37 @@ local MARKER_STYLES = {
 ---@class dwarfui.MinecartRouteMenuLayout: dfhack.class
 ---@field list_x1 integer
 ---@field list_x2 integer
+---@field indicator_x integer
 ---@field first_row_top integer
 ---@field row_height integer
+---@field bounds {x1: integer, y1: integer, x2: integer, y2: integer}|nil
 MinecartRouteMenuLayout = defclass(MinecartRouteMenuLayout)
 
 ---Initializes the native route-list geometry defaults.
 function MinecartRouteMenuLayout:init()
     self.list_x1 = self.list_x1 or DEFAULT_LIST_X1
     self.list_x2 = self.list_x2 or DEFAULT_LIST_X2
+    self.indicator_x = self.indicator_x or DEFAULT_INDICATOR_X
     self.first_row_top = self.first_row_top or DEFAULT_FIRST_ROW_TOP
     self.row_height = self.row_height or DEFAULT_ROW_HEIGHT
+end
+
+---Caches the native Hauling panel bounds and derives its absolute list
+---coordinates. The selection x offset remains relative to the panel origin.
+---@param bounds {x1: integer, y1: integer, x2: integer, y2: integer}
+function MinecartRouteMenuLayout:cache_bounds(bounds)
+    self.bounds = {
+        x1=bounds.x1, y1=bounds.y1, x2=bounds.x2, y2=bounds.y2,
+    }
+    self.list_x1 = bounds.x1
+    self.list_x2 = bounds.x2
+    self.first_row_top = bounds.y1 + DEFAULT_FIRST_ROW_OFFSET
+end
+
+---Returns the absolute interface x coordinate for the selection indicator.
+---@return integer
+function MinecartRouteMenuLayout:get_indicator_x()
+    return self.list_x1 + self.indicator_x
 end
 
 ---Returns whether native route rows are interactive for this focus path.
@@ -236,6 +262,7 @@ MinecartRouteMarkerDescriptor.ATTRS{
 }
 
 ---@class dwarfui.MinecartRouteMarkerProjection: dfhack.class
+---@field ui_position_provider fun(pos: table, viewport: table): table
 MinecartRouteMarkerProjection = defclass(MinecartRouteMarkerProjection)
 
 ---Returns the items in a DF vector or a conventional Lua sequence.
@@ -279,85 +306,48 @@ local function make_label(name, z_delta)
     return label
 end
 
----Returns whether the supplied horizontal label span is inside the map.
----@param x integer
----@param width integer
+---Translates a world map position into interface-layer coordinates. DFHack's
+---Viewport translation is correct in text mode, but Premium graphics applies
+---an independent map zoom before the interface text layer is composited.
+---@param pos {x: integer, y: integer, z: integer}
 ---@param viewport gui.dwarfmode.Viewport
----@return boolean
-local function fits_horizontally(x, width, viewport)
-    return x >= 0 and x + width <= viewport.width
-end
-
----Returns whether a label span conflicts with an occupied label span.
----@param occupied table[]
----@param x integer
----@param y integer
----@param width integer
----@return boolean
-local function conflicts(occupied, x, y, width)
-    for _, span in ipairs(occupied) do
-        if span.y == y and x < span.x + span.width and
-                span.x < x + width then
-            return true
-        end
+---@return {x: integer, y: integer, z: integer}
+local function world_to_ui(pos, viewport)
+    if not dfhack.screen.inGraphicsMode() then
+        return viewport:tileToScreen(pos)
     end
-    return false
-end
 
----Finds a deterministic free map row for a label without changing its marker
----position.
----@param occupied table[]
----@param preferred_y integer
----@param x integer
----@param width integer
----@param viewport gui.dwarfmode.Viewport
----@return integer|nil
-local function find_label_row(occupied, preferred_y, x, width, viewport)
-    for offset=0, viewport.height - 1 do
-        local rows = offset == 0 and {preferred_y} or {
-            preferred_y + offset, preferred_y - offset,
-        }
-        for _, y in ipairs(rows) do
-            if y >= 0 and y < viewport.height and
-                    not conflicts(occupied, x, y, width) then
-                return y
-            end
-        end
+    local gps = df.global.gps
+    local native_viewport = df.global.world.viewport
+    if not native_viewport or not native_viewport.corner or
+            not gps.viewport_zoom_factor then
+        return viewport:tileToScreen(pos)
     end
+
+    local corner = native_viewport.corner
+    local map_tile_pixels = gps.viewport_zoom_factor // 4
+    return {
+        x=math.ceil(map_tile_pixels * (pos.x - corner.x) /
+            gps.tile_pixel_x),
+        y=math.ceil(map_tile_pixels * (pos.y - corner.y) /
+            gps.tile_pixel_y),
+        z=pos.z - corner.z,
+    }
 end
 
----Chooses a left or right map-contained label placement, truncating only when
----neither full placement fits.
+---Initializes the production world-to-interface coordinate translator.
+function MinecartRouteMarkerProjection:init()
+    self.ui_position_provider = self.ui_position_provider or world_to_ui
+end
+
+---Anchors a label at the marker's translated UI column and two rows below it.
+---The screen painter clips naturally when a marker or label is offscreen.
 ---@param label string
 ---@param marker_x integer
 ---@param marker_y integer
----@param occupied table[]
----@param viewport gui.dwarfmode.Viewport
 ---@return string, integer, integer
-local function layout_label(label, marker_x, marker_y, occupied, viewport)
-    local width = #label
-    local candidates = {
-        {x=marker_x + 1, width=width},
-        {x=marker_x - width, width=width},
-    }
-    for _, candidate in ipairs(candidates) do
-        if fits_horizontally(candidate.x, candidate.width, viewport) then
-            local y = find_label_row(occupied, marker_y, candidate.x,
-                candidate.width, viewport)
-            if y then return label, candidate.x, y end
-        end
-    end
-
-    local left_width = math.max(0, marker_x)
-    local right_width = math.max(0, viewport.width - marker_x - 1)
-    local available_width = math.max(left_width, right_width)
-    if available_width == 0 then return '', marker_x, marker_y end
-    local truncated = label:sub(1, available_width)
-    local x = right_width >= left_width and marker_x + 1 or
-        marker_x - available_width
-    local y = find_label_row(occupied, marker_y, x, #truncated, viewport) or
-        marker_y
-    return truncated, x, y
+local function layout_label(label, marker_x, marker_y)
+    return label, marker_x, marker_y + 2
 end
 
 ---Projects the selected route's visible stops into immutable render
@@ -370,7 +360,6 @@ function MinecartRouteMarkerProjection:project(route, viewport)
     if not route or not viewport or not route.stops then return {} end
 
     local markers = {}
-    local occupied = {}
     for display_index, stop in ipairs(vector_values(route.stops)) do
         local pos = stop.pos
         if pos then
@@ -380,11 +369,10 @@ function MinecartRouteMarkerProjection:project(route, viewport)
             if visible then
                 local style = z_delta == 0 and MARKER_STYLES.same_z or
                     z_delta > 0 and MARKER_STYLES.above or MARKER_STYLES.below
-                local screen_pos = viewport:tileToScreen(pos)
+                local screen_pos = self.ui_position_provider(pos, viewport)
                 local label, label_x, label_y = layout_label(
                     make_label(stop.name or '', z_delta), screen_pos.x,
-                    screen_pos.y, occupied, viewport)
-                table.insert(occupied, {x=label_x, y=label_y, width=#label})
+                    screen_pos.y)
                 table.insert(markers, MinecartRouteMarkerDescriptor{
                     stop_id=stop.id,
                     display_index=display_index,
@@ -394,7 +382,11 @@ function MinecartRouteMarkerProjection:project(route, viewport)
                     z_delta=z_delta,
                     marker_kind=style.kind,
                     marker_glyph=style.glyph,
-                    marker_pen={fg=style.pen.fg},
+                    marker_pen={
+                        ch=style.pen.ch,
+                        fg=style.pen.fg,
+                        keep_lower=style.pen.keep_lower,
+                    },
                     label=label,
                     label_x=label_x,
                     label_y=label_y,

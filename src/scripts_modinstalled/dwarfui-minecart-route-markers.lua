@@ -20,6 +20,50 @@ local function get_focus()
     return dfhack.gui.getCurFocus()
 end
 
+---Returns whether a screen cell belongs to a native graphics-backed panel.
+---@param x integer
+---@param y integer
+---@return boolean
+local function is_native_panel_cell(x, y)
+    local tile = dfhack.screen.readTile(x, y)
+    return tile and tile.write_to_lower or false
+end
+
+---Reads the native Hauling panel rectangle from its rendered tile coverage.
+---The longest panel run inside the dwarfmode map region is the route panel;
+---the vertical extent is then expanded from the same interior cell.
+---@param sample_y integer
+---@return {x1: integer, y1: integer, x2: integer, y2: integer}|nil
+local function read_hauling_menu_bounds(sample_y)
+    local map = guidm.getPanelLayout().map
+    local best_x1, best_x2
+    local run_x1
+    for x=map.x1,map.x2 + 1 do
+        if x <= map.x2 and is_native_panel_cell(x, sample_y) then
+            run_x1 = run_x1 or x
+        elseif run_x1 then
+            local run_x2 = x - 1
+            if not best_x1 or run_x2 - run_x1 > best_x2 - best_x1 then
+                best_x1, best_x2 = run_x1, run_x2
+            end
+            run_x1 = nil
+        end
+    end
+    if not best_x1 then return nil end
+
+    local interior_x = math.min(best_x1 + 1, best_x2)
+    local _, screen_height = dfhack.screen.getWindowSize()
+    local y1, y2 = sample_y, sample_y
+    while y1 > 0 and is_native_panel_cell(interior_x, y1 - 1) do
+        y1 = y1 - 1
+    end
+    while y2 + 1 < screen_height and
+            is_native_panel_cell(interior_x, y2 + 1) do
+        y2 = y2 + 1
+    end
+    return {x1=best_x1, y1=y1, x2=best_x2, y2=y2}
+end
+
 ---@class dwarfui.MinecartRouteMarkersOverlay: plugins.overlay.OverlayWidget
 ---@field selection dwarfui.MinecartRouteSelection
 ---@field layout dwarfui.MinecartRouteMenuLayout
@@ -29,6 +73,9 @@ end
 ---@field mouse_provider fun(): integer|nil, integer|nil
 ---@field viewport_provider fun(): gui.dwarfmode.Viewport
 ---@field map_overlay_renderer fun(callback: fun(pos: table): any, bounds: table)
+---@field bounds_provider fun(sample_y: integer): table|nil
+---@field bounds_screen_width integer|nil
+---@field bounds_screen_height integer|nil
 MinecartRouteMarkersOverlay = defclass(MinecartRouteMarkersOverlay,
     overlay.OverlayWidget)
 MinecartRouteMarkersOverlay.ATTRS{
@@ -44,6 +91,7 @@ MinecartRouteMarkersOverlay.ATTRS{
     mouse_provider=dfhack.screen.getMousePos,
     viewport_provider=guidm.Viewport.get,
     map_overlay_renderer=guidm.renderMapOverlay,
+    bounds_provider=read_hauling_menu_bounds,
 }
 
 ---Constructs the selection, native-layout, and marker-projection models.
@@ -66,6 +114,22 @@ function MinecartRouteMarkersOverlay:preUpdateLayout(parent_rect)
     self.frame.h = parent_rect.height
 end
 
+---Reads and caches native Hauling panel bounds, refreshing only after the
+---interface dimensions change.
+function MinecartRouteMarkersOverlay:ensure_menu_bounds()
+    local width, height = dfhack.screen.getWindowSize()
+    if self.layout.bounds and self.bounds_screen_width == width and
+            self.bounds_screen_height == height then
+        return
+    end
+    local bounds = self.bounds_provider(self.layout.first_row_top + 1)
+    if bounds then
+        self.layout:cache_bounds(bounds)
+        self.bounds_screen_width = width
+        self.bounds_screen_height = height
+    end
+end
+
 ---Resolves the current selected route and clears it when its context vanished.
 ---@return df.hauling_route|nil
 function MinecartRouteMarkersOverlay:resolve_selected_route()
@@ -78,13 +142,14 @@ function MinecartRouteMarkersOverlay:resolve_selected_route()
     return self.selection:resolve_selected_route(hauling.routes)
 end
 
----Renders one marker through DFHack's map-overlay compositor.
+---Renders one full map-tile marker while preserving the underlying map
+---graphics as its transparent background.
 ---@param marker dwarfui.MinecartRouteMarkerDescriptor
 function MinecartRouteMarkersOverlay:render_marker(marker)
     local pos = marker.world_pos
     self.map_overlay_renderer(function(candidate)
         if candidate.x == pos.x and candidate.y == pos.y then
-            return marker.marker_pen.fg, marker.marker_glyph
+            return marker.marker_pen
         end
     end, {x1=pos.x, x2=pos.x, y1=pos.y, y2=pos.y})
 end
@@ -106,7 +171,7 @@ function MinecartRouteMarkersOverlay:render_selection_indicator(dc, hauling)
     local y = self.layout:find_route_header_y(hauling,
         self.selection:get_selected_route_id(), self.focus_provider())
     if y and y >= 0 and y < df.global.gps.dimy then
-        dc:seek(self.layout.list_x1, y + 1):string(string.char(16),
+        dc:seek(self.layout:get_indicator_x(), y + 1):string(string.char(16),
             COLOR_YELLOW)
     end
 end
@@ -115,6 +180,7 @@ end
 ---@param dc gui.Painter
 function MinecartRouteMarkersOverlay:render(dc)
     MinecartRouteMarkersOverlay.super.render(self, dc)
+    self:ensure_menu_bounds()
     local hauling = self.hauling_provider()
     local route = self:resolve_selected_route()
     if not hauling or not route then return end
@@ -128,6 +194,7 @@ end
 ---@param keys table
 ---@return false
 function MinecartRouteMarkersOverlay:onInput(keys)
+    self:ensure_menu_bounds()
     local mouse_x, mouse_y = self.mouse_provider()
     self.selection:observe_input(keys, mouse_x, mouse_y,
         self.hauling_provider(), self.focus_provider())
