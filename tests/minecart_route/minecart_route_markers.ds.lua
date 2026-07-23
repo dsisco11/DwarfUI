@@ -1,6 +1,8 @@
 -- Live component contract for minecart route markers.
--- Opens dwarfmode/Hauling from the active fortress, then requires a visible
--- route header and at least one stop. It never mutates player-owned route data.
+-- Opens dwarfmode/Hauling from the active fortress. The prepared save requires
+-- Premium graphics and a scrollable route list with visible stops at distinct
+-- tiles so the graphics and rebound-button contracts can be proven. The test
+-- never mutates player-owned route data.
 
 local guidm = require('gui.dwarfmode')
 local widgets = require('gui.widgets')
@@ -85,6 +87,218 @@ local function assert_rendered_text(x, y, text, color, description)
             ('%s: unexpected color at %d,%d'):format(
                 description, x + offset - 1, y))
     end
+end
+
+---Returns a detached coordinate snapshot.
+---@param pos {x: integer, y: integer, z: integer}
+---@return {x: integer, y: integer, z: integer}
+local function copy_coord(pos)
+    return {x=pos.x, y=pos.y, z=pos.z}
+end
+
+---Returns whether two coordinates identify the same world tile.
+---@param left {x: integer, y: integer, z: integer}
+---@param right {x: integer, y: integer, z: integer}
+---@return boolean
+local function same_coord(left, right)
+    return left.x == right.x and left.y == right.y and left.z == right.z
+end
+
+---Returns every fully visible flattened native row and its screen bounds.
+---@param hauling df.hauling_handlerst
+---@param layout dwarfui.MinecartRouteMenuLayout
+---@return table[]
+local function get_visible_native_rows(hauling, layout)
+    local rows = {}
+    local visible_count = math.max(0, math.floor(
+        (layout.bounds.y2 - layout.first_row_top + 1) /
+            layout.row_height))
+    for visible_index=0,visible_count - 1 do
+        local row_index = hauling.scroll_position + visible_index
+        local route = hauling.view_routes[row_index]
+        if route then
+            table.insert(rows, {
+                row_index=row_index,
+                route=route,
+                stop=hauling.view_stops[row_index],
+                y1=layout.first_row_top +
+                    visible_index * layout.row_height,
+                y2=layout.first_row_top +
+                    (visible_index + 1) * layout.row_height - 1,
+            })
+        end
+    end
+    return rows
+end
+
+---Verifies that production recenter buttons exist only on real stop rows and
+---that all nine cells use the corresponding vanilla interface graphics tile.
+---@param component dwarfui.MinecartRouteMarkersOverlay
+---@param hauling df.hauling_handlerst
+---@param AssetButton dwarfui.AssetButton
+---@param description string
+---@param verify_graphics? boolean
+---@return dwarfui.AssetButton[]
+local function assert_rendered_stop_buttons(
+        component, hauling, AssetButton, description, verify_graphics)
+    component:refresh_stop_actions(hauling)
+    ds.wait_frames(2)
+
+    local rows = get_visible_native_rows(hauling, component.layout)
+    local stop_rows = {}
+    local header_rows = {}
+    for _, row in ipairs(rows) do
+        if row.stop then
+            stop_rows[row.row_index] = row
+        else
+            header_rows[row.row_index] = row
+        end
+    end
+
+    local buttons = component.stop_action_pool:get_active_buttons()
+    local stop_count = 0
+    for _ in pairs(stop_rows) do stop_count = stop_count + 1 end
+    assert.equals(stop_count, #buttons,
+        description .. ': visible stop rows and buttons differ')
+    assert.is_true(#buttons > 0,
+        description .. ': prepared save requires a visible minecart stop row')
+    if verify_graphics ~= false then
+        assert.is_true(dfhack.screen.inGraphicsMode(),
+            description .. ': graphics-cell proof requires Premium graphics mode')
+    end
+
+    local covered_stop_rows = {}
+    for _, button in ipairs(buttons) do
+        assert.equals(AssetButton, getmetatable(button),
+            description .. ': stop action is not the production AssetButton')
+        local descriptor = assert(button.action_descriptor,
+            description .. ': visible button has no native row binding')
+        assert.equals('recenter', descriptor.action_id,
+            description .. ': unexpected stop action')
+        assert.is_nil(header_rows[descriptor.row_index],
+            description .. ': a route-header row received an action button')
+        local native_row = assert(stop_rows[descriptor.row_index],
+            description .. ': button is not bound to a visible stop row')
+        assert.equals(native_row.route.id, descriptor.route_id)
+        assert.equals(native_row.stop.id, descriptor.stop_id)
+        assert.equals(native_row.y1, descriptor.bounds.y1)
+        assert.equals(native_row.y2, descriptor.bounds.y2)
+        covered_stop_rows[descriptor.row_index] = true
+
+        if verify_graphics ~= false then
+            for dy=0,2 do
+                for dx=0,2 do
+                    local expected_tile = assert(dfhack.screen.findGraphicsTile(
+                        'INTERFACE_BITS', 32 + dx, dy),
+                        description ..
+                            ': STOCKS_RECENTER asset cell is unavailable')
+                    local screen_pen = assert(dfhack.screen.readTile(
+                        descriptor.bounds.x1 + dx, descriptor.bounds.y1 + dy),
+                        description .. ': rendered button cell is unavailable')
+                    assert.equals(expected_tile, screen_pen.tile,
+                        ('%s: incorrect graphics tile at button cell %d,%d')
+                            :format(description, dx + 1, dy + 1))
+                end
+            end
+        end
+    end
+    for row_index in pairs(stop_rows) do
+        assert.is_true(covered_stop_rows[row_index],
+            description .. ': visible stop row has no recenter button')
+    end
+    return buttons
+end
+
+---Moves the standard DwarfSpec pointer target onto one exact screen cell.
+---@param root dwarfui.MinecartRouteMarkersOverlay
+---@param pointer_target widgets.Panel
+---@param pointer_subject dwarfspec.Subject
+---@param x integer
+---@param y integer
+---@return integer
+---@return integer
+local function move_pointer_to_cell(
+        root, pointer_target, pointer_subject, x, y)
+    pointer_target.frame.l = x
+    pointer_target.frame.t = y
+    root:updateLayout()
+    local actual_x, actual_y = ds.move_pointer(pointer_subject)
+    assert.equals(x, actual_x, 'DwarfSpec pointer x did not reach target cell')
+    assert.equals(y, actual_y, 'DwarfSpec pointer y did not reach target cell')
+    return actual_x, actual_y
+end
+
+---Clamps a requested map origin to the native fortress-map dimensions.
+---@param x integer
+---@param y integer
+---@return integer
+---@return integer
+local function clamp_map_origin(x, y)
+    local dims = dfhack.gui.getDwarfmodeViewDims()
+    local width = dims.map_x2 - dims.map_x1 + 1
+    local height = dims.map_y2 - dims.map_y1 + 1
+    local max_x = math.max(0, df.global.world.map.x_count - width)
+    local max_y = math.max(0, df.global.world.map.y_count - height)
+    return math.max(0, math.min(x, max_x)),
+        math.max(0, math.min(y, max_y))
+end
+
+---Returns the clamped map origin expected from DFHack's centered reveal call.
+---@param pos {x: integer, y: integer, z: integer}
+---@return integer
+---@return integer
+local function expected_centered_origin(pos)
+    local dims = dfhack.gui.getDwarfmodeViewDims()
+    local width = dims.map_x2 - dims.map_x1 + 1
+    local height = dims.map_y2 - dims.map_y1 + 1
+    return clamp_map_origin(pos.x - width // 2, pos.y - height // 2)
+end
+
+---Verifies the native viewport and pulsing recenter indicator after activation.
+---@param pos {x: integer, y: integer, z: integer}
+---@param description string
+local function assert_centered_and_highlighted(pos, description)
+    local expected_x, expected_y = expected_centered_origin(pos)
+    ds.await(description, function()
+        local indicator =
+            df.global.game.main_interface.recenter_indicator_m
+        local actual_x, actual_y =
+            clamp_map_origin(df.global.window_x, df.global.window_y)
+        return df.global.window_z == pos.z and actual_x == expected_x and
+            actual_y == expected_y and indicator.x == pos.x and
+            indicator.y == pos.y and indicator.z == pos.z
+    end)
+    local indicator = df.global.game.main_interface.recenter_indicator_m
+    assert.same(pos, copy_coord(indicator),
+        description .. ': native highlight targets the wrong tile')
+end
+
+---Returns current visible button bindings keyed by native stop ID.
+---@param buttons dwarfui.AssetButton[]
+---@return table<integer, table>
+local function snapshot_button_bindings(buttons)
+    local bindings = {}
+    for _, button in ipairs(buttons) do
+        local descriptor = assert(button.action_descriptor)
+        bindings[descriptor.stop_id] = {
+            button=button,
+            row_index=descriptor.row_index,
+            y1=descriptor.bounds.y1,
+        }
+    end
+    return bindings
+end
+
+---Returns whether a retained native stop moved to a different rendered row.
+---@param before table<integer, table>
+---@param after table<integer, table>
+---@return boolean
+local function has_moved_binding(before, after)
+    for stop_id, old_binding in pairs(before) do
+        local new_binding = after[stop_id]
+        if new_binding and new_binding.y1 ~= old_binding.y1 then return true end
+    end
+    return false
 end
 
 ---Returns the projected descriptor for one real native stop.
@@ -182,11 +396,19 @@ describe('native Minecart Route marker overlay', function()
             window_z=df.global.window_z,
             mouse_focus=df.global.enabler.mouse_focus,
             tracking_on=df.global.enabler.tracking_on,
+            recenter_indicator=copy_coord(
+                df.global.game.main_interface.recenter_indicator_m),
+            follow_unit=df.global.plotinfo.follow_unit,
+            follow_item=df.global.plotinfo.follow_item,
+            minimap_update=df.global.game.minimap.update,
+            minimap_mustmake=df.global.game.minimap.mustmake,
         }
         local saved_unit_card = snapshot_unit_card()
         local screen
         local hauling
         local root
+        local registered
+        local overlay_plugin
         local old_focus_provider
         local old_map_overlay_renderer
         local map_render_calls = {}
@@ -196,6 +418,12 @@ describe('native Minecart Route marker overlay', function()
             -- through the same input binding available to a player.
             screen = assert(dfhack.gui.getDFViewscreen(true),
                 'prepared save must have a fortress viewscreen')
+            saved.hauling_was_open =
+                dfhack.gui.matchFocusString('dwarfmode/Hauling', screen)
+            if saved.hauling_was_open then
+                saved.scroll_position =
+                    assert(df.global.plotinfo.hauling).scroll_position
+            end
             if saved_unit_card.open then
                 df.global.game.main_interface.view_sheets.open = false
                 ds.await('native unit card closes', function()
@@ -221,8 +449,9 @@ describe('native Minecart Route marker overlay', function()
                 'Hauling viewscreen disappeared after opening')
             hauling = assert(df.global.plotinfo.hauling,
                 'prepared save has no plotinfo.hauling state')
-            saved.scroll_position = hauling.scroll_position
-            native_focus = dfhack.gui.getCurFocus()
+            saved.scroll_position =
+                saved.scroll_position or hauling.scroll_position
+            native_focus = dfhack.gui.getFocusStrings(screen)
             assert.is_table(native_focus,
                 'DFHack must expose the native focus-string list')
             assert.is_true(require('utils').linear_index(native_focus,
@@ -232,18 +461,36 @@ describe('native Minecart Route marker overlay', function()
             -- Add a transparent one-cell interaction target to the production
             -- component instance. DwarfSpec can then own the exact pointer
             -- position without replacing dfhack.screen.getMousePos in the test.
+            overlay_plugin = require('plugins.overlay')
+            local prior_overlay_state = overlay_plugin.get_state()
+            local prior_registered =
+                prior_overlay_state.db[REGISTERED_WIDGET] and
+                    prior_overlay_state.db[REGISTERED_WIDGET].widget
+            saved.registered_was_present = prior_registered ~= nil
+            saved.registered_selection_id = prior_registered and
+                prior_registered.selection and
+                prior_registered.selection:get_selected_route_id() or nil
             dfhack.run_command('dwarfui reload')
             local MinecartRouteMarkersOverlay = reqscript(
                 'dwarfui-minecart-route-markers').MinecartRouteMarkersOverlay
-            local overlay_plugin = require('plugins.overlay')
+            local AssetButton =
+                reqscript('dwarfui/widgets/asset_button').AssetButton
             local overlay_state = overlay_plugin.get_state()
             local registered_entry = assert(overlay_state.db[REGISTERED_WIDGET],
                 'production minecart-route overlay is not registered')
             assert.is_true(overlay_state.config[REGISTERED_WIDGET].enabled,
                 'production minecart-route overlay is not enabled')
-            local registered = registered_entry.widget
+            registered = registered_entry.widget
             assert.is_true(registered.visible,
                 'production minecart-route overlay is not visible')
+            -- The native viewscreen exposes its new focus immediately, but
+            -- DFHack publishes getCurFocus() on the following update. Wait for
+            -- the exact production focus provider before sending overlay input.
+            ds.await('production overlay observes native Hauling focus',
+                function()
+                    return registered.layout:is_supported_focus(
+                        registered.focus_provider())
+                end)
             ds.await('production overlay caches native Hauling bounds',
                 function()
                     registered:ensure_menu_bounds()
@@ -313,6 +560,11 @@ describe('native Minecart Route marker overlay', function()
                 'registered stop-row click retains the route indicator')
             registered:clear_selection()
 
+            -- Inspect the canonical registered overlay's real pooled widgets
+            -- and the screen buffer generated from the vanilla interface asset.
+            assert_rendered_stop_buttons(registered, hauling, AssetButton,
+                'registered production overlay')
+
             local component = MinecartRouteMarkersOverlay{}
             local pointer_target = widgets.Panel{
                 view_id='native_route_pointer_target',
@@ -344,21 +596,158 @@ describe('native Minecart Route marker overlay', function()
             root.focus_provider = function() return native_focus end
             root:ensure_menu_bounds()
 
-            -- Prove the native route list receives wheel input only while the
-            -- DwarfSpec-owned pointer is physically over that list.
+            -- Bind and inspect the same production AssetButton class through the
+            -- mounted component boundary before activating a real native stop.
+            local component_buttons = assert_rendered_stop_buttons(
+                root, hauling, AssetButton, 'mounted production component',
+                false)
+            local initial_button = component_buttons[1]
+            local initial_descriptor = assert(initial_button.action_descriptor)
+            local initial_route = assert(
+                hauling.view_routes[initial_descriptor.row_index])
+            local initial_stop = assert(
+                hauling.view_stops[initial_descriptor.row_index])
+            local initial_stop_pos = copy_coord(initial_stop.pos)
+            local initial_scroll = hauling.scroll_position
+            local initial_selection = root.selection:get_selected_route_id()
+            local initial_route_id = initial_route.id
+            local initial_stop_id = initial_stop.id
+
+            -- DwarfSpec positions the real pointer on the center cell of the
+            -- rendered 3-by-3 button, then feeds the click through the mounted
+            -- production component instead of invoking its callback.
             df.global.enabler.mouse_focus = true
             df.global.enabler.tracking_on = 1
-            local native_x, native_y = ds.move_pointer(pointer_subject)
+            move_pointer_to_cell(root, pointer_target, pointer_subject,
+                initial_descriptor.bounds.x1 + 1,
+                initial_descriptor.bounds.y1 + 1)
+            ds.click(pointer_subject)
+            assert_centered_and_highlighted(initial_stop_pos,
+                'real recenter-button click')
+            assert.is_true(dfhack.gui.matchFocusString('dwarfmode/Hauling',
+                dfhack.gui.getDFViewscreen(true)),
+                'recenter click closed the native Hauling menu')
+            assert.equals(initial_scroll, hauling.scroll_position,
+                'recenter click changed the native list scroll position')
+            assert.equals(initial_selection,
+                root.selection:get_selected_route_id(),
+                'recenter click triggered native route-row selection')
+            assert.equals(initial_route_id,
+                hauling.view_routes[initial_descriptor.row_index].id,
+                'recenter click changed the underlying native route row')
+            assert.equals(initial_stop_id,
+                hauling.view_stops[initial_descriptor.row_index].id,
+                'recenter click changed the underlying native stop row')
+
+            -- Scroll the actual native list only after DwarfSpec moves the real
+            -- pointer over its row area. Repeatedly render until one retained
+            -- stop visibly moves and one occupied button row becomes associated
+            -- with a different stop at a different world position.
+            local before_bindings =
+                snapshot_button_bindings(component_buttons)
+            local previous_screen_rows = {}
+            for _, button in ipairs(component_buttons) do
+                local descriptor = assert(button.action_descriptor)
+                local stop = assert(hauling.view_stops[descriptor.row_index])
+                previous_screen_rows[descriptor.bounds.y1] = {
+                    stop_id=descriptor.stop_id,
+                    pos=copy_coord(stop.pos),
+                }
+            end
+            local scroll_key = 'CONTEXT_SCROLL_DOWN'
+            local moved_binding = false
+            local rebound_button
+            local rebound_previous
+            local native_x, native_y = move_pointer_to_cell(
+                root, pointer_target, pointer_subject,
+                root.layout.bounds.x1 + 2,
+                root.layout.first_row_top + 1)
+            -- The native C++ list reads gps coordinates instead of DFHack's
+            -- patched getMousePos function. Mirror DwarfSpec's resolved pointer
+            -- cell into that native buffer while exercising native scrolling.
             gps.mouse_x, gps.mouse_y = native_x, native_y
             gps.precise_mouse_x = native_x * gps.tile_pixel_x + 1
             gps.precise_mouse_y = native_y * gps.tile_pixel_y + 1
             require('gui').simulateInput(screen, '_MOUSE_L')
-            require('gui').simulateInput(screen, 'CONTEXT_SCROLL_DOWN')
-            ds.wait_frames(1)
-            assert.is_true(hauling.scroll_position > saved.scroll_position,
-                ('native route list did not scroll under pointer %d,%d ' ..
-                    '(before=%d, after=%d)'):format(native_x, native_y,
-                    saved.scroll_position, hauling.scroll_position))
+            for attempt=1,16 do
+                local before_scroll = hauling.scroll_position
+                require('gui').simulateInput(screen, scroll_key)
+                ds.wait_frames(1)
+                if hauling.scroll_position == before_scroll and attempt == 1 then
+                    scroll_key = 'CONTEXT_SCROLL_UP'
+                    require('gui').simulateInput(screen, scroll_key)
+                    ds.wait_frames(1)
+                end
+                if hauling.scroll_position ~= before_scroll then
+                    root:refresh_stop_actions(hauling)
+                    ds.wait_frames(1)
+                    local current_buttons =
+                        root.stop_action_pool:get_active_buttons()
+                    local current_bindings =
+                        snapshot_button_bindings(current_buttons)
+                    moved_binding = moved_binding or
+                        has_moved_binding(before_bindings, current_bindings)
+                    before_bindings = current_bindings
+                    for _, current_button in ipairs(current_buttons) do
+                        local rebound_descriptor =
+                            current_button.action_descriptor
+                        local previous = rebound_descriptor and
+                            previous_screen_rows[
+                                rebound_descriptor.bounds.y1]
+                        local rebound_stop = rebound_descriptor and
+                            hauling.view_stops[
+                                rebound_descriptor.row_index]
+                        if previous and rebound_stop and
+                                rebound_descriptor.stop_id ~=
+                                    previous.stop_id and
+                                not same_coord(previous.pos,
+                                    rebound_stop.pos) then
+                            rebound_button = current_button
+                            rebound_previous = previous
+                            break
+                        end
+                    end
+                    if moved_binding and rebound_button then break end
+                end
+            end
+            assert.is_true(hauling.scroll_position ~= initial_scroll,
+                'native route list did not scroll with the pointer over it')
+            assert.is_true(moved_binding,
+                'native scrolling did not move retained visible stop buttons')
+            assert.is_table(rebound_button,
+                ('native scrolling did not rebind a pooled button to a new ' ..
+                    'stop at an occupied screen row (before_scroll=%s ' ..
+                    'after_scroll=%s)')
+                    :format(tostring(initial_scroll),
+                        tostring(hauling.scroll_position)))
+
+            -- Activate the reused button at its new rendered location. Its
+            -- current descriptor, highlight, and viewport must all target the
+            -- newly visible stop rather than its previous binding.
+            local rebound_descriptor =
+                assert(rebound_button.action_descriptor)
+            local rebound_stop = assert(
+                hauling.view_stops[rebound_descriptor.row_index])
+            local rebound_pos = copy_coord(rebound_stop.pos)
+            assert.not_equals(rebound_previous.stop_id,
+                rebound_descriptor.stop_id)
+            assert.is_false(same_coord(rebound_previous.pos, rebound_pos),
+                'prepared save requires scroll-rebound stops at different tiles')
+            local rebound_scroll = hauling.scroll_position
+            move_pointer_to_cell(root, pointer_target, pointer_subject,
+                rebound_descriptor.bounds.x1 + 1,
+                rebound_descriptor.bounds.y1 + 1)
+            ds.click(pointer_subject)
+            assert_centered_and_highlighted(rebound_pos,
+                'scroll-rebound recenter-button click')
+            assert.equals(rebound_scroll, hauling.scroll_position,
+                'rebound recenter click changed native list scroll position')
+            assert.is_false(same_coord(rebound_previous.pos,
+                df.global.game.main_interface.recenter_indicator_m),
+                'rebound button still targeted its previous stop')
+            assert.is_true(dfhack.gui.matchFocusString('dwarfmode/Hauling',
+                dfhack.gui.getDFViewscreen(true)),
+                'rebound recenter click closed the native Hauling menu')
 
             -- Point at a real visible route header and click through the mounted
             -- production overlay, then verify its selected-route state.
@@ -458,6 +847,11 @@ describe('native Minecart Route marker overlay', function()
                     df.global.world.map.z_count - 1)))
             if off_z.z ~= stop.pos.z and off_z:isVisibleXY(stop.pos) then
                 off_z:set()
+                ds.await('native map viewport applies the off-z movement',
+                    function()
+                        return df.global.world.viewport.corner.z == off_z.z
+                    end)
+                map_render_calls = {}
                 local projected_markers = root.projection:project(route, off_z)
                 local projected = find_stop_marker(projected_markers, stop)
                 assert.not_equals('same_z', projected.marker_kind)
@@ -476,8 +870,17 @@ describe('native Minecart Route marker overlay', function()
             end
         end, debug.traceback)
 
-        -- Restore native list, pointer, viewport, focus, overlay, and unit-card
-        -- state even when an assertion above fails.
+        -- Unmount before restoring globals so DwarfSpec's own mount snapshot
+        -- cannot overwrite the original pointer or viewport values below.
+        if root then
+            root:clear_selection()
+            root.focus_provider = old_focus_provider
+            root.map_overlay_renderer = old_map_overlay_renderer
+            ds.unmount()
+        end
+
+        -- Restore native list, pointer, viewport, highlight, follow state, and
+        -- minimap invalidation flags even when an assertion above fails.
         if hauling and saved.scroll_position then
             hauling.scroll_position = saved.scroll_position
         end
@@ -486,14 +889,20 @@ describe('native Minecart Route marker overlay', function()
             saved.precise_mouse_y
         df.global.window_x, df.global.window_y, df.global.window_z =
             saved.window_x, saved.window_y, saved.window_z
+        local indicator =
+            df.global.game.main_interface.recenter_indicator_m
+        indicator.x, indicator.y, indicator.z =
+            saved.recenter_indicator.x, saved.recenter_indicator.y,
+            saved.recenter_indicator.z
+        df.global.plotinfo.follow_unit = saved.follow_unit
+        df.global.plotinfo.follow_item = saved.follow_item
+        df.global.game.minimap.update = saved.minimap_update
+        df.global.game.minimap.mustmake = saved.minimap_mustmake
         df.global.enabler.mouse_focus = saved.mouse_focus
         df.global.enabler.tracking_on = saved.tracking_on
-        if root then
-            root:clear_selection()
-            root.focus_provider = old_focus_provider
-            root.map_overlay_renderer = old_map_overlay_renderer
-            ds.unmount()
-        end
+
+        -- Close the menu opened by the test, then recreate the original native
+        -- screen state when the player already had Hauling open beforehand.
         local native_screen = dfhack.gui.getDFViewscreen(true)
         if native_screen and dfhack.gui.matchFocusString('dwarfmode/Hauling',
                 native_screen) then
@@ -504,6 +913,75 @@ describe('native Minecart Route marker overlay', function()
             end)
         end
         restore_unit_card(saved_unit_card)
+        if saved.hauling_was_open and not saved_unit_card.open then
+            native_screen = assert(dfhack.gui.getDFViewscreen(true))
+            require('gui').simulateInput(native_screen, 'D_HAULING')
+            ds.await('original native Hauling menu reopens', function()
+                return dfhack.gui.matchFocusString('dwarfmode/Hauling',
+                    dfhack.gui.getDFViewscreen(true))
+            end)
+            if hauling and saved.scroll_position then
+                hauling.scroll_position = saved.scroll_position
+            end
+        end
+        if overlay_plugin then
+            local restored_state = overlay_plugin.get_state()
+            local restored_entry = restored_state.db[REGISTERED_WIDGET]
+            if restored_entry and restored_entry.widget.selection then
+                restored_entry.widget.selection.selected_route_id =
+                    saved.registered_selection_id
+            end
+        end
+        df.global.game.minimap.update = saved.minimap_update
+        df.global.game.minimap.mustmake = saved.minimap_mustmake
+
+        -- Prove every manually owned state value is back to its original value.
+        assert.equals(saved.mouse_x, gps.mouse_x,
+            'cleanup retained a changed native pointer x')
+        assert.equals(saved.mouse_y, gps.mouse_y,
+            'cleanup retained a changed native pointer y')
+        assert.equals(saved.precise_mouse_x, gps.precise_mouse_x,
+            'cleanup retained a changed precise pointer x')
+        assert.equals(saved.precise_mouse_y, gps.precise_mouse_y,
+            'cleanup retained a changed precise pointer y')
+        assert.equals(saved.window_x, df.global.window_x,
+            'cleanup retained a changed viewport x')
+        assert.equals(saved.window_y, df.global.window_y,
+            'cleanup retained a changed viewport y')
+        assert.equals(saved.window_z, df.global.window_z,
+            'cleanup retained a changed viewport z-level')
+        assert.same(saved.recenter_indicator, copy_coord(
+            df.global.game.main_interface.recenter_indicator_m),
+            'cleanup retained the native location highlight')
+        assert.equals(saved.follow_unit, df.global.plotinfo.follow_unit,
+            'cleanup retained a changed followed unit')
+        assert.equals(saved.follow_item, df.global.plotinfo.follow_item,
+            'cleanup retained a changed followed item')
+        assert.equals(saved.minimap_update, df.global.game.minimap.update,
+            'cleanup retained a changed minimap update flag')
+        assert.equals(saved.minimap_mustmake, df.global.game.minimap.mustmake,
+            'cleanup retained a changed minimap rebuild flag')
+        assert.equals(saved.mouse_focus, df.global.enabler.mouse_focus,
+            'cleanup retained changed native mouse focus')
+        assert.equals(saved.tracking_on, df.global.enabler.tracking_on,
+            'cleanup retained changed native pointer tracking')
+        assert.equals(saved.scroll_position, hauling.scroll_position,
+            'cleanup retained a changed native list scroll position')
+        assert.equals(saved.hauling_was_open,
+            dfhack.gui.matchFocusString('dwarfmode/Hauling',
+                dfhack.gui.getDFViewscreen(true)),
+            'cleanup did not restore the original Hauling screen state')
+        if root then
+            assert.is_nil(root.selection:get_selected_route_id(),
+                'cleanup retained mounted route selection')
+        end
+        if overlay_plugin and saved.registered_was_present then
+            local restored_entry =
+                overlay_plugin.get_state().db[REGISTERED_WIDGET]
+            assert.equals(saved.registered_selection_id,
+                restored_entry.widget.selection:get_selected_route_id(),
+                'cleanup retained changed registered route selection')
+        end
         assert.is_true(ok, failure)
     end)
 end)

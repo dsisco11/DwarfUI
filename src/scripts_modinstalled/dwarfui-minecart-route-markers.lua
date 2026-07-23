@@ -30,8 +30,8 @@ local function get_hauling()
     return df.global.plotinfo and df.global.plotinfo.hauling or nil
 end
 
----Returns the current DFHack focus strings.
----@return string[]
+---Returns the current DFHack focus path.
+---@return string|string[]
 local function get_focus()
     return dfhack.gui.getCurFocus()
 end
@@ -89,7 +89,7 @@ end
 ---@field stop_action_pool dwarfui.MinecartStopActionPool
 ---@field extra_stop_actions dwarfui.MinecartStopActionDefinition[]|false
 ---@field hauling_provider fun(): df.hauling_handlerst|nil
----@field focus_provider fun(): string[]
+---@field focus_provider fun(): string|string[]
 ---@field mouse_provider fun(): integer|nil, integer|nil
 ---@field viewport_provider fun(): gui.dwarfmode.Viewport
 ---@field map_overlay_renderer fun(callback: fun(pos: table): any, bounds: table)
