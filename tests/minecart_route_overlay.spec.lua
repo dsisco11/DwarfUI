@@ -36,6 +36,11 @@ local function load_overlay(state)
         selected_route_id=nil,
         clear=function(self) self.selected_route_id = nil end,
         get_selected_route_id=function(self) return self.selected_route_id end,
+        select_route=function(self, route)
+            if not route or type(route.id) ~= 'number' then return false end
+            self.selected_route_id = route.id
+            return true
+        end,
         resolve_selected_route=function(self, routes)
             return routes and routes[0] or nil
         end,
@@ -319,7 +324,7 @@ describe('DwarfUI minecart route markers overlay', function()
             },
         }
         local overlay, selection = load_overlay(state)
-        selection.selected_route_id = 8
+        selection.selected_route_id = nil
         layout_overlay(overlay)
         local routes = state.hauling.routes
         local scroll_position = state.hauling.scroll_position
@@ -360,7 +365,8 @@ describe('DwarfUI minecart route markers overlay', function()
                 scroll_position=0,
             },
         }
-        local overlay = load_overlay(state)
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = 77
         layout_overlay(overlay)
         overlay:ensure_menu_bounds()
         overlay:refresh_stop_actions(state.hauling)
@@ -382,6 +388,8 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.has_no.errors(function() button:activate() end)
 
         assert.equals(0, #state.reveals)
+        assert.equals(77, selection.selected_route_id,
+            'stale zoom actions must not change route selection')
     end)
 
     it('passes ordinary native row clicks through after button dispatch',

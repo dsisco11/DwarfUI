@@ -616,7 +616,17 @@ describe('native Minecart Route marker overlay', function()
             local component_buttons = assert_rendered_stop_buttons(
                 root, hauling, AssetButton, 'mounted production component',
                 false)
-            local initial_button = component_buttons[1]
+            local initial_button
+            for _, button in ipairs(component_buttons) do
+                local descriptor = assert(button.action_descriptor)
+                if root.layout:find_route_header_y(hauling,
+                        descriptor.route_id, native_focus) then
+                    initial_button = button
+                    break
+                end
+            end
+            assert.is_table(initial_button,
+                'prepared save requires a visible stop with its route header')
             local initial_descriptor = assert(initial_button.action_descriptor)
             local initial_route = assert(
                 hauling.view_routes[initial_descriptor.row_index])
@@ -624,7 +634,6 @@ describe('native Minecart Route marker overlay', function()
                 hauling.view_stops[initial_descriptor.row_index])
             local initial_stop_pos = copy_coord(initial_stop.pos)
             local initial_scroll = hauling.scroll_position
-            local initial_selection = root.selection:get_selected_route_id()
             local initial_route_id = initial_route.id
             local initial_stop_id = initial_stop.id
 
@@ -644,15 +653,22 @@ describe('native Minecart Route marker overlay', function()
                 'recenter click closed the native Hauling menu')
             assert.equals(initial_scroll, hauling.scroll_position,
                 'recenter click changed the native list scroll position')
-            assert.equals(initial_selection,
+            assert.equals(initial_route_id,
                 root.selection:get_selected_route_id(),
-                'recenter click triggered native route-row selection')
+                'recenter click did not select its owning hauling route')
             assert.equals(initial_route_id,
                 hauling.view_routes[initial_descriptor.row_index].id,
                 'recenter click changed the underlying native route row')
             assert.equals(initial_stop_id,
                 hauling.view_stops[initial_descriptor.row_index].id,
                 'recenter click changed the underlying native stop row')
+            local zoom_indicator_y = assert(
+                root.layout:find_route_header_y(hauling, initial_route_id,
+                    native_focus),
+                'zoom-selected hauling route header is not visible') + 1
+            assert_rendered_text(root.layout:get_indicator_x(),
+                zoom_indicator_y, string.char(16), COLOR_YELLOW,
+                'zoom click renders its hauling-route selection indicator')
 
             -- Scroll the actual native list only after DwarfSpec moves the real
             -- pointer over its row area. Repeatedly render until one retained
@@ -755,6 +771,9 @@ describe('native Minecart Route marker overlay', function()
             ds.click(pointer_subject)
             assert_centered_and_highlighted(rebound_pos,
                 'scroll-rebound recenter-button click')
+            assert.equals(rebound_descriptor.route_id,
+                root.selection:get_selected_route_id(),
+                'rebound zoom click did not select its current owning route')
             assert.equals(rebound_scroll, hauling.scroll_position,
                 'rebound recenter click changed native list scroll position')
             assert.is_false(same_coord(rebound_previous.pos,

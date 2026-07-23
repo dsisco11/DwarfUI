@@ -204,6 +204,7 @@ end
 ---Resolves a bound descriptor against the current flattened native row.
 ---@param descriptor dwarfui.MinecartStopActionDescriptor|nil
 ---@return {x: integer, y: integer, z: integer}|nil
+---@return df.hauling_route|nil
 function MinecartRouteMarkersOverlay:resolve_stop_action_position(descriptor)
     if not descriptor or
             not self.layout:is_supported_focus(self.focus_provider()) then
@@ -236,15 +237,15 @@ function MinecartRouteMarkersOverlay:resolve_stop_action_position(descriptor)
             type(pos.z) ~= 'number' then
         return nil
     end
-    return {x=pos.x, y=pos.y, z=pos.z}
+    return {x=pos.x, y=pos.y, z=pos.z}, route
 end
 
----Centers and highlights the current position of a validated stop action.
+---Selects the owning route, then centers and highlights its validated stop.
 ---@param descriptor dwarfui.MinecartStopActionDescriptor
 ---@return boolean activated
 function MinecartRouteMarkersOverlay:activate_zoom_action(descriptor)
-    local pos = self:resolve_stop_action_position(descriptor)
-    if not pos then return false end
+    local pos, route = self:resolve_stop_action_position(descriptor)
+    if not pos or not self.selection:select_route(route) then return false end
     self.reveal_provider(pos, true, true)
     return true
 end
