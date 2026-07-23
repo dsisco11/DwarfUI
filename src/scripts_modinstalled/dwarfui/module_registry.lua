@@ -16,6 +16,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/minecart_stop_actions',
+        contract='MinecartStopActionLayout',
+        contract_type='table',
+    },
+    {
         name='dwarfui/pointer',
         contract='PointerDispatcher',
         contract_type='table',
