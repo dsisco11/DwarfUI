@@ -25,7 +25,7 @@ local function native_screen_contains(text)
 end
 
 describe('live mood popover overlay registration', function()
-    it('is discovered under its canonical name and fills the active screen',
+    it('is discovered and renders injected data across the active screen',
             function()
         local overlay = require('plugins.overlay')
         overlay.rescan()
@@ -86,8 +86,8 @@ describe('live mood popover overlay registration', function()
     end)
 end)
 
-describe('native DF top-bar moodlet integration', function()
-    it('detects pointer hover over every rendered native moodlet', function()
+describe('registered mood overlay with native top-bar data', function()
+    it('resolves rendered moodlets from directly assigned pointer state', function()
         local screen = assert(dfhack.gui.getDFViewscreen(true),
             'native fortress viewscreen is unavailable')
         assert.is_true(dfhack.gui.matchFocusString(
@@ -327,7 +327,7 @@ local function mount_overlay(overrides)
     return ds.mount(MoodPopoverOverlay, attributes)
 end
 
----Selects one injected native mood icon at a deterministic screen position.
+---Selects one injected mood value at a deterministic screen position.
 ---@param hover_index integer
 ---@param x integer
 ---@param y integer
@@ -345,7 +345,7 @@ local function popover_controls()
         ds.get('mood_popover/list')
 end
 
-describe('live mood popover overlay component', function()
+describe('mounted mood popover component with injected providers', function()
     before_each(function()
         state = {active=true, hover=nil, mouse_x=nil, mouse_y=nil, rows={}}
         for index=0,6 do
@@ -358,7 +358,7 @@ describe('live mood popover overlay component', function()
         root = mount_overlay()
     end)
 
-    it('renders every injected native mood heading, count, and row set',
+    it('renders every injected mood heading, count, and row set',
             function()
         local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
             'Unhappy', 'Very Unhappy', 'Miserable'}
@@ -374,7 +374,7 @@ describe('live mood popover overlay component', function()
         end
     end)
 
-    it('retains the current mood when the native hover yields to its panel',
+    it('retains the current mood when injected hover yields to its panel',
             function()
         select_mood(0, 10, 3)
         local popover = ds.get('mood_popover')
@@ -390,7 +390,7 @@ describe('live mood popover overlay component', function()
         assert.is_true(popover:inspect().visible)
     end)
 
-    it('focuses the scrollbar and lets DFHack move it from the moodlet',
+    it('handles direct wheel input while the injected mood remains selected',
             function()
         state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
         select_mood(3, 10, 3)

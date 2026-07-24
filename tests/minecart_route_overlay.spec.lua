@@ -190,7 +190,7 @@ local function painter()
 end
 
 describe('DwarfUI minecart route markers overlay', function()
-    it('registers a fullscreen Hauling overlay and passes native input through',
+    it('declares a fullscreen Hauling overlay and returns false for ordinary input',
             function()
         local state = {
             focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11, markers={},
@@ -417,7 +417,7 @@ describe('DwarfUI minecart route markers overlay', function()
             'stale zoom actions must not change route selection')
     end)
 
-    it('passes ordinary native row clicks through after button dispatch',
+    it('returns false for ordinary row clicks after button dispatch',
             function()
         local route = {id=8}
         local state = {
@@ -460,7 +460,7 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.is_nil(overlay:target_at_stop(6, 11))
     end)
 
-    it('consumes wheel input over the rail but refreshes after native list scrolling',
+    it('consumes rail wheel input and refreshes after reported list scrolling',
             function()
         local route = {id=8}
         local state = {

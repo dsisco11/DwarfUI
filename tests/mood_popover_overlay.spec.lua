@@ -139,7 +139,7 @@ local function overlay_with(state)
 end
 
 describe('DwarfUI mood popover overlay', function()
-    it('registers a default-enabled fullscreen fortress overlay', function()
+    it('declares a default-enabled fullscreen fortress overlay', function()
         local state = {active=true}
         local Overlay, module = load_overlay(state)
         assert.is_true(Overlay.ATTRS.default_enabled)
@@ -177,7 +177,7 @@ describe('DwarfUI mood popover overlay', function()
         assert.is_false(Overlay.ATTRS.active_provider())
     end)
 
-    it('discovers and hit-tests the rendered top-bar mood icons', function()
+    it('discovers and hit-tests simulated top-bar mood tiles', function()
         local state = {width=40, height=10, tiles={}}
         for y=0,2 do state.tiles[y] = {} end
         state.tiles[0][5] = {ch=string.byte('P'), tile=0}
@@ -211,7 +211,7 @@ describe('DwarfUI mood popover overlay', function()
         end
     end)
 
-    it('samples native hover during render after DF has updated it', function()
+    it('samples its hover provider during render before drawing', function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
         overlay.visible = true
@@ -221,7 +221,7 @@ describe('DwarfUI mood popover overlay', function()
         assert.equals(1, overlay.popover.render_count)
     end)
 
-    it('opens for native hover, refreshes on cadence, and keeps its anchor',
+    it('opens for provider-reported hover, refreshes, and keeps its anchor',
             function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)

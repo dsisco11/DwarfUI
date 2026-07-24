@@ -1,4 +1,4 @@
--- Live component coverage for the registered Minecart Route hover rail.
+-- Mounted component coverage for the production Minecart Route hover rail.
 --
 -- The prepared fortress must use Premium graphics and contain a scrollable
 -- Hauling route list with route headers and stops at distinct world tiles.
@@ -255,8 +255,8 @@ local function assert_rendered_marker_label(marker)
     end
 end
 
-describe('native Minecart Route hover rail', function()
-    it('uses the registered production rail against the native Hauling menu',
+describe('mounted Minecart Route hover rail against the native menu', function()
+    it('mounts the production overlay class over the native Hauling menu',
             function()
         assert.is_true(dfhack.screen.inGraphicsMode(),
             'prepared save must use Premium graphics')
@@ -342,8 +342,8 @@ describe('native Minecart Route hover rail', function()
                 end)
 
             -- A minimal mounted pointer host gives DwarfSpec ownership of every
-            -- pointer move while the registered overlay remains the component
-            -- receiving production input through DFHack's overlay dispatcher.
+            -- pointer move while the fresh production-class overlay receives
+            -- input through the DwarfSpec component host.
             pointer_target = widgets.Panel{
                 view_id='minecart_route_pointer_target',
                 frame={l=0, t=0, w=1, h=1},
@@ -386,9 +386,9 @@ describe('native Minecart Route hover rail', function()
                     overlay:onInput({})
                     local overlay_x, overlay_y = overlay:getMousePos()
                     assert.equals(x, overlay_x,
-                        'registered overlay did not receive DwarfSpec pointer x')
+                        'mounted production overlay did not receive DwarfSpec pointer x')
                     assert.equals(y, overlay_y,
-                        'registered overlay did not receive DwarfSpec pointer y')
+                        'mounted production overlay did not receive DwarfSpec pointer y')
                     assert.is_table(overlay:target_at_stop(x, y),
                         'production adapter did not resolve the hovered native stop')
                     local rail_x, rail_y = overlay.stop_rail:getMousePos()
@@ -457,7 +457,7 @@ describe('native Minecart Route hover rail', function()
             assert_recenter_asset(action)
 
             -- Cross from the stop to the action surface without losing the
-            -- target, then click through the registered overlay dispatcher.
+            -- target, then click through the mounted component host.
             assert.is_table(rail:get_target(),
                 'rail lost its stop target before pointer transfer')
             move_pointer(pointer_target, subject,
