@@ -559,7 +559,7 @@ describe('mounted Minecart Route hover rail against the native menu', function()
                 local before_scroll = hauling.scroll_position
                 -- DwarfSpec dispatches the wheel at its current virtual pointer
                 -- position and mirrors that position to native mouse input.
-                ds.mouseInput(ds.MouseInput.SCROLL_DOWN)
+                ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
                 ds.wait_frames(1)
                 if hauling.scroll_position ~= before_scroll then
                     overlay:onInput({})

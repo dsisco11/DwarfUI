@@ -23,7 +23,7 @@ dependencies = {
 }
 
 test_dependencies = {
-    "dwarfspec ~> 0.1",
+    "dwarfspec >= 0.2.0",
 }
 
 build = {
