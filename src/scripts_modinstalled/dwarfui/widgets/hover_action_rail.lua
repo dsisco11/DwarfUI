@@ -376,7 +376,6 @@ end
 ---@field target_at fun(x: integer, y: integer): dwarfui.HoverActionTarget|nil Resolves a fresh target at a rail-local pointer cell.
 ---@field validate_target fun(target: dwarfui.HoverActionTarget): dwarfui.HoverActionTarget|nil Re-resolves target identity before activation.
 ---@field context_active fun(): boolean Reports whether the owning context remains valid.
----@field mouse_provider fun(): integer|nil, integer|nil Supplies the current screen pointer cell.
 ---@field placement_bounds_provider fun(): table Supplies the rail-local placement bounds.
 ---@field placement_order string[] Preferred placements in order.
 ---@field action_gap integer Additional cells between every visible action.
@@ -401,7 +400,6 @@ HoverActionRail.ATTRS{
     target_at=DEFAULT_NIL,
     validate_target=DEFAULT_NIL,
     context_active=DEFAULT_NIL,
-    mouse_provider=DEFAULT_NIL,
     placement_bounds_provider=DEFAULT_NIL,
     placement_order={'left', 'right', 'above', 'below'},
     action_gap=0,
@@ -415,7 +413,7 @@ HoverActionRail.ATTRS{
 ---Creates each configured action widget once and initializes empty rail state.
 function HoverActionRail:init()
     for _, field in ipairs({
-            'target_at', 'validate_target', 'context_active', 'mouse_provider',
+            'target_at', 'validate_target', 'context_active',
             'placement_bounds_provider'}) do
         assert(type(self[field]) == 'function',
             'HoverActionRail.' .. field .. ' must be a function')
@@ -502,7 +500,7 @@ function HoverActionRail:update_hover()
         self:clear()
         return changed
     end
-    local x, y = self:get_local_pointer()
+    local x, y = self:getMousePos()
     local resolved = self:resolve_target_at_pointer(x, y)
     if resolved then
         local changed = not self.active_target or self.active_target.key ~= resolved.key
@@ -528,23 +526,12 @@ function HoverActionRail:update_hover()
     return true
 end
 
----Converts the current screen pointer cell into this rail's local coordinates.
----@return integer|nil x
----@return integer|nil y
-function HoverActionRail:get_local_pointer()
-    local screen_x, screen_y = self.mouse_provider()
-    if screen_x == nil or screen_y == nil or not self.frame_body then
-        return nil, nil
-    end
-    return self.frame_body:localXY(screen_x, screen_y)
-end
-
 ---Resolves one fresh target using supplied or current rail-local coordinates.
 ---@param x? integer
 ---@param y? integer
 ---@return dwarfui.HoverActionTarget|nil
 function HoverActionRail:resolve_target_at_pointer(x, y)
-    if x == nil or y == nil then x, y = self:get_local_pointer() end
+    if x == nil or y == nil then x, y = self:getMousePos() end
     if x == nil or y == nil then return nil end
     local target = self.target_at(x, y)
     assert(target == nil or is_instance_of(target, HoverActionTarget),
@@ -727,7 +714,7 @@ end
 function HoverActionRail:onInput(keys)
     self:update_hover()
     if not self.surface.visible then return false end
-    local x, y = self:get_local_pointer()
+    local x, y = self:getMousePos()
     if not contains_point(self.rail_bounds, x, y) then return false end
     if self.surface:inputToSubviews(keys or {}) then return true end
     local scroll = keys and (keys.CONTEXT_SCROLL_UP or keys.CONTEXT_SCROLL_DOWN or

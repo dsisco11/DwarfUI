@@ -1,6 +1,7 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
+local stub = require('luassert.stub')
 
 local module_path =
     'src/scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua'
@@ -93,7 +94,6 @@ local function rail_options(values)
             return current_target
         end,
         context_active=values.context_active or function() return true end,
-        mouse_provider=values.mouse_provider or function() return nil, nil end,
         placement_bounds_provider=values.placement_bounds_provider or
             function() return {x1=0, y1=0, x2=79, y2=24} end,
         placement_order=values.placement_order,
@@ -268,7 +268,7 @@ describe('DwarfUI HoverActionRail construction', function()
         local context = make_context()
         local valid = rail_options{actions={action(context)}}
         for _, field in ipairs({
-                'target_at', 'validate_target', 'context_active', 'mouse_provider',
+                'target_at', 'validate_target', 'context_active',
                 'placement_bounds_provider'}) do
             local values = {}
             for key, value in pairs(valid) do values[key] = value end
@@ -525,8 +525,8 @@ describe('DwarfUI HoverActionRail surface', function()
             background_pen='opaque',
             border_style=context.gui.FRAME_INTERIOR,
             content_inset=1,
-            mouse_provider=function() return 5, 6 end,
         })
+        stub(rail, 'getMousePos', 5, 6)
         rail.active_target = target(context)
         rail:refresh_surface()
         rail:updateLayout(widget_harness.rect(0, 0, 20, 10))
@@ -769,15 +769,14 @@ describe('DwarfUI HoverActionRail placement', function()
                 rail.action_widgets[1].frame.w - 1)
     end)
 
-    it('converts the screen pointer to local coordinates without mixing spaces',
+    it('uses inherited widget-local pointer coordinates without converting them',
             function()
         local context = make_context()
-        local mouse_x, mouse_y = 14, 26
+        local mouse_x, mouse_y = 4, 6
         local resolved_x, resolved_y
         local resolved_target = target(context, 'resolved')
         local rail = context.HoverActionRail(rail_options{
             actions={action(context)},
-            mouse_provider=function() return mouse_x, mouse_y end,
             target_at=function(x, y)
                 resolved_x, resolved_y = x, y
                 return resolved_target
@@ -787,10 +786,13 @@ describe('DwarfUI HoverActionRail placement', function()
                 return {x1=0, y1=0, x2=19, y2=9}
             end,
         })
+        local mouse_stub = stub(rail, 'getMousePos', function()
+            return mouse_x, mouse_y
+        end)
         rail:updateLayout(widget_harness.rect(10, 20, 20, 10))
-        assert.same({4, 6}, {rail:get_local_pointer()})
         assert.is.equal(resolved_target, rail:resolve_target_at_pointer())
         assert.same({4, 6}, {resolved_x, resolved_y})
+        assert.spy(mouse_stub).was.called()
 
         rail.active_target = anchored_target(context,
             {x1=4, y1=6, x2=4, y2=6})
@@ -957,7 +959,6 @@ describe('DwarfUI HoverActionRail hover lifecycle', function()
                 return context.widgets.Widget{frame={w=1, h=1}}
             end})},
             placement_order={'right'}, target_gap=1,
-            mouse_provider=function() return mouse_x, mouse_y end,
             context_active=function() return context_active end,
             target_at=function(x, y)
                 if y ~= 5 then return nil end
@@ -968,6 +969,7 @@ describe('DwarfUI HoverActionRail hover lifecycle', function()
                 return valid and target or nil
             end,
         })
+        stub(rail, 'getMousePos', function() return mouse_x, mouse_y end)
         rail:updateLayout(widget_harness.rect(0, 0, 30, 15))
         rail:update_hover()
         assert.equals('first', rail:get_target().key)
@@ -1032,7 +1034,7 @@ describe('DwarfUI HoverActionRail input', function()
         local rail = context.HoverActionRail(rail_options{
             actions={action(context, {enabled=function() return false end,
                 widget_factory=function() return context.widgets.Widget{frame={w=1,h=1}} end})},
-            placement_order={'right'}, mouse_provider=function() return mouse_x, mouse_y end,
+            placement_order={'right'},
             target_at=function(x, y)
                 if x == 5 and y == 5 then
                     return context.HoverActionTarget{
@@ -1042,6 +1044,7 @@ describe('DwarfUI HoverActionRail input', function()
             end,
             consume_scroll=true,
         })
+        stub(rail, 'getMousePos', function() return mouse_x, mouse_y end)
         rail:updateLayout(widget_harness.rect(0, 0, 20, 10))
         rail:update_hover()
         mouse_x = rail.rail_bounds.x1

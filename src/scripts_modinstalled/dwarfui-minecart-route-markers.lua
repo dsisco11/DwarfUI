@@ -110,7 +110,6 @@ end
 ---@field stop_rail dwarfui.HoverActionRail
 ---@field hauling_provider fun(): df.hauling_handlerst|nil
 ---@field focus_provider fun(): string|string[]
----@field mouse_provider fun(): integer|nil, integer|nil
 ---@field viewport_provider fun(): gui.dwarfmode.Viewport
 ---@field map_overlay_renderer fun(callback: fun(pos: table): any, bounds: table)
 ---@field reveal_provider fun(pos: table, center: boolean, highlight: boolean)
@@ -129,7 +128,6 @@ MinecartRouteMarkersOverlay.ATTRS{
     frame={l=0, t=0, w=1, h=1},
     hauling_provider=get_hauling,
     focus_provider=get_focus,
-    mouse_provider=dfhack.screen.getMousePos,
     viewport_provider=guidm.Viewport.get,
     map_overlay_renderer=guidm.renderMapOverlay,
     reveal_provider=dfhack.gui.revealInDwarfmodeMap,
@@ -155,7 +153,6 @@ function MinecartRouteMarkersOverlay:init()
         target_at=function(x,y) return self:target_at_stop(x,y) end,
         validate_target=function(target) return self:validate_stop_target(target) end,
         context_active=function() return self.layout:is_supported_focus(self.focus_provider()) and self.hauling_provider() ~= nil end,
-        mouse_provider=self.mouse_provider,
         placement_bounds_provider=function()
             local bounds = self.layout.bounds
             return {x1=0, y1=0, x2=bounds and bounds.x1 - 1 or 0,
@@ -377,7 +374,7 @@ function MinecartRouteMarkersOverlay:onInput(keys)
     self:ensure_menu_bounds()
     local hauling = self.hauling_provider()
     if self:inputToSubviews(keys) then return true end
-    local mouse_x, mouse_y = self.mouse_provider()
+    local mouse_x, mouse_y = self:getMousePos()
     self.selection:observe_input(keys, mouse_x, mouse_y,
         hauling, self.focus_provider())
     return false

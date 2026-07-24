@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed for DwarfUI.
+Implemented and proven against the native Hauling menu on 2026-07-24.
 
-The first consumer is the native Hauling route list, where the rail will expose
+The first consumer is the native Hauling route list, where the rail exposes
 stop actions without covering the native scrollbar. The widget itself remains
 independent of minecart routes, native Hauling state, and `AssetButton`.
 
@@ -128,7 +128,6 @@ DFHack layout and input contracts.
 ---@field target_at fun(x: integer, y: integer): dwarfui.HoverActionTarget|nil
 ---@field validate_target fun(target: dwarfui.HoverActionTarget): dwarfui.HoverActionTarget|nil
 ---@field context_active fun(): boolean
----@field mouse_provider fun(): integer|nil, integer|nil
 ---@field placement_bounds_provider fun(): table
 ---@field placement_order string[]
 ---@field action_gap integer
@@ -184,14 +183,13 @@ Required callbacks have deliberately narrow responsibilities:
 | `target_at(x, y)` | Map one current pointer position to a fresh target or `nil`. |
 | `validate_target(target)` | Re-resolve target identity and return a fresh snapshot immediately before activation. |
 | `context_active()` | Report whether the host screen, focus, and backing data are still valid. |
-| `mouse_provider()` | Supply the screen pointer cell without requiring a global pointer hook. |
 | `placement_bounds_provider()` | Supply the rail-local rectangle in which actions may be placed. |
 
-The rail fills its parent and converts the screen pointer into rail-local
-coordinates before calling `target_at`. Action frames and target anchors use
-that same local coordinate space. This allows the widget to live in a
-fullscreen overlay or another laid-out root without assuming that its parent
-begins at screen coordinate `0,0`.
+The rail fills its parent and uses the inherited `getMousePos()` widget method
+before calling `target_at`. Action frames and target anchors use that same
+local coordinate space. This allows the widget to live in a fullscreen overlay
+or another laid-out root without assuming that its parent begins at screen
+coordinate `0,0`.
 
 `target_gap` controls the number of cells between the target anchor and the
 outer rail surface. It defaults to zero. A nonzero gap produces the retention
