@@ -53,9 +53,14 @@ local function get_hauling()
     return df.global.plotinfo and df.global.plotinfo.hauling or nil
 end
 
----Returns the current DFHack focus path.
+---Returns the current native DF viewscreen focus paths.
 ---@return string|string[]
 local function get_focus()
+    if type(dfhack.gui.getDFViewscreen) == 'function' and
+            type(dfhack.gui.getFocusStrings) == 'function' then
+        local screen = dfhack.gui.getDFViewscreen(true)
+        if screen then return dfhack.gui.getFocusStrings(screen) end
+    end
     return dfhack.gui.getCurFocus()
 end
 

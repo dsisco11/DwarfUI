@@ -5,12 +5,35 @@
 -- This test only observes native route data and restores every UI value it
 -- changes.
 
+local gui = require('gui')
 local widgets = require('gui.widgets')
 local spy = require('luassert.spy')
-local stub = require('luassert.stub')
 
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
+
+---@class tests.MinecartNativeInteractionScreen: gui.ZScreen
+local MinecartNativeInteractionScreen = defclass(nil, gui.ZScreen)
+MinecartNativeInteractionScreen.ATTRS{initial_pause=false}
+
+---Builds the movable pointer subject used to address native screen cells.
+function MinecartNativeInteractionScreen:init()
+    self:addviews{
+        widgets.Panel{
+            view_id='minecart_route_pointer_target',
+            frame={l=0, t=0, w=1, h=1},
+        },
+    }
+end
+
+---Forwards unconsumed input once to the real native fortress screen.
+---@param keys table
+---@return boolean
+function MinecartNativeInteractionScreen:onInput(keys)
+    if self:inputToSubviews(keys) then return true end
+    self:sendInputToParent(keys)
+    return true
+end
 
 ---Returns a detached coordinate snapshot.
 ---@param pos {x: integer, y: integer, z: integer}
@@ -41,6 +64,22 @@ local function expected_center_origin(pos)
         math.max(0, math.min(max_y, pos.y - height // 2))
 end
 
+---Returns the independently calculated Premium interface position.
+---@param pos {x: integer, y: integer, z: integer}
+---@return {x: integer, y: integer, z: integer}
+local function expected_premium_ui_position(pos)
+    local gps = df.global.gps
+    local corner = df.global.world.viewport.corner
+    local map_tile_pixels = gps.viewport_zoom_factor // 4
+    return {
+        x=math.ceil(map_tile_pixels * (pos.x - corner.x) /
+            gps.tile_pixel_x),
+        y=math.ceil(map_tile_pixels * (pos.y - corner.y) /
+            gps.tile_pixel_y),
+        z=pos.z - corner.z,
+    }
+end
+
 ---Moves DwarfSpec's standard pointer target to one screen cell.
 ---@param target widgets.Widget
 ---@param subject dwarfspec.Subject
@@ -52,6 +91,7 @@ local function move_pointer(target, subject, x, y)
     local actual_x, actual_y = ds.move_pointer(subject)
     assert.equals(x, actual_x, 'DwarfSpec pointer x did not reach the cell')
     assert.equals(y, actual_y, 'DwarfSpec pointer y did not reach the cell')
+    ds.redraw(subject)
 end
 
 ---Returns a fully visible route-header row followed by a visible stop row.
@@ -143,10 +183,11 @@ end
 ---@param key string
 ---@param description string
 local function await_target(overlay, key, description)
-    overlay.stop_rail:update_hover()
-    local rail = overlay.stop_rail
-    assert.is_true(rail.surface.visible and rail:get_target() and
-        rail:get_target().key == key, description)
+    ds.await(description, function()
+        local rail = overlay.stop_rail
+        local target = rail:get_target()
+        return rail.surface.visible and target and target.key == key
+    end)
 end
 
 ---Verifies that a recenter activation centered and highlighted one stop.
@@ -170,6 +211,7 @@ end
 local function assert_selection_indicator(overlay, hauling, route_id)
     local y = assert(overlay.layout:find_route_header_y(hauling, route_id,
         overlay.focus_provider()), 'selected route header is not visible') + 1
+    ds.redraw()
     ds.await('selection indicator renders on the native route header', function()
         local tile = dfhack.screen.readTile(overlay.layout:get_indicator_x(), y)
         local color = tile and tile.fg + (tile.bold and 8 or 0) or nil
@@ -180,7 +222,7 @@ end
 ---Asserts that every cell in the Premium recenter asset reached the screen.
 ---@param action dwarfui.AssetButton
 local function assert_recenter_asset(action)
-    ds.wait_frames(2)
+    ds.redraw()
     local body = assert(action.frame_body,
         'production recenter action has no rendered body')
     assert.equals(3, body.width)
@@ -210,33 +252,38 @@ local function find_stop_marker(markers, stop)
     error(('selected native stop %s was not projected'):format(stop.id))
 end
 
----Asserts that the Busted compositor callback spies recorded one transparent
----marker glyph at the selected native stop.
----@param callback_spies table[]
+---Asserts that one marker glyph reached DFHack's real map paint boundary.
 ---@param marker dwarfui.MinecartRouteMarkerDescriptor
-local function assert_composited_marker(callback_spies, marker)
-    for _, callback_spy in ipairs(callback_spies) do
-        for index=#callback_spy.calls,1,-1 do
-            local pos = callback_spy.calls[index].vals[1]
-            local returns = callback_spy.returnvals[index]
-            local pen = returns and returns.vals[1]
-            if pos and pos.x == marker.world_pos.x and
-                    pos.y == marker.world_pos.y and pos.z == marker.world_pos.z and
-                    pen and pen.ch == marker.marker_glyph:byte() and
-                    pen.fg == marker.marker_pen.fg and pen.keep_lower == true then
-                return
-            end
+---@param paint_tile_spy luassert.spy
+local function assert_rendered_marker(marker, paint_tile_spy)
+    ds.redraw()
+    local map_pos = require('gui.dwarfmode').Viewport.get():tileToScreen(
+        marker.world_pos)
+    local observed = {}
+    for index=#paint_tile_spy.calls,1,-1 do
+        local values = paint_tile_spy.calls[index].vals
+        local pen, x, y, map = values[1], values[2], values[3], values[6]
+        if pen and pen.ch == marker.marker_glyph:byte() then
+            table.insert(observed, ('%s,%s map=%s fg=%s lower=%s'):format(
+                tostring(x), tostring(y), tostring(map), tostring(pen.fg),
+                tostring(pen.keep_lower)))
+        end
+        if x == map_pos.x and y == map_pos.y and map == true and
+                pen and pen.ch == marker.marker_glyph:byte() and
+                pen.fg == marker.marker_pen.fg and pen.keep_lower == true then
+            return
         end
     end
-    error(('Busted map-compositor spy did not observe route marker at %d,%d,%d')
-        :format(
-        marker.world_pos.x, marker.world_pos.y, marker.world_pos.z))
+    error(('registered overlay did not paint marker %d at map cell %d,%d; ' ..
+        'calls=%d matching=%s'):format(marker.marker_glyph:byte(),
+            map_pos.x, map_pos.y, #paint_tile_spy.calls,
+            table.concat(observed, ';')))
 end
 
 ---Asserts one rendered marker label and its foreground color.
 ---@param marker dwarfui.MinecartRouteMarkerDescriptor
 local function assert_rendered_marker_label(marker)
-    ds.wait_frames(2)
+    ds.redraw()
     for offset=1,#marker.label do
         local tile = dfhack.screen.readTile(
             marker.label_x + offset - 1, marker.label_y)
@@ -255,8 +302,8 @@ local function assert_rendered_marker_label(marker)
     end
 end
 
-describe('mounted Minecart Route hover rail against the native menu', function()
-    it('mounts the production overlay class over the native Hauling menu',
+describe('registered Minecart Route overlay against the native menu', function()
+    it('uses registry rendering and mounted native input for route interaction',
             function()
         assert.is_true(dfhack.screen.inGraphicsMode(),
             'prepared save must use Premium graphics')
@@ -272,100 +319,78 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             indicator=copy_coord(df.global.game.main_interface.recenter_indicator_m),
         }
         local overlay_plugin = require('plugins.overlay')
-        local screen, hauling, overlay, registered, mount_root, pointer_target, subject
+        local screen, hauling, overlay, mount_root, pointer_target, subject
         local initial_scroll, initial_selection, initially_open
-        local native_focus, original_map_overlay_renderer
-        local focus_provider_stub, ondisable_stub
-        local map_renderer_stub, marker_callback_spies = nil, {}
+        local paint_tile_spy
         local ok, failure = xpcall(function()
             screen = assert(dfhack.gui.getDFViewscreen(true),
                 'prepared save must have a fortress viewscreen')
             initially_open = dfhack.gui.matchFocusString('dwarfmode/Hauling',
                 screen)
+
+            -- Mount only a transparent input/redraw screen. The minecart
+            -- overlay remains owned and dispatched by DFHack's registry.
+            mount_root = ds.mount(MinecartNativeInteractionScreen, {
+                backing_viewscreen=screen,
+                initial_pause=false,
+            }):raw()
+            ds.viewport(gps.dimx, gps.dimy)
+            subject = ds.get('minecart_route_pointer_target')
+            pointer_target = subject:raw()
+
+            -- Establish a known native focus through the same mounted input
+            -- path used for every later click and wheel event.
             if initially_open then
-                require('gui').simulateInput(screen, 'LEAVESCREEN')
+                ds.input('LEAVESCREEN')
                 ds.await('pre-existing Hauling menu closes', function()
                     return dfhack.gui.matchFocusString('dwarfmode/Default',
                         dfhack.gui.getDFViewscreen(true))
                 end)
             end
-            screen = assert(dfhack.gui.getDFViewscreen(true))
-            require('gui').simulateInput(screen, 'D_HAULING')
-            ds.await('native Hauling menu opens', function()
-                return dfhack.gui.matchFocusString('dwarfmode/Hauling',
-                    dfhack.gui.getDFViewscreen(true))
-            end)
-            screen = assert(dfhack.gui.getDFViewscreen(true))
-            hauling = assert(df.global.plotinfo.hauling,
-                'native Hauling state is unavailable')
-            initial_scroll = hauling.scroll_position
-            native_focus = dfhack.gui.getFocusStrings(screen)
-            assert.is_table(native_focus,
-                'DFHack did not expose the native Hauling focus list')
 
             dfhack.run_command('dwarfui reload')
+            ds.await('registered minecart overlay is discovered', function()
+                local entry = overlay_plugin.get_state().db[REGISTERED_WIDGET]
+                return entry and entry.widget
+            end)
             overlay = assert(overlay_plugin.get_state().db[REGISTERED_WIDGET],
                 'registered minecart overlay is unavailable').widget
             assert.equals(reqscript('dwarfui/widgets/hover_action_rail').
                 HoverActionRail, getmetatable(overlay.stop_rail),
                 'registered overlay did not construct the production rail')
+            assert.is_false(overlay.layout:is_supported_focus(
+                overlay.focus_provider()),
+                'registered overlay became active outside native Hauling focus')
+            assert.is_false(overlay.stop_rail.surface.visible,
+                'registered rail remained visible outside native Hauling focus')
+
+            ds.input('D_HAULING')
+            ds.await('native Hauling menu opens', function()
+                return dfhack.gui.matchFocusString('dwarfmode/Hauling',
+                    dfhack.gui.getDFViewscreen(true))
+            end)
+            hauling = assert(df.global.plotinfo.hauling,
+                'native Hauling state is unavailable')
+            initial_scroll = hauling.scroll_position
             ds.await('registered overlay observes the native Hauling menu',
                 function()
-                    overlay:ensure_menu_bounds()
                     return overlay.layout.bounds and
-                    overlay.layout:is_supported_focus(overlay.focus_provider())
+                        overlay.layout:is_supported_focus(
+                            overlay.focus_provider())
                 end)
             -- Overlay rescan finishes asynchronously after `dwarfui reload`.
             -- Reacquire its canonical widget only after the native focus and
             -- cached bounds are stable.
             overlay = assert(overlay_plugin.get_state().db[REGISTERED_WIDGET],
                 'registered minecart overlay disappeared after rescan').widget
+            assert.is_equal(overlay,
+                overlay_plugin.get_state().db[REGISTERED_WIDGET].widget,
+                'interaction target is not the canonical registry widget')
             initial_selection = overlay.selection:get_selected_route_id()
-
-            -- The DFHack registry disables a Hauling-only overlay while the
-            -- DwarfSpec component host owns foreground focus. Preserve the
-            -- canonical registered instance for registration assertions, then
-            -- mount a fresh instance of that exact production class over the
-            -- real native screen for interaction and rendering coverage.
-            registered = overlay
-            overlay = getmetatable(registered){}
-            original_map_overlay_renderer = overlay.map_overlay_renderer
-            -- Busted owns the interception and call history. Each render
-            -- callback gets its own spy so assertions observe the real map
-            -- compositor inputs and returned marker pen.
-            map_renderer_stub = stub(overlay, 'map_overlay_renderer',
-                function(callback, bounds)
-                    local marker_callback_spy = spy.new(callback)
-                    table.insert(marker_callback_spies, marker_callback_spy)
-                    return original_map_overlay_renderer(marker_callback_spy,
-                        bounds)
-                end)
-
-            -- A minimal mounted pointer host gives DwarfSpec ownership of every
-            -- pointer move while the fresh production-class overlay receives
-            -- input through the DwarfSpec component host.
-            pointer_target = widgets.Panel{
-                view_id='minecart_route_pointer_target',
-                frame={l=0, t=0, w=1, h=1},
-            }
-            overlay:addviews{pointer_target}
-            mount_root = ds.mount(overlay, {
-                backing_viewscreen=screen,
-                initial_pause=false,
-            }):raw()
-            ds.viewport(gps.dimx, gps.dimy)
-            subject = ds.get('minecart_route_pointer_target')
-            -- Mounting the DwarfSpec pointer host makes it the immediate
-            -- DFHack focus. The production overlay must still receive the
-            -- backing native Hauling focus list, never a synthetic string.
-            focus_provider_stub = stub(overlay, 'focus_provider', function()
-                return dfhack.gui.getFocusStrings(screen)
-            end)
-            -- The DwarfSpec host is not a Hauling viewscreen, so DFHack would
-            -- otherwise invoke the registered overlay's disable callback on
-            -- every host render. The component itself still reads the real
-            -- native focus list above; only host-induced teardown is skipped.
-            ondisable_stub = stub(overlay, 'overlay_ondisable', function() end)
+            -- Premium keep-lower map glyphs compose over the base map tile,
+            -- so readTile() exposes the base graphic. Observe DFHack's final
+            -- paint call without replacing or bypassing the real renderer.
+            paint_tile_spy = spy.on(dfhack.screen, 'paintTile')
             local header, stop = find_visible_header_and_stop(hauling,
                 overlay.layout)
             local other_stop = find_other_visible_stop(hauling, overlay.layout,
@@ -374,16 +399,19 @@ describe('mounted Minecart Route hover rail against the native menu', function()
 
             -- Route headers are never hover targets.
             move_pointer(pointer_target, subject, header.x, header.y)
-            overlay:onInput({})
-            ds.wait_frames(2)
             assert.is_false(overlay.stop_rail.surface.visible)
+            ds.mouseInput(ds.EMouseButton.LEFT)
+            ds.await('native route-row click selects its route', function()
+                return overlay.selection:get_selected_route_id() ==
+                    header.route.id
+            end)
+            assert_selection_indicator(overlay, hauling, header.route.id)
 
             -- Number, label, and final native-list content cells resolve the
             -- same three-row stop target.
             for _, y in ipairs({stop.y1, stop.y1 + 1, stop.y2}) do
                 for _, x in ipairs({stop.x1, stop.x1 + 2, stop.x2}) do
                     move_pointer(pointer_target, subject, x, y)
-                    overlay:onInput({})
                     local overlay_x, overlay_y = overlay:getMousePos()
                     assert.equals(x, overlay_x,
                         'mounted production overlay did not receive DwarfSpec pointer x')
@@ -400,7 +428,6 @@ describe('mounted Minecart Route hover rail against the native menu', function()
                         'production rail context is not active for native Hauling')
                     assert.is_table(overlay.stop_rail:resolve_target_at_pointer(),
                         'production rail did not resolve its hovered target')
-                    overlay.stop_rail:update_hover()
                     await_target(overlay, target_key,
                         ('visible stop cell %d,%d resolves the production rail')
                             :format(x, y))
@@ -416,6 +443,10 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             assert.is_true(rail.rail_bounds.x2 < overlay.layout.bounds.x1,
                 'rail must end immediately before the native panel')
             assert.equals(overlay.layout.bounds.x1 - 1, rail.rail_bounds.x2)
+            assert.equals(stop.y1, rail.rail_bounds.y1,
+                'rail top is not aligned with its three-row stop')
+            assert.equals(stop.y2, rail.rail_bounds.y2,
+                'rail bottom is not aligned with its three-row stop')
             assert.is_true(rail.surface.frame_background.keep_lower,
                 'rail background must preserve native cells')
             assert.is_false(rail.surface.frame_style)
@@ -443,17 +474,21 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             local other_key = other_stop.route.id .. ':' .. other_stop.stop.id
             move_pointer(pointer_target, subject, other_stop.x1 + 2,
                 other_stop.y1 + 1)
-            overlay:onInput({})
             await_target(overlay, other_key,
                 'direct stop-to-stop movement rebinds the production rail')
             assert.is_equal(original_action, rail.action_widgets[1])
             assert.is_false(same_coord(stop.stop.pos, other_stop.stop.pos),
                 'prepared visible stops must occupy distinct world tiles')
             move_pointer(pointer_target, subject, stop.x1 + 2, stop.y1 + 1)
-            overlay:onInput({})
             await_target(overlay, target_key,
                 'rail rebinds to the original stop without reconstruction')
             assert.is_equal(original_action, rail.action_widgets[1])
+            ds.mouseInput(ds.EMouseButton.LEFT)
+            ds.await('native stop-row click selects its route', function()
+                return overlay.selection:get_selected_route_id() ==
+                    stop.route.id
+            end)
+            assert_selection_indicator(overlay, hauling, stop.route.id)
             assert_recenter_asset(action)
 
             -- Cross from the stop to the action surface without losing the
@@ -512,10 +547,12 @@ describe('mounted Minecart Route hover rail against the native menu', function()
                 resolved_after_zoom, overlay.viewport_provider()), stop.stop)
             assert.equals('same_z', marker.marker_kind)
             assert.equals(string.char(9), marker.marker_glyph)
+            assert.same(expected_premium_ui_position(before_pos),
+                marker.screen_pos,
+                'marker does not use the Premium world-to-UI transform')
             assert.equals(marker.screen_pos.x, marker.label_x)
             assert.equals(marker.screen_pos.y + 2, marker.label_y)
-            assert.spy(map_renderer_stub).was.called()
-            assert_composited_marker(marker_callback_spies, marker)
+            assert_rendered_marker(marker, paint_tile_spy)
             assert.is_true(marker.label_x >= overlay.frame_body.x1 and
                 marker.label_x + #marker.label - 1 <= overlay.frame_body.x2 and
                 marker.label_y >= overlay.frame_body.y1 and
@@ -526,6 +563,32 @@ describe('mounted Minecart Route hover rail against the native menu', function()
                         overlay.frame_body.x1, overlay.frame_body.y1,
                         overlay.frame_body.x2, overlay.frame_body.y2))
             assert_rendered_marker_label(marker)
+
+            -- Pan the real map a few tiles while keeping this stop visible,
+            -- then prove the registered overlay follows the native viewport.
+            local pan_x = before_pos.x >= 4 and before_pos.x - 4 or
+                before_pos.x + 4
+            dfhack.gui.revealInDwarfmodeMap(
+                {x=pan_x, y=before_pos.y, z=before_pos.z}, true, false)
+            ds.await('native viewport applies the marker-follow pan',
+                function()
+                    local corner = df.global.world.viewport.corner
+                    return corner.x == df.global.window_x and
+                        corner.y == df.global.window_y and
+                        corner.z == df.global.window_z
+                end)
+            local marker_after_pan = find_stop_marker(
+                overlay.projection:project(resolved_after_zoom,
+                    overlay.viewport_provider()), stop.stop)
+            assert.same(expected_premium_ui_position(before_pos),
+                marker_after_pan.screen_pos,
+                'panned marker does not use the Premium world-to-UI transform')
+            assert.is_false(marker_after_pan.screen_pos.x ==
+                    marker.screen_pos.x and marker_after_pan.screen_pos.y ==
+                    marker.screen_pos.y,
+                'route marker did not follow the changed native viewport')
+            assert_rendered_marker(marker_after_pan, paint_tile_spy)
+            assert_rendered_marker_label(marker_after_pan)
             assert.equals(before_route_id, hauling.view_routes[stop.index].id)
             assert.equals(before_stop_id, hauling.view_stops[stop.index].id)
             assert.is_equal(before_route_object,
@@ -542,7 +605,7 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             -- scroll the list nor change the map z-level.
             local z_before_wheel, scroll_before_wheel = df.global.window_z,
                 hauling.scroll_position
-            assert.is_true(overlay:onInput({CONTEXT_SCROLL_DOWN=true}))
+            ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
             assert.equals(z_before_wheel, df.global.window_z)
             assert.equals(scroll_before_wheel, hauling.scroll_position)
 
@@ -551,18 +614,17 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             -- rail click targets that current stop, not the old one.
             move_pointer(pointer_target, subject, stop.x1 + 2,
                 stop.y1 + 1)
-            overlay:onInput({})
             df.global.enabler.mouse_focus = true
             df.global.enabler.tracking_on = 1
+            local stale_target = assert(rail:get_target())
             local moved_stop
             for _=1,16 do
                 local before_scroll = hauling.scroll_position
                 -- DwarfSpec dispatches the wheel at its current virtual pointer
                 -- position and mirrors that position to native mouse input.
                 ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
-                ds.wait_frames(1)
+                ds.redraw()
                 if hauling.scroll_position ~= before_scroll then
-                    overlay:onInput({})
                     moved_stop = visible_stop_at(hauling, overlay.layout,
                         stop.x1 + 2, stop.y1 + 1)
                     if moved_stop and moved_stop.stop.id ~= before_stop_id then
@@ -577,26 +639,31 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             local moved_key = moved_stop.route.id .. ':' .. moved_stop.stop.id
             await_target(overlay, moved_key,
                 'rail rebinds after native list scrolling')
+            assert.is_nil(rail.validate_target(stale_target),
+                'formerly bound stop remained eligible after native scrolling')
             assert.equals(1, #rail.action_widgets,
                 'scrolling must reuse the one action-widget set')
             move_pointer(pointer_target, subject, rail.rail_bounds.x2,
                 rail.rail_bounds.y1 + 1)
-            overlay:onInput({})
             ds.click(subject)
             assert_centered_and_highlighted(copy_coord(moved_stop.stop.pos),
                 'rebound rail click targets the new native stop')
             assert.equals(moved_stop.route.id,
                 overlay.selection:get_selected_route_id())
 
-            require('gui').simulateInput(screen, 'LEAVESCREEN')
+            ds.input('LEAVESCREEN')
             ds.await('native Hauling menu closes', function()
                 return dfhack.gui.matchFocusString('dwarfmode/Default',
                     dfhack.gui.getDFViewscreen(true))
             end)
+            ds.redraw()
             ds.await('rail clears after native menu closure', function()
                 return overlay.stop_rail:get_target() == nil and
                     not overlay.stop_rail.surface.visible
             end)
+            assert.is_false(overlay.layout:is_supported_focus(
+                overlay.focus_provider()),
+                'registered overlay remained eligible after Hauling closed')
         end, debug.traceback)
 
         if mount_root then ds.unmount() end
@@ -613,13 +680,9 @@ describe('mounted Minecart Route hover rail against the native menu', function()
             saved.mouse_focus, saved.tracking_on
         if overlay then
             overlay:clear_overlay_state()
-            if ondisable_stub then ondisable_stub:revert() end
-            if focus_provider_stub then focus_provider_stub:revert() end
-            if map_renderer_stub then map_renderer_stub:revert() end
+            overlay.selection.selected_route_id = initial_selection
         end
-        if registered then
-            registered.selection.selected_route_id = initial_selection
-        end
+        if paint_tile_spy then paint_tile_spy:revert() end
         local current = dfhack.gui.getDFViewscreen(true)
         local is_open = current and dfhack.gui.matchFocusString(
             'dwarfmode/Hauling', current)
