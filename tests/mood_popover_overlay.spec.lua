@@ -138,7 +138,7 @@ local function overlay_with(state)
     return instance
 end
 
-describe('DwarfUI mood popover overlay', function()
+describe('DwarfUI mood popover overlay component contracts', function()
     it('declares a default-enabled fullscreen fortress overlay', function()
         local state = {active=true}
         local Overlay, module = load_overlay(state)
@@ -239,7 +239,7 @@ describe('DwarfUI mood popover overlay', function()
         assert.is_false(overlay.popover.set_calls[2].reset_scroll)
     end)
 
-    it('retains selection inside the panel, switches directly, and clears out',
+    it('uses injected pointer state to retain, switch, and clear selection',
             function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
@@ -264,7 +264,8 @@ describe('DwarfUI mood popover overlay', function()
         assert.same({}, overlay.popover.rows)
     end)
 
-    it('clears safely on null pointers, inactive maps, and disable', function()
+    it('clears injected component state for null pointers and inactive maps',
+            function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
         overlay:update_popover()
@@ -281,7 +282,7 @@ describe('DwarfUI mood popover overlay', function()
         assert.is_false(overlay.popover.visible)
     end)
 
-    it('forwards every input decision to the active popover', function()
+    it('forwards direct input return-value contracts to the popover', function()
         local state = {active=true}
         local overlay = overlay_with(state)
         local keys = {CUSTOM=true}

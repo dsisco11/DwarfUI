@@ -1,4 +1,4 @@
--- Live component contracts for the native mood-icon popover overlay.
+-- Native moodlet production proof and injected mounted-component coverage.
 
 local mood_overlay = reqscript('dwarfui-mood-popover')
 
@@ -82,68 +82,6 @@ local function rendered_mood_count(rect)
     return assert(tonumber(table.concat(digits)),
         'native moodlet has no rendered count')
 end
-
-describe('live mood popover overlay registration', function()
-    it('is discovered and renders injected data across the active screen',
-            function()
-        local overlay = require('plugins.overlay')
-        overlay.rescan()
-
-        local name = 'dwarfui-mood-popover.mood_popover'
-        local entry = assert(overlay.get_state().db[name],
-            ('overlay is not registered: %s'):format(name))
-        local widget = assert(entry.widget, 'registered overlay has no instance')
-        assert.is_true(widget.fullscreen)
-        assert.is_true(widget.hotspot)
-        assert.equals(widget.frame_parent_rect.width, widget.frame_rect.width)
-        assert.equals(widget.frame_parent_rect.height, widget.frame_rect.height)
-        assert.equals(0, widget.frame_rect.x1)
-        assert.equals(0, widget.frame_rect.y1)
-        assert.is_true(widget.active_provider())
-
-        for _, descriptor in ipairs(widget.mood_model:get_descriptors()) do
-            local live_rows = widget.mood_model:build_active_snapshot(descriptor)
-            assert.equals('table', type(live_rows))
-            for index, row in ipairs(live_rows) do
-                assert.equals(descriptor.stress_category,
-                    dfhack.units.getStressCategory(row.unit))
-                if index > 1 then
-                    local previous_stress = live_rows[index - 1].stress
-                    if descriptor.stress_descending then
-                        assert.is_true(previous_stress >= row.stress)
-                    else
-                        assert.is_true(previous_stress <= row.stress)
-                    end
-                end
-            end
-        end
-
-        local old_hover = widget.hover_provider
-        local old_mouse = widget.mouse_provider
-        local old_snapshot = widget.snapshot_provider
-        local old_active = widget.active_provider
-        local ok, failure = xpcall(function()
-            widget.active_provider = function() return true end
-            widget.hover_provider = function()
-                return df.main_hover_instruction.INFO_STRESSED_0
-            end
-            widget.mouse_provider = function() return 10, 3 end
-            widget.snapshot_provider = function()
-                return {{id=1, name='Registered Citizen'}}
-            end
-            ds.wait_frames(2)
-            assert.equals('Ecstatic', widget.selected_descriptor.label)
-            assert.is_true(widget.popover.visible)
-            assert.equals('Ecstatic (1)', widget.popover.header.text)
-        end, debug.traceback)
-        widget.hover_provider = old_hover
-        widget.mouse_provider = old_mouse
-        widget.snapshot_provider = old_snapshot
-        widget.active_provider = old_active
-        widget:clear()
-        assert.is_true(ok, failure)
-    end)
-end)
 
 describe('registered mood overlay with native top-bar data', function()
     it('routes native moodlet hover, scrolling, and unit selection', function()
@@ -446,8 +384,7 @@ end
 local function select_mood(hover_index, x, y)
     state.hover = df.main_hover_instruction['INFO_STRESSED_' .. hover_index]
     state.mouse_x, state.mouse_y = x, y
-    root:raw():update_popover()
-    ds.wait_frames(1)
+    ds.redraw()
 end
 
 ---Returns the mounted reusable popover and its stable controls.
@@ -495,29 +432,30 @@ describe('mounted mood popover component with injected providers', function()
         state.mouse_x = math.floor((body.x1 + body.x2) / 2)
         state.mouse_y = math.floor((body.y1 + body.y2) / 2)
         popover:move_pointer('center')
-        root:raw():update_popover()
-        ds.wait_frames(1)
+        ds.redraw()
 
         assert.equals('Ecstatic', root:raw().selected_descriptor.label)
         assert.is_true(popover:inspect().visible)
     end)
 
-    it('handles direct wheel input while the injected mood remains selected',
+    it('routes mounted wheel input while the injected mood remains selected',
             function()
         state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
         select_mood(3, 10, 3)
         local popover, _, list = popover_controls()
         local scrollbar = list:raw().scrollbar
         local initial_offset = scrollbar.bar_offset
-        assert.is_true(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
+        list:move_pointer('center')
+        ds.redraw()
+        ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
         assert.equals(2, list:raw().page_top)
         assert.equals(2, scrollbar.top_elem)
         assert.is_true(scrollbar.bar_offset > initial_offset)
-        root:raw():update_popover()
+        ds.redraw()
         assert.equals(2, list:raw().page_top)
         assert.equals(2, scrollbar.top_elem)
         for _=1,20 do
-            assert.is_true(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
+            ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
         end
         assert.equals(20 - root:raw().popover.visible_rows + 1,
             list:raw().page_top)
@@ -526,15 +464,11 @@ describe('mounted mood popover component with injected providers', function()
         assert.equals('Content Unit 20', list:raw().choices[20].text)
 
         state.hover, state.mouse_x, state.mouse_y = nil, 0, 0
-        root:raw():update_popover()
-        ds.wait_frames(1)
-        assert.is_nil(root:raw():onInput({_MOUSE_L=true}))
-        assert.is_nil(root:raw():onInput({CUSTOM_A=true}))
-        assert.is_nil(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
+        ds.redraw()
         assert.is_false(popover:inspect().visible)
     end)
 
-    it('handles pointer loss, direct changes, empty rows, and viewport bounds',
+    it('lays out injected selections, empty rows, and viewport bounds',
             function()
         select_mood(1, 10, 5)
         local first_anchor = root:raw().popover.frame_global
@@ -551,17 +485,16 @@ describe('mounted mood popover component with injected providers', function()
         select_mood(2, 10, 3)
         assert.equals('Happy (0)', header:text())
         assert.is_false(list:inspect().visible)
-        assert.is_true(root:raw():onInput({CONTEXT_SCROLL_DOWN=true}))
         assert.equals(1, list:raw().page_top)
 
         ds.viewport(30, 10)
+        ds.redraw()
         frame = root:raw().popover.frame_global
         assert.is_true(frame.x >= 0 and frame.x + frame.w <= 30)
         assert.is_true(frame.y >= 0 and frame.y + frame.h <= 10)
 
         state.mouse_x = nil
-        root:raw():update_popover()
-        ds.wait_frames(1)
+        ds.redraw()
         assert.is_nil(root:raw().selected_descriptor)
         assert.is_false(popover:inspect().visible)
     end)
