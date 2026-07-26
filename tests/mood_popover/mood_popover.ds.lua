@@ -3,25 +3,84 @@
 local mood_overlay = reqscript('dwarfui-mood-popover')
 
 local MoodPopoverOverlay = mood_overlay.MoodPopoverOverlay
+local MoodPopoverModel = reqscript('dwarfui/mood_popover').MoodPopoverModel
+local REGISTERED_WIDGET = 'dwarfui-mood-popover.mood_popover'
 local state
 local root
 
----Returns whether the current native screen contains an ASCII text fragment.
+---Returns whether the current native screen contains a CP437 text fragment.
 ---@param text string
 ---@return boolean
 local function native_screen_contains(text)
+    local expected = text:lower()
     local width, height = dfhack.screen.getWindowSize()
     for y=0,height - 1 do
         local row = {}
         for x=0,width - 1 do
             local tile = dfhack.screen.readTile(x, y)
-            local character = tile and tile.ch or string.byte(' ')
-            table.insert(row, character >= 32 and character <= 126 and
-                string.char(character) or ' ')
+            row[#row + 1] = string.char(tile and tile.ch or 0)
         end
-        if table.concat(row):find(text, 1, true) then return true end
+        if table.concat(row):lower():find(expected, 1, true) then return true end
     end
     return false
+end
+
+---Parses the rendered popover heading into its category and row count.
+---@param text string|nil
+---@return string, integer
+local function parse_header(text)
+    local label, count
+    if text then label, count = text:match('^(.-) %((%d+)%)$') end
+    assert(label and count,
+        ('invalid mood popover header: %s'):format(tostring(text)))
+    return label, tonumber(count)
+end
+
+---Returns one captured zero-based screen cell.
+---@param capture dwarfspec.ScreenCapture
+---@param x integer
+---@param y integer
+---@return table|nil
+local function captured_cell(capture, x, y)
+    local row = capture.cells[y + 1]
+    return row and row[x + 1] or nil
+end
+
+---Returns the rendered CP437 character codes in one inspected rectangle.
+---@param name string
+---@param bounds {x1: integer, y1: integer, x2: integer, y2: integer}
+---@return string
+local function captured_cp437(name, bounds)
+    local capture = ds.capture_screen(name, {
+        max_width=bounds.x2 + 1,
+        max_height=bounds.y2 + 1,
+    })
+    local lines = {}
+    for y=bounds.y1,bounds.y2 do
+        local row = {}
+        for x=bounds.x1,bounds.x2 do
+            local cell = captured_cell(capture, x, y)
+            row[#row + 1] = string.char(cell and cell.ch or 0)
+        end
+        lines[#lines + 1] = table.concat(row)
+    end
+    return table.concat(lines, '\n')
+end
+
+---Returns the integer rendered in one native moodlet count row.
+---@param rect {x1: integer, x2: integer, y2: integer}
+---@return integer
+local function rendered_mood_count(rect)
+    local digits = {}
+    for x=rect.x1,rect.x2 do
+        local tile = dfhack.screen.readTile(x, rect.y2)
+        if tile and tile.ch >= string.byte('0') and
+                tile.ch <= string.byte('9') then
+            digits[#digits + 1] = string.char(tile.ch)
+        end
+    end
+    return assert(tonumber(table.concat(digits)),
+        'native moodlet has no rendered count')
 end
 
 describe('live mood popover overlay registration', function()
@@ -87,42 +146,16 @@ describe('live mood popover overlay registration', function()
 end)
 
 describe('registered mood overlay with native top-bar data', function()
-    it('resolves rendered moodlets from directly assigned pointer state', function()
-        local screen = assert(dfhack.gui.getDFViewscreen(true),
+    it('routes native moodlet hover, scrolling, and unit selection', function()
+        local borrowed_screen = assert(dfhack.gui.getDFViewscreen(true),
             'native fortress viewscreen is unavailable')
-        assert.is_true(dfhack.gui.matchFocusString(
-            'dwarfmode/Default', screen))
-        local overlay = require('plugins.overlay')
-        overlay.rescan()
-        ds.wait_frames(2)
-
-        local name = 'dwarfui-mood-popover.mood_popover'
-        local entry = assert(overlay.get_state().db[name],
-            ('overlay is not registered: %s'):format(name))
-        local widget = assert(entry.widget, 'registered overlay has no instance')
-        assert.is_true(widget.active_provider())
-        assert.equals(require('gui').FRAME_INTERIOR,
-            widget.popover.frame_style)
-
-        local display = mood_overlay.TopBarMoodDisplay{}
-        local moodlets = assert(display:find_layout(),
-            'rendered top information-bar moodlets are unavailable')
-        assert.equals(7, #moodlets)
-        local gps = df.global.gps
-        local enabler = df.global.enabler
         local sheets = df.global.game.main_interface.view_sheets
         local indicator = df.global.game.main_interface.recenter_indicator_m
         local saved_unids = {}
         for _, unit_id in ipairs(sheets.viewing_unid) do
-            table.insert(saved_unids, unit_id)
+            saved_unids[#saved_unids + 1] = unit_id
         end
         local saved = {
-            mouse_x=gps.mouse_x,
-            mouse_y=gps.mouse_y,
-            precise_mouse_x=gps.precise_mouse_x,
-            precise_mouse_y=gps.precise_mouse_y,
-            mouse_focus=enabler.mouse_focus,
-            tracking_on=enabler.tracking_on,
             window_x=df.global.window_x,
             window_y=df.global.window_y,
             window_z=df.global.window_z,
@@ -140,106 +173,157 @@ describe('registered mood overlay with native top-bar data', function()
             indicator_y=indicator.y,
             indicator_z=indicator.z,
         }
-
-        local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
-            'Unhappy', 'Very Unhappy', 'Miserable'}
-        local old_snapshot = widget.snapshot_provider
+        local native_subject
+        local popover_subject
         local ok, failure = xpcall(function()
-            enabler.mouse_focus = true
-            enabler.tracking_on = 1
-            for index, expected_label in ipairs(labels) do
-                local rect = moodlets[index]
-                local tile = assert(dfhack.screen.readTile(rect.x1, rect.y1))
-                assert.equals(0, tile.ch)
+            -- Attach to the game-owned fortress screen without creating a host
+            -- or taking ownership of the existing native viewscreen.
+            native_subject = ds.mountNativeScreen()
+            assert.is_true(ds.hasFocus('dwarfmode/Default'))
 
+            local source = {
+                source='overlay',
+                overlay=REGISTERED_WIDGET,
+            }
+            local header_subject
+            local list_subject
+            ds.await('registered mood popover controls become addressable',
+                function()
+                    local popover_ok, selected_popover = pcall(ds.get,
+                        'mood_popover', source)
+                    local header_ok, selected_header = pcall(ds.get,
+                        'mood_popover/header', source)
+                    local list_ok, selected_list = pcall(ds.get,
+                        'mood_popover/list', source)
+                    if not (popover_ok and header_ok and list_ok) then
+                        return false
+                    end
+                    popover_subject = selected_popover
+                    header_subject = selected_header
+                    list_subject = selected_list
+                    return true
+                end)
+
+            local display = mood_overlay.TopBarMoodDisplay{}
+            local moodlets = assert(display:find_layout(),
+                'rendered top information-bar moodlets are unavailable')
+            local descriptors = MoodPopoverModel{}:get_descriptors()
+            assert.equals(7, #moodlets)
+            assert.equals(#moodlets, #descriptors)
+
+            local overflow_index
+            for index, descriptor in ipairs(descriptors) do
+                local rect = moodlets[index]
                 local expected_hover = df.main_hover_instruction[
                     'INFO_STRESSED_' .. (index - 1)]
+
+                -- Every cell in the complete two-column information-bar hit
+                -- region is real input evidence: both icon cells, the number
+                -- row, and the surrounding cells above and below its graphic.
                 for y=rect.y1,rect.y2 do
                     for x=rect.x1,rect.x2 do
                         assert.equals(expected_hover,
                             display:resolve_hover(x, y))
+                        ds.move_pointer(x, y)
+                        ds.redraw()
+                        local label, count = parse_header(
+                            header_subject:text())
+                        assert.equals(descriptor.label, label)
+                        assert.equals(rendered_mood_count(rect), count)
+                        assert.is_true(popover_subject:inspect().visible,
+                            ('mood popover closed at moodlet %d cell %d,%d')
+                                :format(index, x, y))
                     end
                 end
-                gps.mouse_x, gps.mouse_y = rect.x1, rect.y2
-                gps.precise_mouse_x = rect.x1 * gps.tile_pixel_x + 1
-                gps.precise_mouse_y = rect.y2 * gps.tile_pixel_y + 1
-                widget:update_popover()
-                assert.equals(expected_label,
-                    widget.selected_descriptor.label)
-                assert.is_true(widget.popover.visible)
-                assert.equals(expected_label, widget.popover.title)
-                assert.equals(rect.y2 + 2, widget.popover.frame_global.y)
 
-                local displayed_count = ''
-                for x=rect.x1,rect.x2 do
-                    local count_tile = dfhack.screen.readTile(x, rect.y2)
-                    if count_tile.ch >= string.byte('0') and
-                            count_tile.ch <= string.byte('9') then
-                        displayed_count = displayed_count ..
-                            string.char(count_tile.ch)
+                local list_state = list_subject:inspect()
+                assert.is_table(popover_subject:inspect().frame)
+                assert.is_table(list_state.body)
+                assert.equals(1, list_state.scroll_position)
+                if rendered_mood_count(rect) >
+                        (list_state.visible_row_count or 0) then
+                    local rows = popover_subject:raw().rows
+                    for _, row in ipairs(rows) do
+                        local soul = row.unit and row.unit.status and
+                            row.unit.status.current_soul
+                        if soul and #soul.skills > 0 then
+                            overflow_index = index
+                            break
+                        end
                     end
                 end
-                assert.equals(tonumber(displayed_count), #widget.popover.rows)
             end
+            assert.is_not_nil(overflow_index,
+                'prepared fortress has no overflowing mood with overview data')
 
-            local scroll_rows = {}
-            for index=1,20 do
-                table.insert(scroll_rows, {
-                    id=index,
-                    name=('Content Unit %02d'):format(index),
-                })
-            end
-            widget.snapshot_provider = function()
-                return scroll_rows
-            end
-            local rect = moodlets[4]
-            gps.mouse_x, gps.mouse_y = rect.x1, rect.y2
-            gps.precise_mouse_x = rect.x1 * gps.tile_pixel_x + 1
-            gps.precise_mouse_y = rect.y2 * gps.tile_pixel_y + 1
-            widget:update_popover()
-            assert.is_true(widget.popover:has_overflow())
-            local previous_z = df.global.window_z
-            require('gui').simulateInput(screen, {
-                CONTEXT_SCROLL_DOWN=true,
-                CURSOR_UP_Z=true,
-            })
-            assert.equals(2, widget.popover.list.page_top)
-            assert.equals(previous_z, df.global.window_z)
+            -- Reopen one naturally populated overflowing category, then keep
+            -- the pointer on the native moodlet while the registered overlay
+            -- consumes exactly one wheel step.
+            local rect = moodlets[overflow_index]
+            ds.move_pointer(rect.x1, rect.y2)
+            ds.redraw()
+            local list_before_moodlet_scroll = list_subject:inspect()
+            local z_before_moodlet_scroll = df.global.window_z
+            ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
+            local list_after_moodlet_scroll = list_subject:inspect()
+            assert.equals(list_before_moodlet_scroll.scroll_position + 1,
+                list_after_moodlet_scroll.scroll_position)
+            assert.equals(z_before_moodlet_scroll, df.global.window_z)
 
-            local target
-            for _, unit in ipairs(df.global.world.units.active) do
-                local soul = unit.status and unit.status.current_soul
-                if dfhack.units.isCitizen(unit) and soul and
-                        #soul.skills > 0 then
-                    target = unit
+            -- Cross the one-row retention bridge into the inspected list body.
+            -- Normal render-time hover must retain the open popover.
+            local list_bounds = assert(list_after_moodlet_scroll.body)
+            ds.move_pointer(list_bounds.x1 + 1, list_bounds.y1)
+            ds.redraw()
+            assert.is_true(popover_subject:inspect().visible)
+
+            -- Scrolling over the list updates DwarfSpec's inspected list state
+            -- and changes the actual rendered rows in the same direction.
+            local before_text = captured_cp437(
+                'mood_popover_rows_before_scroll', list_bounds)
+            local before_list_scroll = list_subject:inspect().scroll_position
+            ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
+            local after_list_state = list_subject:inspect()
+            local after_text = captured_cp437(
+                'mood_popover_rows_after_scroll',
+                assert(after_list_state.body))
+            assert.equals(before_list_scroll + 1,
+                after_list_state.scroll_position)
+            assert.is_false(before_text == after_text,
+                'list scroll state changed without changing rendered rows')
+
+            -- Resolve the row currently occupying the clicked rendered line.
+            -- The row identity is evidence only; activation still travels from
+            -- DwarfSpec through the registered overlay's natural input path.
+            local list = list_subject:raw()
+            local choice
+            local choice_index
+            local first_visible = after_list_state.scroll_position
+            local last_visible = math.min(#list.choices,
+                first_visible + after_list_state.visible_row_count - 1)
+            for index=first_visible,last_visible do
+                local candidate = list.choices[index]
+                local unit = candidate and candidate.row and candidate.row.unit
+                local soul = unit and unit.status and unit.status.current_soul
+                if soul and #soul.skills > 0 then
+                    choice = candidate
+                    choice_index = index
                     break
                 end
             end
-            assert.is_not_nil(target)
-            widget.snapshot_provider = function()
-                return {{
-                    id=target.id,
-                    unit=target,
-                    name=dfhack.units.getReadableName(target),
-                }}
-            end
-            widget:refresh()
-            local frame = widget.popover.frame_global
-            local pointer_x = frame.x + 2
-
-            gps.mouse_x, gps.mouse_y = pointer_x, frame.y - 1
-            gps.precise_mouse_x = pointer_x * gps.tile_pixel_x + 1
-            gps.precise_mouse_y = (frame.y - 1) * gps.tile_pixel_y + 1
-            widget:update_popover()
-            assert.is_true(widget.popover.visible)
-
-            gps.mouse_x, gps.mouse_y = pointer_x, frame.y + 3
-            gps.precise_mouse_x = pointer_x * gps.tile_pixel_x + 1
-            gps.precise_mouse_y = (frame.y + 3) * gps.tile_pixel_y + 1
-            widget:update_popover()
-            assert.is_true(widget.popover:contains_list_point(
-                gps.mouse_x, gps.mouse_y))
-            require('gui').simulateInput(screen, '_MOUSE_L')
+            assert.is_not_nil(choice,
+                'visible mood rows contain no unit with overview skill data')
+            local target = assert(choice.row and choice.row.unit,
+                'visible mood row has no native unit')
+            local rendered_row = choice.text
+            assert.is_truthy(after_text:find(rendered_row, 1, true),
+                ('selected unit row %q is not present in captured rendering %q')
+                    :format(choice.text, after_text))
+            ds.move_pointer(after_list_state.body.x1 + 1,
+                after_list_state.body.y1 +
+                    (choice_index - after_list_state.scroll_position))
+            ds.redraw()
+            ds.mouseInput(ds.EMouseButton.LEFT)
 
             assert.is_true(sheets.open)
             assert.equals(df.view_sheet_type.UNIT, sheets.active_sheet)
@@ -251,20 +335,42 @@ describe('registered mood overlay with native top-bar data', function()
             assert.equals(0, sheets.scroll_position)
             assert.equals(0, sheets.active_sub_tab)
             assert.equals(target.pos.z, df.global.window_z)
-            assert.is_false(widget.popover.visible)
+
+            -- The native screen's focus and the overlay's rendered lifecycle
+            -- both prove that unit selection left the top-bar context.
+            ds.redraw()
+            assert.is_false(ds.hasFocus('dwarfmode/Default'))
+            assert.is_true(ds.hasFocus('dwarfmode/ViewSheets'))
+            assert.is_false(popover_subject:inspect().visible)
+
+            -- The default Overview tab must contain real unit-card data, not
+            -- merely an open shell with the selected unit ID.
+            local overview_name = assert(target.name.first_name ~= '' and
+                target.name.first_name,
+                'selected citizen has no first name')
             ds.wait_frames(3)
-            local overview_name = assert(target.name.first_name:match('[A-Za-z]+'),
-                'selected citizen has no ASCII first-name fragment')
-            assert.is_true(native_screen_contains(overview_name))
-            assert.is_true(#sheets.raw_thought_str > 0)
-            assert.is_true(sheets.labor_skill_num > 0)
+            local overview_name_visible = native_screen_contains(overview_name)
+            local thought_count = #sheets.raw_thought_str
+            local skill_count = sheets.labor_skill_num
+            if not overview_name_visible or thought_count == 0 or
+                    skill_count == 0 then
+                local width, height = dfhack.screen.getWindowSize()
+                local screen_text = captured_cp437('unit_card_overview', {
+                    x1=0, y1=0, x2=width - 1, y2=height - 1,
+                })
+                error(('unit %d overview is unpopulated: name=%q visible=%s ' ..
+                    'thoughts=%d skills=%d soul_skills=%d screen=%q')
+                    :format(target.id, overview_name,
+                        tostring(overview_name_visible), thought_count,
+                        skill_count, #target.status.current_soul.skills,
+                        screen_text))
+            end
         end, debug.traceback)
 
-        gps.mouse_x, gps.mouse_y = saved.mouse_x, saved.mouse_y
-        gps.precise_mouse_x = saved.precise_mouse_x
-        gps.precise_mouse_y = saved.precise_mouse_y
-        enabler.mouse_focus = saved.mouse_focus
-        enabler.tracking_on = saved.tracking_on
+        -- Release the borrowed attachment before restoring all game-owned
+        -- viewport and unit-card state. DwarfSpec restores pointer state.
+        local popover_cleanup = popover_subject and popover_subject:raw() or nil
+        if native_subject then ds.unmount() end
         df.global.window_x = saved.window_x
         df.global.window_y = saved.window_y
         df.global.window_z = saved.window_z
@@ -285,10 +391,16 @@ describe('registered mood overlay with native top-bar data', function()
         indicator.x = saved.indicator_x
         indicator.y = saved.indicator_y
         indicator.z = saved.indicator_z
-        widget.snapshot_provider = old_snapshot
-        widget:clear()
-        screen:logic()
-        screen:render(df.global.cur_year_tick)
+        if popover_cleanup then
+            if popover_cleanup.parent_view and
+                    popover_cleanup.parent_view.clear then
+                popover_cleanup.parent_view:clear()
+            end
+        end
+        borrowed_screen:logic()
+        borrowed_screen:render(df.global.cur_year_tick)
+        assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
+            'native attachment dismissed or replaced the game screen')
         assert.is_true(ok, failure)
     end)
 end)

@@ -135,17 +135,6 @@ local function visible_stop_at(hauling, layout, x, y)
     return {index=index, route=route, stop=stop, x=x, y=y}
 end
 
----Returns whether one mounted subject reports an exact focus path.
----@param subject dwarfspec.Subject
----@param expected string
----@return boolean
-local function has_focus(subject, expected)
-    for _, focus in ipairs(subject:getFocusList()) do
-        if focus == expected then return true end
-    end
-    return false
-end
-
 ---Captures enough of the screen to include one cached native panel.
 ---@param name string
 ---@param bounds {x1: integer, y1: integer, x2: integer, y2: integer}
@@ -338,7 +327,7 @@ describe('registered Minecart Route overlay against the native menu', function()
             borrowed_screen = assert(dfhack.gui.getDFViewscreen(true),
                 'prepared save must have a fortress viewscreen')
             native_subject = ds.mountNativeScreen()
-            initially_open = has_focus(native_subject, 'dwarfmode/Hauling')
+            initially_open = ds.hasFocus('dwarfmode/Hauling')
             initial_view_pos = ds.getViewPos()
             ds.setViewPos(initial_view_pos)
 
@@ -347,7 +336,7 @@ describe('registered Minecart Route overlay against the native menu', function()
             if initially_open then
                 ds.input('LEAVESCREEN')
                 ds.await('pre-existing Hauling menu closes', function()
-                    return has_focus(native_subject, 'dwarfmode/Default')
+                    return ds.hasFocus('dwarfmode/Default')
                 end)
             end
 
@@ -362,9 +351,9 @@ describe('registered Minecart Route overlay against the native menu', function()
             dfhack.run_command('dwarfui reload')
             ds.input('D_HAULING')
             ds.await('native Hauling menu opens', function()
-                return has_focus(native_subject, 'dwarfmode/Hauling')
+                return ds.hasFocus('dwarfmode/Hauling')
             end)
-            assert.is_true(has_focus(native_subject, 'dwarfmode/Hauling'),
+            assert.is_true(ds.hasFocus('dwarfmode/Hauling'),
                 'borrowed native screen did not report Hauling focus')
             hauling = assert(df.global.plotinfo.hauling,
                 'native Hauling state is unavailable')
@@ -583,7 +572,7 @@ describe('registered Minecart Route overlay against the native menu', function()
             assert.equals(before_route_rows, #hauling.view_routes)
             assert.equals(before_stop_rows, #hauling.view_stops)
             assert.equals(initial_scroll, hauling.scroll_position)
-            assert.is_true(has_focus(native_subject, 'dwarfmode/Hauling'),
+            assert.is_true(ds.hasFocus('dwarfmode/Hauling'),
                 'zoom click closed Hauling')
 
             -- Wheel input over the rail belongs to the rail and must neither
@@ -640,7 +629,7 @@ describe('registered Minecart Route overlay against the native menu', function()
 
             ds.input('LEAVESCREEN')
             ds.await('native Hauling menu closes', function()
-                return has_focus(native_subject, 'dwarfmode/Default')
+                return ds.hasFocus('dwarfmode/Default')
             end)
             ds.redraw()
             ds.await('rail clears after native menu closure', function()
@@ -664,17 +653,16 @@ describe('registered Minecart Route overlay against the native menu', function()
         if native_subject and initial_view_pos then
             ds.setViewPos(initial_view_pos)
         end
-        local is_open = native_subject and
-            has_focus(native_subject, 'dwarfmode/Hauling')
+        local is_open = native_subject and ds.hasFocus('dwarfmode/Hauling')
         if native_subject and initially_open and not is_open then
             ds.input('D_HAULING')
             ds.await('original Hauling menu reopens', function()
-                return has_focus(native_subject, 'dwarfmode/Hauling')
+                return ds.hasFocus('dwarfmode/Hauling')
             end)
         elseif native_subject and not initially_open and is_open then
             ds.input('LEAVESCREEN')
             ds.await('test Hauling menu closes', function()
-                return has_focus(native_subject, 'dwarfmode/Default')
+                return ds.hasFocus('dwarfmode/Default')
             end)
         end
         if native_subject then ds.unmount() end
