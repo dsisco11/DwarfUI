@@ -19,18 +19,13 @@ TooltipRegistrationOverlay.ATTRS{
 ---Builds the target inside the intentionally clipped registered overlay.
 function TooltipRegistrationOverlay:init()
     self.tooltip_target = widgets.Label{
+        view_id='tooltip_target',
         frame={l=0, t=0, r=0, b=0},
         text=' ',
         tooltip='Automation overlay tooltip outside its narrow root.',
     }
     self:addviews{self.tooltip_target}
     tooltip.register(self.tooltip_target)
-end
-
----Releases the product registration when the overlay is disposed.
-function TooltipRegistrationOverlay:onDismiss()
-    tooltip.unregister(self.tooltip_target)
-    TooltipRegistrationOverlay.super.onDismiss(self)
 end
 
 OVERLAY_WIDGETS = {tooltip_probe=TooltipRegistrationOverlay}

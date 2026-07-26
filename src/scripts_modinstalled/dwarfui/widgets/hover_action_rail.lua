@@ -443,7 +443,7 @@ function HoverActionRail:init()
         widget.enabled = false
         table.insert(self.action_widgets, widget)
     end
-    self.surface = HoverActionRailSurface{}
+    self.surface = HoverActionRailSurface{view_id='surface'}
     self.surface:addviews(self.action_widgets)
     self:addviews{self.surface}
     self.active_target = nil

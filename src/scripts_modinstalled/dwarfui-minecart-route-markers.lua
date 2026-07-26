@@ -147,11 +147,12 @@ function MinecartRouteMarkersOverlay:init()
     local zoom = rail_model.HoverAction{
         id=ZOOM_ACTION_ID,
         widget_factory=function(activate)
-            return AssetButton{frame={w=3,h=3}, asset={page='INTERFACE_BITS',x=32,y=0}, chars=STOCKS_RECENTER_CHARS, pens=STOCKS_RECENTER_PENS, tooltip=STOCKS_RECENTER_TOOLTIP, on_activate=activate}
+            return AssetButton{view_id=ZOOM_ACTION_ID, frame={w=3,h=3}, asset={page='INTERFACE_BITS',x=32,y=0}, chars=STOCKS_RECENTER_CHARS, pens=STOCKS_RECENTER_PENS, tooltip=STOCKS_RECENTER_TOOLTIP, on_activate=activate}
         end,
         activate=function(target) return self:activate_zoom_action(target.payload) end,
     }
     self.stop_rail = rail_model.HoverActionRail{
+        view_id='stop_action_rail',
         actions={zoom}, placement_order={'left'},
         background_pen=RAIL_BACKGROUND, border_style=RAIL_BORDER,
         content_inset=RAIL_CONTENT_INSET, consume_scroll=true,
