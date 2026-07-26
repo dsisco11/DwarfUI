@@ -1,23 +1,7 @@
 -- Real overlay-discovery integration contracts for the singleton tooltip.
 
-local gui = require('gui')
-local widgets = require('gui.widgets')
 local tooltip = reqscript('dwarfui/tooltip')
 local overlay = require('plugins.overlay')
-
----@class tests.TooltipRegistrationScreen: gui.ZScreen
-local TooltipRegistrationScreen = defclass(nil, gui.ZScreen)
-TooltipRegistrationScreen.ATTRS{initial_pause=false}
-
----Builds a pointer target aligned with the registered probe overlay.
-function TooltipRegistrationScreen:init()
-    self:addviews{
-        widgets.Panel{
-            view_id='pointer_target',
-            frame={l=1, t=1, w=8, h=4},
-        },
-    }
-end
 
 ---Returns the product diagnostics registered in tests/dwarfspec/config.lua.
 ---@return table
@@ -25,69 +9,70 @@ local function diagnostics()
     return ds.tooltip_state()
 end
 
----Returns the overlay registered by the active DwarfSpec run.
----@return string|nil, table|nil
-local function find_staged_overlay()
-    for name, entry in pairs(overlay.get_state().db) do
-        if name:find('dwarfspec_', 1, true) and
-                name:find('tooltip_probe', 1, true) then
-            return name, entry
-        end
-    end
-    return nil, nil
-end
-
----Returns whether an overlay accepts the live underlying DF viewscreen.
----@param widget table
----@return boolean
-local function matches_live_viewscreen(widget)
-    local current = dfhack.gui.getDFViewscreen(true)
-    if not current then return false end
-    for _, focus in ipairs(overlay.normalize_list(widget.viewscreens)) do
-        if focus == 'all' or dfhack.gui.matchFocusString(
-                overlay.simplify_viewscreen_name(focus), current) then
-            return true
-        end
-    end
-    return false
-end
-
 describe('live singleton tooltip overlay registration', function()
+    local native_subject
+    local borrowed_screen
     local overlay_name
+    local target_subject
     local widget
     local target
     local original_viewscreens
 
     before_each(function()
-        ds.mount(TooltipRegistrationScreen, {initial_pause=false})
-        ds.stage_overlay_registration(
+        borrowed_screen = assert(dfhack.gui.getDFViewscreen(true),
+            'native fortress viewscreen is unavailable')
+        native_subject = ds.mountNativeScreen()
+        assert.is_true(ds.hasFocus('dwarfmode/Default'))
+        local native_state = native_subject:inspect()
+        assert.is_true(native_state.visible)
+        assert.is_true(native_state.active)
+        assert.equals('dwarfmode/Default',
+            native_subject:getFocusList()[1])
+
+        local staged = ds.stage_overlay_registration(
             'tests/tooltip/support/tooltip_overlay_registration.lua',
             'tooltip_probe')
-        local overlay_entry
-        overlay_name, overlay_entry = find_staged_overlay()
-        assert.is_truthy(overlay_entry)
-        widget = overlay_entry.widget
-        target = widget.tooltip_target
+        assert.equals(1, #staged.registered_names)
+        overlay_name = staged.registered_names[1]
+        ds.redraw()
+
+        target_subject = ds.get('tooltip_target', {
+            source='overlay',
+            overlay=overlay_name,
+        })
+        target = target_subject:raw()
+        widget = assert(target.parent_view,
+            'staged tooltip target has no registered overlay parent')
         original_viewscreens = widget.viewscreens
     end)
 
     after_each(function()
-        widget.viewscreens = original_viewscreens
-        tooltip.unregister(target)
-        ds.wait_frames(2)
+        if widget then widget.viewscreens = original_viewscreens end
+        if target then
+            assert.is_true(tooltip.unregister(target))
+        end
+        if native_subject then
+            ds.redraw()
+            assert.is_not_equal(target, diagnostics().target)
+        end
     end)
 
     it('honors real discovery, enablement, and focus eligibility', function()
         assert.is_true(overlay.isOverlayEnabled(overlay_name))
-        assert.equals(widget, overlay.get_state().db[overlay_name].widget)
-        assert.is_true(matches_live_viewscreen(widget))
-        ds.await('registered overlay layout', function()
-            return target.frame_body and target.frame_body.height > 0
-        end)
-        local pointer_target = ds.get('pointer_target')
-        pointer_target:move_pointer('top_left')
-        tooltip.unregister(target)
-        assert.is_true(tooltip.register(target))
+        local target_state = target_subject:inspect()
+        assert.is_true(target_state.visible)
+        assert.is_true(target_state.active)
+        assert.equals('Automation overlay tooltip outside its narrow root.',
+            target_state.tooltip)
+        local body = assert(target_state.body,
+            'registered tooltip target has no rendered bounds')
+        local target_x = math.floor((body.x1 + body.x2) / 2)
+        local target_y = math.floor((body.y1 + body.y2) / 2)
+
+        -- Exact native-screen pointer placement and a completed redraw prove
+        -- selection through the staged registry-owned overlay.
+        ds.move_pointer(target_x, target_y)
+        ds.redraw()
         ds.await('registered overlay tooltip target selected', function()
             local state = diagnostics()
             return state.target == target and state.screen.renderer.visible
@@ -98,16 +83,34 @@ describe('live singleton tooltip overlay registration', function()
             state.screen.renderer.frame.w - 1 >
             widget.frame_body.clip_x2)
 
+        -- The staged overlay becomes ineligible solely through its viewscreen
+        -- contract while its borrowed backing screen remains unchanged.
         widget.viewscreens = 'title'
-        pointer_target:move_pointer('top_left')
+        ds.redraw()
+        assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true))
+        assert.is_equal(borrowed_screen.widgets, native_subject:raw())
+        local ineligible_state = target_subject:inspect()
+        assert.equals(target_state.tooltip, ineligible_state.tooltip)
         assert.is_nil(diagnostics().target)
         assert.is_false(state.screen.renderer.visible)
 
         widget.viewscreens = original_viewscreens
+        ds.redraw()
+        ds.move_pointer(target_x, target_y)
+        ds.redraw()
+        ds.await('focus-eligible tooltip target selected again', function()
+            local selected = diagnostics()
+            return selected.target == target and
+                selected.screen.renderer.visible
+        end)
+
         assert.is_true(overlay.overlay_command(
             {'disable', overlay_name}, true))
-        pointer_target:move_pointer('top_left')
+        ds.redraw()
+        assert.is_false(overlay.isOverlayEnabled(overlay_name))
         assert.is_nil(diagnostics().target)
         assert.is_false(state.screen.renderer.visible)
+        assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
+            'native attachment dismissed or replaced the game screen')
     end)
 end)
