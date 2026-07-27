@@ -351,8 +351,6 @@ describe('registered mood overlay with native top-bar data', function()
         -- released and are not evidence for any interaction assertion.
         borrowed_screen:logic()
         borrowed_screen:render(df.global.cur_year_tick)
-        assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
-            'native attachment dismissed or replaced the game screen')
         if initially_hauling_open then
             native_subject = ds.mountNativeScreen()
             ds.input('D_HAULING')

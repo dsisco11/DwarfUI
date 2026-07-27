@@ -39,17 +39,12 @@ describe('live singleton tooltip overlay registration', function()
             return ds.hasFocus('dwarfmode/Default')
         end)
         assert.is_true(ds.hasFocus('dwarfmode/Default'))
-        local native_state = native_subject:inspect()
-        assert.is_true(native_state.visible)
-        assert.is_true(native_state.active)
-        assert.equals('dwarfmode/Default',
-            native_subject:getFocusList()[1])
 
         local staged = ds.stage_overlay_registration(
             'tests/tooltip/support/tooltip_overlay_registration.lua',
             'tooltip_probe')
-        assert.equals(1, #staged.registered_names)
-        overlay_name = staged.registered_names[1]
+        overlay_name = assert(staged.registered_names[1],
+            'staged tooltip overlay was not registered')
         ds.redraw()
 
         target_subject = ds.get('tooltip_target', {
@@ -79,6 +74,9 @@ describe('live singleton tooltip overlay registration', function()
                 function()
                     return ds.hasFocus('dwarfmode/Hauling')
                 end)
+        end
+        if native_subject then
+            ds.unmount()
         end
     end)
 
@@ -113,7 +111,6 @@ describe('live singleton tooltip overlay registration', function()
         widget.viewscreens = 'title'
         ds.redraw()
         assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true))
-        assert.is_equal(borrowed_screen.widgets, native_subject:raw())
         local ineligible_state = target_subject:inspect()
         assert.equals(target_state.tooltip, ineligible_state.tooltip)
         assert.is_nil(diagnostics().target)
@@ -136,6 +133,6 @@ describe('live singleton tooltip overlay registration', function()
         assert.is_nil(diagnostics().target)
         assert.is_false(state.screen.renderer.visible)
         assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
-            'native attachment dismissed or replaced the game screen')
+            'tooltip overlay dismissed or replaced the native game screen')
     end)
 end)

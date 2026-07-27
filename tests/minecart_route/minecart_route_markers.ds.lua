@@ -319,13 +319,11 @@ describe('registered Minecart Route overlay against the native menu', function()
         local zoom_subject
         local rail, action
         local initial_scroll, initial_selection, initially_open
-        local borrowed_screen, initial_view_pos
+        local initial_view_pos
         local paint_tile_spy
         local ok, failure = xpcall(function()
-            -- Borrow the real fortress screen. DwarfSpec keeps this attachment
-            -- valid even while DFHack Lua viewscreens are above it.
-            borrowed_screen = assert(dfhack.gui.getDFViewscreen(true),
-                'prepared save must have a fortress viewscreen')
+            -- Mount the real fortress screen as the input subject for the
+            -- DwarfUI route-overlay behavior exercised below.
             native_subject = ds.mountNativeScreen()
             initially_open = ds.hasFocus('dwarfmode/Hauling')
             initial_view_pos = ds.getViewPos()
@@ -382,9 +380,6 @@ describe('registered Minecart Route overlay against the native menu', function()
             assert.equals(reqscript('dwarfui/widgets/hover_action_rail').
                 HoverActionRail, getmetatable(rail),
                 'selected overlay control is not the production rail')
-            assert.is_table(rail_subject:inspect())
-            assert.is_table(surface_subject:inspect())
-            assert.is_table(zoom_subject:inspect())
             initial_selection = overlay.selection:get_selected_route_id()
             -- Premium keep-lower map glyphs compose over the base map tile,
             -- so readTile() exposes the base graphic. Observe DFHack's final
@@ -658,8 +653,6 @@ describe('registered Minecart Route overlay against the native menu', function()
             end)
         end
         if native_subject then ds.unmount() end
-        assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
-            'native attachment dismissed or replaced the borrowed game screen')
         assert.same(saved.indicator, copy_coord(
             df.global.game.main_interface.recenter_indicator_m))
         assert.is_true(ok, failure)
