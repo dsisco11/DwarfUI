@@ -17,11 +17,27 @@ describe('live singleton tooltip overlay registration', function()
     local widget
     local target
     local original_viewscreens
+    local initially_hauling_open
 
     before_each(function()
+        native_subject, borrowed_screen, overlay_name = nil, nil, nil
+        target_subject, widget, target, original_viewscreens =
+            nil, nil, nil, nil
+        initially_hauling_open = nil
         borrowed_screen = assert(dfhack.gui.getDFViewscreen(true),
             'native fortress viewscreen is unavailable')
         native_subject = ds.mountNativeScreen()
+        initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
+        if initially_hauling_open then
+            ds.input('LEAVESCREEN')
+            ds.await('native Hauling menu closes for tooltip coverage',
+                function()
+                    return ds.hasFocus('dwarfmode/Default')
+                end)
+        end
+        ds.await('prior test-owned tooltip screens release focus', function()
+            return ds.hasFocus('dwarfmode/Default')
+        end)
         assert.is_true(ds.hasFocus('dwarfmode/Default'))
         local native_state = native_subject:inspect()
         assert.is_true(native_state.visible)
@@ -53,7 +69,16 @@ describe('live singleton tooltip overlay registration', function()
         end
         if native_subject then
             ds.redraw()
-            assert.is_not_equal(target, diagnostics().target)
+            if target then
+                assert.is_not_equal(target, diagnostics().target)
+            end
+        end
+        if native_subject and initially_hauling_open then
+            ds.input('D_HAULING')
+            ds.await('original Hauling menu reopens after tooltip coverage',
+                function()
+                    return ds.hasFocus('dwarfmode/Hauling')
+                end)
         end
     end)
 

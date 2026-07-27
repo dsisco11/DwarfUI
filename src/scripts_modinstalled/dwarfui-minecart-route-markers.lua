@@ -124,6 +124,9 @@ MinecartRouteMarkersOverlay.ATTRS{
     default_enabled=true,
     viewscreens=HAULING_FOCUS,
     hotspot=true,
+    -- Clear context-owned state on the first overlay update after focus leaves
+    -- Hauling instead of inheriting the five-second update throttle.
+    overlay_onupdate_max_freq_seconds=0,
     fullscreen=true,
     frame={l=0, t=0, w=1, h=1},
     hauling_provider=get_hauling,

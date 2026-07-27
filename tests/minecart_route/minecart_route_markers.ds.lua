@@ -344,11 +344,6 @@ describe('registered Minecart Route overlay against the native menu', function()
                 source='overlay',
                 overlay=REGISTERED_WIDGET,
             }
-            local previous_rail
-            local previous_ok, previous_subject = pcall(ds.get,
-                'stop_action_rail', overlay_source)
-            if previous_ok then previous_rail = previous_subject:raw() end
-            dfhack.run_command('dwarfui reload')
             ds.input('D_HAULING')
             ds.await('native Hauling menu opens', function()
                 return ds.hasFocus('dwarfmode/Hauling')
@@ -358,8 +353,8 @@ describe('registered Minecart Route overlay against the native menu', function()
             hauling = assert(df.global.plotinfo.hauling,
                 'native Hauling state is unavailable')
             initial_scroll = hauling.scroll_position
-            -- Select controls only after the asynchronous registry reload has
-            -- produced the canonical widget and it has cached native bounds.
+            -- Select the existing registry-owned controls after they observe
+            -- Hauling and cache the rendered native panel bounds.
             ds.await('registered minecart controls observe Hauling', function()
                 local rail_ok, selected_rail = pcall(ds.get,
                     'stop_action_rail', overlay_source)
@@ -368,9 +363,6 @@ describe('registered Minecart Route overlay against the native menu', function()
                 local zoom_ok, selected_zoom = pcall(ds.get,
                     'stop_action_rail/surface/recenter', overlay_source)
                 if not rail_ok or not surface_ok or not zoom_ok then
-                    return false
-                end
-                if previous_rail and selected_rail:raw() == previous_rail then
                     return false
                 end
                 local selected_overlay = selected_rail:raw().parent_view

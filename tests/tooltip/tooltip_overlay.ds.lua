@@ -1,4 +1,4 @@
--- Live component contracts for tooltip behavior inside an overlay widget.
+-- Mounted component contracts for tooltip behavior inside an overlay widget.
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
@@ -42,19 +42,24 @@ function TooltipOverlayComponent:render(dc)
     end
 end
 
-describe('live tooltip overlay component', function()
-    it('mounts directly and presents outside the clipped overlay root',
+describe('mounted tooltip overlay component', function()
+    it('presents outside the clipped test-owned overlay root',
             function()
+        -- Setup mounts the purpose-built overlay fixture as the test subject.
         local root = ds.mount(TooltipOverlayComponent, {
             initial_pause=false,
             overlay_position={x=1, y=1},
         })
         local target = ds.get('tooltip_target')
+
+        -- Interaction moves through the selected mounted control and awaits
+        -- its normal render-owned tooltip update.
         target:move_pointer('top_left')
         ds.await('overlay component tooltip visible', function()
             return root:raw().tooltip_renderer.visible
         end)
 
+        -- Assertions prove mounted component geometry, not native DF UI.
         local component = root:raw()
         assert.equals(target:raw().tooltip,
             component.tooltip_renderer.tooltip_text)

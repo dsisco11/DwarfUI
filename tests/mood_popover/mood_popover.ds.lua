@@ -113,10 +113,19 @@ describe('registered mood overlay with native top-bar data', function()
         }
         local native_subject
         local popover_subject
+        local initially_hauling_open
         local ok, failure = xpcall(function()
             -- Attach to the game-owned fortress screen without creating a host
             -- or taking ownership of the existing native viewscreen.
             native_subject = ds.mountNativeScreen()
+            initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
+            if initially_hauling_open then
+                ds.input('LEAVESCREEN')
+                ds.await('native Hauling menu closes for moodlet coverage',
+                    function()
+                        return ds.hasFocus('dwarfmode/Default')
+                    end)
+            end
             assert.is_true(ds.hasFocus('dwarfmode/Default'))
 
             local source = {
@@ -286,7 +295,7 @@ describe('registered mood overlay with native top-bar data', function()
             local overview_name = assert(target.name.first_name ~= '' and
                 target.name.first_name,
                 'selected citizen has no first name')
-            ds.wait_frames(3)
+            ds.redraw()
             local overview_name_visible = native_screen_contains(overview_name)
             local thought_count = #sheets.raw_thought_str
             local skill_count = sheets.labor_skill_num
@@ -330,15 +339,29 @@ describe('registered mood overlay with native top-bar data', function()
         indicator.y = saved.indicator_y
         indicator.z = saved.indicator_z
         if popover_cleanup then
+            -- Direct clear is cleanup-only synchronization after the
+            -- registered interaction assertions and borrowed unmount.
             if popover_cleanup.parent_view and
                     popover_cleanup.parent_view.clear then
                 popover_cleanup.parent_view:clear()
             end
         end
+        -- These game-owned lifecycle calls are cleanup-only synchronization:
+        -- they apply restored DF state after the borrowed attachment has been
+        -- released and are not evidence for any interaction assertion.
         borrowed_screen:logic()
         borrowed_screen:render(df.global.cur_year_tick)
         assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
             'native attachment dismissed or replaced the game screen')
+        if initially_hauling_open then
+            native_subject = ds.mountNativeScreen()
+            ds.input('D_HAULING')
+            ds.await('original Hauling menu reopens after moodlet coverage',
+                function()
+                    return ds.hasFocus('dwarfmode/Hauling')
+                end)
+            ds.unmount()
+        end
         assert.is_true(ok, failure)
     end)
 end)
@@ -409,8 +432,12 @@ describe('mounted mood popover component with injected providers', function()
 
     it('renders every injected mood heading, count, and row set',
             function()
+        -- Setup supplies deterministic rows for all seven injected categories.
         local labels = {'Ecstatic', 'Very Happy', 'Happy', 'Content',
             'Unhappy', 'Very Unhappy', 'Miserable'}
+
+        -- Interaction selects each provider value through completed mounted
+        -- redraws.
         for index, label in ipairs(labels) do
             local hover_index = index - 1
             select_mood(hover_index, 8 + hover_index, 3)
@@ -421,30 +448,39 @@ describe('mounted mood popover component with injected providers', function()
             assert.equals(('%s Unit 01'):format(label),
                 list:raw().choices[1].text)
         end
+        -- The loop assertions prove mounted text and row rendering only.
     end)
 
     it('retains the current mood when injected hover yields to its panel',
             function()
+        -- Setup opens one injected category and records its rendered panel.
         select_mood(0, 10, 3)
         local popover = ds.get('mood_popover')
         local body = assert(popover:inspect().body)
         state.hover = nil
         state.mouse_x = math.floor((body.x1 + body.x2) / 2)
         state.mouse_y = math.floor((body.y1 + body.y2) / 2)
+
+        -- Interaction moves through the mounted subject and redraws after the
+        -- injected top-bar hover is removed.
         popover:move_pointer('center')
         ds.redraw()
 
+        -- Assertions prove mounted retention behavior, not native moodlet UI.
         assert.equals('Ecstatic', root:raw().selected_descriptor.label)
         assert.is_true(popover:inspect().visible)
     end)
 
     it('routes mounted wheel input while the injected mood remains selected',
             function()
+        -- Setup opens an overflowing deterministic list.
         state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
         select_mood(3, 10, 3)
         local popover, _, list = popover_controls()
         local scrollbar = list:raw().scrollbar
         local initial_offset = scrollbar.bar_offset
+
+        -- Interaction uses public mounted pointer and mouse-wheel routing.
         list:move_pointer('center')
         ds.redraw()
         ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
@@ -457,6 +493,9 @@ describe('mounted mood popover component with injected providers', function()
         for _=1,20 do
             ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
         end
+
+        -- Assertions prove list and scrollbar state advance together and clamp
+        -- at the final rendered row.
         assert.equals(20 - root:raw().popover.visible_rows + 1,
             list:raw().page_top)
         assert.equals(list:raw().page_top, scrollbar.top_elem)
@@ -470,6 +509,8 @@ describe('mounted mood popover component with injected providers', function()
 
     it('lays out injected selections, empty rows, and viewport bounds',
             function()
+        -- Setup and interaction select deterministic edge and empty states
+        -- through the mounted redraw path.
         select_mood(1, 10, 5)
         local first_anchor = root:raw().popover.frame_global
         assert.equals(6, first_anchor.y)
@@ -489,6 +530,9 @@ describe('mounted mood popover component with injected providers', function()
 
         ds.viewport(30, 10)
         ds.redraw()
+
+        -- Assertions prove the mounted component remains within its viewport
+        -- and clears when its injected pointer disappears.
         frame = root:raw().popover.frame_global
         assert.is_true(frame.x >= 0 and frame.x + frame.w <= 30)
         assert.is_true(frame.y >= 0 and frame.y + frame.h <= 10)
@@ -501,15 +545,20 @@ describe('mounted mood popover component with injected providers', function()
 
     it('cleans state on unmount and begins a remount without stale rows',
             function()
+        -- Setup creates visible injected state on the first mounted instance.
         select_mood(4, 10, 3)
         local first = root:raw()
         assert.equals('Unhappy', first.selected_descriptor.label)
+
+        -- Interaction exercises DwarfSpec-owned unmount and remount lifecycle.
         ds.unmount()
         assert.is_nil(first.selected_descriptor)
         assert.same({}, first.popover.rows)
 
         state.hover, state.mouse_x, state.mouse_y = nil, nil, nil
         root = mount_overlay()
+
+        -- Assertions prove teardown and remount do not retain component state.
         local popover, header, list = popover_controls()
         assert.is_nil(root:raw().selected_descriptor)
         assert.equals(' (0)', header:text())

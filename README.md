@@ -191,7 +191,7 @@ luarocks test --prepare dwarfui.rockspec
 .\tools\Run-AutomationTests.ps1 tests/mood_popover/mood_popover.ds.lua
 .\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip.ds.lua
 .\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay.ds.lua
-.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_registration_integration_spec.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_registration_integration.ds.lua
 ```
 
 The component specs, registration source, and configuration under `tests/` are
@@ -199,3 +199,10 @@ DwarfUI-owned consumer files. Test discovery, Busted hosting, live interaction,
 cleanup, and reporting are supplied by the installed DwarfSpec package. See
 DwarfSpec's writing-tests, configuration, and command-line documentation for
 the framework contracts.
+
+Native-interaction claims require a borrowed native screen, public DwarfSpec
+pointer or input commands, and observable production rendering or state.
+Calling an internal widget callback directly is method or component coverage
+and must not be presented as proof of native interaction. Tests mounted with
+`ds.mount(...)` cover their test-owned fixture unless they separately attach to
+and exercise the production native screen.

@@ -3,6 +3,17 @@
 describe('registered mood popover component with injected providers', function()
     it('renders injected component data through the registry-owned instance',
             function()
+        -- Setup uses the real registry-owned instance while its data sources
+        -- are replaced with deterministic component providers.
+        local native_subject = ds.mountNativeScreen()
+        local initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
+        if initially_hauling_open then
+            ds.input('LEAVESCREEN')
+            ds.await('native Hauling menu closes for mood component coverage',
+                function()
+                    return ds.hasFocus('dwarfmode/Default')
+                end)
+        end
         local overlay = require('plugins.overlay')
         overlay.rescan()
 
@@ -32,10 +43,12 @@ describe('registered mood popover component with injected providers', function()
                 return {{id=1, name='Registered Citizen'}}
             end
 
-            -- The normal registered-overlay render cadence samples the
-            -- injected providers and renders their deterministic component
-            -- state without making a native moodlet-interaction claim.
-            ds.wait_frames(2)
+            -- Interaction requests the normal registered-overlay render
+            -- cadence without making a native moodlet-interaction claim.
+            ds.redraw()
+
+            -- Assertions prove only deterministic registered-component
+            -- rendering and never claim native top-bar input coverage.
             assert.equals('Ecstatic', widget.selected_descriptor.label)
             assert.is_true(widget.popover.visible)
             assert.equals('Ecstatic (1)', widget.popover.header.text)
@@ -44,7 +57,16 @@ describe('registered mood popover component with injected providers', function()
         widget.mouse_provider = old_mouse
         widget.snapshot_provider = old_snapshot
         widget.active_provider = old_active
+        -- Direct clear is teardown for the injected registry-owned component.
         widget:clear()
+        if initially_hauling_open then
+            ds.input('D_HAULING')
+            ds.await('original Hauling menu reopens after mood component coverage',
+                function()
+                    return ds.hasFocus('dwarfmode/Hauling')
+                end)
+        end
+        ds.unmount()
         assert.is_true(ok, failure)
     end)
 end)

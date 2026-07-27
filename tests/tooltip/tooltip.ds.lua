@@ -1,4 +1,4 @@
--- Live product contracts for the singleton tooltip service.
+-- Mounted component contracts for the singleton tooltip service.
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
@@ -78,10 +78,10 @@ local function restart_service_for_target(target)
     local view = target:raw()
     tooltip.unregister(view)
     assert.is_true(tooltip.register(view))
-    ds.wait_frames(2)
+    ds.redraw()
 end
 
-describe('live singleton tooltip service', function()
+describe('mounted singleton tooltip service component', function()
     local root
     local screen
 
@@ -92,13 +92,18 @@ describe('live singleton tooltip service', function()
 
     it('targets normal screens and presents dynamic text after real renders',
             function()
+        -- Setup selects a control on the test-owned mounted screen.
         local target = ds.get('tooltip_target')
         local body = assert(target:inspect().body)
         local mouse_x = math.floor((body.x1 + body.x2) / 2)
         local mouse_y = math.floor((body.y1 + body.y2) / 2)
         target:move_pointer()
+
+        -- Interaction recreates the real singleton registration and requests
+        -- a completed render through DwarfSpec.
         restart_service_for_target(target)
 
+        -- Assertions prove mounted component rendering, not native DF UI.
         local state = diagnostics()
         assert.equals(target:raw(), state.target)
         assert.is_true(state.screen.renderer.visible)
@@ -112,6 +117,7 @@ describe('live singleton tooltip service', function()
 
     it('blocks targets covered by a modal view through real rendering',
             function()
+        -- Setup remounts the test-owned fixture with its modal blocker shown.
         ds.unmount()
         root = ds.mount(TooltipScreen, {
             initial_pause=false,
@@ -119,25 +125,36 @@ describe('live singleton tooltip service', function()
         })
         screen = root:raw()
         local target = ds.get('tooltip_target')
+
+        -- Interaction points at the covered target and redraws the singleton.
         target:move_pointer()
         restart_service_for_target(target)
+
+        -- Assertions prove the mounted component's modal occlusion contract.
         assert.is_nil(diagnostics().target)
         assert.is_false(diagnostics().screen.renderer.visible)
     end)
 
     it('recovers z-order and forwards input over a newly opened screen',
             function()
+        -- Setup presents the singleton over a test-owned mounted target.
         local target = ds.get('tooltip_target')
         target:move_pointer()
         restart_service_for_target(target)
         local state = diagnostics()
         assert.equals(target:raw(), state.target)
+
+        -- Subject input proves routing through the mounted fixture.
         root:input('CUSTOM_A')
         assert.equals('CUSTOM_A', screen.last_key)
         assert.is_false(state.screen:isMouseOver())
 
+        -- Direct show/dismiss calls intentionally establish and remove a
+        -- temporary modal screen; this case explicitly tests that lifecycle.
         screen:show_cover()
-        ds.wait_frames(2)
+        ds.await('tooltip singleton recovers focus above the cover', function()
+            return state.screen:hasFocus()
+        end)
         assert.is_true(state.screen:hasFocus())
         screen:dismiss_cover()
     end)
