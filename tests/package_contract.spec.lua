@@ -11,6 +11,7 @@ local shipped_modules = {
     'dwarfui/pointer.lua',
     'dwarfui/pointer_poller.lua',
     'dwarfui/tooltip_target_detector.lua',
+    'dwarfui/tooltip_service.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
     'dwarfui/popover.lua',
@@ -155,6 +156,11 @@ local function load_public_module(package_path)
                 },
             },
         }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/tooltip_service.lua' then
+        options = {
+            globals={dfhack={dwarfui={}}},
+        }
     elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
         local widget_harness = require('support.widget_harness')
         local default_nil = widget_harness.default_nil()
@@ -261,6 +267,28 @@ local function load_public_module(package_path)
                 gui={ZScreen=ZScreen, Painter={new=function() return {} end}},
             },
             reqscript={
+                ['dwarfui/tooltip_service']={
+                    service={
+                        get_registrations=function()
+                            return setmetatable({}, {__mode='k'})
+                        end,
+                        registration_count=function() return 0 end,
+                        register=function() return true end,
+                        unregister=function() return false end,
+                        shutdown=function() end,
+                        set_intent_observer=function() end,
+                        accept_pointer_observation=function() end,
+                        get_diagnostics=function()
+                            return {
+                                api_version=1,
+                                generation=1,
+                                registration_count=0,
+                                revision=0,
+                                last_sequence=0,
+                            }
+                        end,
+                    },
+                },
                 ['dwarfui/tooltip']={TooltipRenderer=function() return {} end},
                 ['dwarfui/tooltip_target_detector']={
                     TooltipTargetDetector={
@@ -329,6 +357,17 @@ describe('DwarfUI package contract', function()
             local _, module_result = load_public_module(package_path)
             assert.equals('table', type(module_result), package_path)
         end
+    end)
+
+    it('ships the process-wide tooltip service object', function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/tooltip_service.lua')
+
+        assert.equals('table', type(module.TooltipService))
+        assert.equals('table', type(module.service))
+        assert.is_equal(module.TooltipService, getmetatable(module.service))
+        assert.equals('function',
+            type(module.service.accept_pointer_observation))
     end)
 
     it('roots shipped modules in the package', function()

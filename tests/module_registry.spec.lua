@@ -26,6 +26,7 @@ describe('DwarfUI module registry', function()
         assert.equals('dwarfui/pointer', calls[5])
         assert.equals('dwarfui/pointer_poller', calls[6])
         assert.equals('dwarfui/tooltip_target_detector', calls[7])
+        assert.equals('dwarfui/tooltip_service', calls[8])
         assert.equals('dwarfui/tooltip_registration', calls[#calls])
         assert.equals('table',
             type(loaded['dwarfui/widgets/asset_button']))
@@ -34,6 +35,8 @@ describe('DwarfUI module registry', function()
         assert.equals('table', type(loaded['dwarfui/pointer_poller']))
         assert.equals('table',
             type(loaded['dwarfui/tooltip_target_detector']))
+        assert.equals('table',
+            type(loaded['dwarfui/tooltip_service'].service))
         assert.equals('table', type(loaded['dwarfui/tooltip']))
     end)
 

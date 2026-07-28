@@ -36,6 +36,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/tooltip_service',
+        contract='service',
+        contract_type='table',
+    },
+    {
         name='dwarfui/popover',
         contract='Popover',
         contract_type='table',
