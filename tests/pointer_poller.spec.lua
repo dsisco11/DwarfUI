@@ -1,0 +1,294 @@
+local module_loader = require('support.module_loader')
+local repo_root = require('support.repo_root')
+
+local POLLER_PATH =
+    'src/scripts_modinstalled/dwarfui/pointer_poller.lua'
+
+---Creates a controlled scheduler and an isolated poller module generation.
+---@param state table|nil
+---@return table harness
+local function load_harness(state)
+    state = state or {}
+    state.callbacks = state.callbacks or {}
+    state.dwarfui = state.dwarfui or {}
+    state.mouse_reads = state.mouse_reads or 0
+    state.notifications = state.notifications or {}
+    if state.demand == nil then state.demand = true end
+    local dfhack = state.dfhack or {
+        dwarfui=state.dwarfui,
+        screen={
+            getMousePos=function()
+                state.mouse_reads = state.mouse_reads + 1
+                return state.mouse_x, state.mouse_y
+            end,
+        },
+        timeout=function(delay, mode, callback)
+            state.default_schedule = {delay=delay, mode=mode}
+            table.insert(state.callbacks, callback)
+        end,
+    }
+    state.dfhack = dfhack
+
+    local _, module = module_loader.load(repo_root, POLLER_PATH, {
+        globals={dfhack=dfhack},
+    })
+
+    ---Queues one controlled callback without executing it synchronously.
+    ---@param callback function
+    local function schedule(callback)
+        state.schedule_count = (state.schedule_count or 0) + 1
+        table.insert(state.callbacks, callback)
+    end
+
+    local options = {
+        observer=function(sample)
+            table.insert(state.notifications, sample)
+            if state.observer_error then
+                error(state.observer_error)
+            end
+            if state.lose_demand_in_observer then
+                state.demand = false
+            end
+        end,
+        has_demand=function()
+            state.demand_checks = (state.demand_checks or 0) + 1
+            return state.demand
+        end,
+    }
+    if not state.use_defaults then
+        options.scheduler = schedule
+        options.sample_pointer = function()
+            state.mouse_reads = state.mouse_reads + 1
+            return state.mouse_x, state.mouse_y
+        end
+    end
+
+    ---Runs the oldest controlled callback.
+    ---@return boolean
+    ---@return any
+    local function run_next()
+        local callback = table.remove(state.callbacks, 1)
+        assert.is_function(callback)
+        return pcall(callback)
+    end
+
+    return {
+        module=module,
+        new_poller=function()
+            return module.PointerPoller.new(options)
+        end,
+        run_next=run_next,
+        state=state,
+    }
+end
+
+describe('DwarfUI pointer poller', function()
+    it('publishes one immutable sample per controlled active tick', function()
+        local harness = load_harness{mouse_x=12, mouse_y=7}
+        local poller = harness.new_poller()
+
+        assert.is_true(poller:start())
+        assert.equals(1, #harness.state.callbacks)
+        assert.is_true(harness.run_next())
+
+        assert.equals(1, harness.state.mouse_reads)
+        assert.equals(1, #harness.state.notifications)
+        local sample = harness.state.notifications[1]
+        assert.equals(1, sample.sequence)
+        assert.equals(12, sample.x)
+        assert.equals(7, sample.y)
+        assert.equals('screen-cells', sample.coordinate_space)
+        assert.has_error(function() sample.x = 99 end,
+            'DwarfUI pointer samples are immutable.')
+        assert.equals(1, #harness.state.callbacks)
+    end)
+
+    it('does not create a second callback chain on duplicate start', function()
+        local harness = load_harness()
+        local poller = harness.new_poller()
+
+        assert.is_true(poller:start())
+        assert.is_false(poller:start())
+        assert.equals(1, harness.state.schedule_count)
+        assert.equals(1, #harness.state.callbacks)
+
+        assert.is_true(harness.run_next())
+        assert.equals(2, harness.state.schedule_count)
+        assert.equals(1, #harness.state.callbacks)
+    end)
+
+    it('normalizes partial and complete missing positions', function()
+        local harness = load_harness{mouse_x=4, mouse_y=nil}
+        local poller = harness.new_poller()
+        poller:start()
+
+        assert.is_true(harness.run_next())
+        assert.is_nil(harness.state.notifications[1].x)
+        assert.is_nil(harness.state.notifications[1].y)
+
+        harness.state.mouse_x, harness.state.mouse_y = nil, 8
+        assert.is_true(harness.run_next())
+        assert.is_nil(harness.state.notifications[2].x)
+        assert.is_nil(harness.state.notifications[2].y)
+
+        harness.state.mouse_x, harness.state.mouse_y = nil, nil
+        assert.is_true(harness.run_next())
+        assert.is_nil(harness.state.notifications[3].x)
+        assert.is_nil(harness.state.notifications[3].y)
+        assert.equals(3, harness.state.mouse_reads)
+    end)
+
+    it('assigns monotonically increasing sequences across restart', function()
+        local harness = load_harness{mouse_x=1, mouse_y=2}
+        local poller = harness.new_poller()
+        poller:start()
+        harness.run_next()
+        assert.is_true(poller:stop())
+
+        assert.is_true(poller:start())
+        assert.is_true(harness.run_next())
+        assert.is_true(harness.run_next())
+
+        assert.equals(1, harness.state.notifications[1].sequence)
+        assert.equals(2, harness.state.notifications[2].sequence)
+    end)
+
+    it('makes stop idempotent and every old callback inert', function()
+        local harness = load_harness{mouse_x=2, mouse_y=3}
+        local poller = harness.new_poller()
+        poller:start()
+
+        assert.is_true(poller:stop())
+        assert.is_false(poller:stop())
+        assert.is_true(harness.run_next())
+        assert.equals(0, harness.state.mouse_reads)
+        assert.equals(0, #harness.state.notifications)
+        assert.equals(0, #harness.state.callbacks)
+    end)
+
+    it('does not let a stale callback stop a restarted chain', function()
+        local harness = load_harness{mouse_x=5, mouse_y=6}
+        local poller = harness.new_poller()
+        poller:start()
+        poller:stop()
+        poller:start()
+        assert.equals(2, #harness.state.callbacks)
+
+        assert.is_true(harness.run_next())
+        assert.equals(0, harness.state.mouse_reads)
+        assert.equals(1, #harness.state.callbacks)
+
+        assert.is_true(harness.run_next())
+        assert.equals(1, harness.state.mouse_reads)
+        assert.equals(1, #harness.state.notifications)
+        assert.equals(1, #harness.state.callbacks)
+    end)
+
+    it('checks demand before sampling and before rescheduling', function()
+        local before_sample = load_harness{mouse_x=1, mouse_y=1}
+        local first = before_sample.new_poller()
+        first:start()
+        before_sample.state.demand = false
+        assert.is_true(before_sample.run_next())
+        assert.equals(0, before_sample.state.mouse_reads)
+        assert.equals(0, #before_sample.state.notifications)
+        assert.equals(0, #before_sample.state.callbacks)
+
+        local after_observer = load_harness{
+            mouse_x=1,
+            mouse_y=1,
+            lose_demand_in_observer=true,
+        }
+        local second = after_observer.new_poller()
+        second:start()
+        assert.is_true(after_observer.run_next())
+        assert.equals(1, after_observer.state.mouse_reads)
+        assert.equals(1, #after_observer.state.notifications)
+        assert.equals(0, #after_observer.state.callbacks)
+    end)
+
+    it('surfaces observer failure and permits a deliberate restart', function()
+        local harness = load_harness{
+            mouse_x=9,
+            mouse_y=4,
+            observer_error='controlled observer failure',
+        }
+        local poller = harness.new_poller()
+        poller:start()
+
+        local ok, failure = harness.run_next()
+        assert.is_false(ok)
+        assert.is_truthy(tostring(failure):find(
+            'DwarfUI pointer poller observer failed:', 1, true))
+        assert.is_truthy(tostring(failure):find(
+            'controlled observer failure', 1, true))
+        assert.equals(0, #harness.state.callbacks)
+
+        harness.state.observer_error = nil
+        assert.is_true(poller:start())
+        assert.is_true(harness.run_next())
+        assert.equals(2, harness.state.notifications[2].sequence)
+        assert.equals(1, #harness.state.callbacks)
+    end)
+
+    it('makes callbacks from an older module generation inert', function()
+        local state = {mouse_x=3, mouse_y=8}
+        local old_harness = load_harness(state)
+        local old_poller = old_harness.new_poller()
+        old_poller:start()
+
+        local new_harness = load_harness(state)
+        local new_poller = new_harness.new_poller()
+        assert.is_false(old_poller:start())
+        assert.is_true(new_poller:start())
+        assert.equals(2, #state.callbacks)
+
+        assert.is_true(old_harness.run_next())
+        assert.equals(0, state.mouse_reads)
+        assert.equals(1, #state.callbacks)
+
+        assert.is_true(new_harness.run_next())
+        assert.equals(1, state.mouse_reads)
+        assert.equals(1, #state.notifications)
+    end)
+
+    it('uses one production pointer read and one-frame scheduling', function()
+        local harness = load_harness{
+            use_defaults=true,
+            mouse_x=14,
+            mouse_y=10,
+        }
+        local poller = harness.new_poller()
+
+        assert.is_true(poller:start())
+        assert.same({delay=1, mode='frames'},
+            harness.state.default_schedule)
+        assert.is_true(harness.run_next())
+        assert.equals(1, harness.state.mouse_reads)
+        assert.equals(1, #harness.state.notifications)
+        assert.same({14, 10}, {
+            harness.state.notifications[1].x,
+            harness.state.notifications[1].y,
+        })
+    end)
+
+    it('loads without GUI, overlay, tooltip, or renderer modules', function()
+        local dfhack = {
+            dwarfui={},
+            screen={getMousePos=function() return nil, nil end},
+            timeout=function() end,
+        }
+        local _, module = module_loader.load(repo_root, POLLER_PATH, {
+            globals={dfhack=dfhack},
+            require_modules={},
+            reqscript={},
+        })
+
+        assert.equals('table', type(module.PointerPoller))
+        local poller = module.PointerPoller.new{
+            observer=function() end,
+            has_demand=function() return false end,
+        }
+        assert.is_false(poller:start())
+    end)
+end)

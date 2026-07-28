@@ -9,6 +9,7 @@ local shipped_modules = {
     'dwarfui/widgets/asset_button.lua',
     'dwarfui/widgets/hover_action_rail.lua',
     'dwarfui/pointer.lua',
+    'dwarfui/pointer_poller.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
     'dwarfui/popover.lua',
@@ -110,6 +111,17 @@ local function load_public_module(package_path)
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },
         }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/pointer_poller.lua' then
+        options = {
+            globals={
+                dfhack={
+                    dwarfui={},
+                    screen={getMousePos=function() return nil, nil end},
+                    timeout=function() end,
+                },
+            },
+        }
     elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
         local widget_harness = require('support.widget_harness')
         local default_nil = widget_harness.default_nil()
@@ -200,7 +212,12 @@ local function load_public_module(package_path)
         options = {
             globals={
                 defclass=widget_harness.defclass,
+                SC_MAP_LOADED='map-loaded',
+                SC_MAP_UNLOADED='map-unloaded',
+                SC_WORLD_UNLOADED='world-unloaded',
                 dfhack={
+                    isMapLoaded=function() return false end,
+                    onStateChange={},
                     gui={
                         getDFViewscreen=function() return nil end,
                         matchFocusString=function() return false end,

@@ -26,6 +26,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/pointer_poller',
+        contract='PointerPoller',
+        contract_type='table',
+    },
+    {
         name='dwarfui/popover',
         contract='Popover',
         contract_type='table',

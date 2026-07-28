@@ -24,11 +24,13 @@ describe('DwarfUI module registry', function()
         assert.equals('dwarfui/widgets/asset_button', calls[3])
         assert.equals('dwarfui/widgets/hover_action_rail', calls[4])
         assert.equals('dwarfui/pointer', calls[5])
+        assert.equals('dwarfui/pointer_poller', calls[6])
         assert.equals('dwarfui/tooltip_registration', calls[#calls])
         assert.equals('table',
             type(loaded['dwarfui/widgets/asset_button']))
         assert.equals('table',
             type(loaded['dwarfui/widgets/hover_action_rail']))
+        assert.equals('table', type(loaded['dwarfui/pointer_poller']))
         assert.equals('table', type(loaded['dwarfui/tooltip']))
     end)
 
