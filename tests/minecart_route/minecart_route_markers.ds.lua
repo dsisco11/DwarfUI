@@ -6,6 +6,7 @@
 -- changes.
 
 local spy = require('luassert.spy')
+local utils = require('utils')
 
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
@@ -477,11 +478,19 @@ describe('registered Minecart Route overlay against the native menu', function()
             assert_recenter_asset(action)
 
             -- Cross from the stop to the action surface without losing the
-            -- target, then click the selected registered-overlay control.
-            ds.move_pointer(surface_bounds.x2, surface_bounds.y1 + 1)
+            -- target, present its registered tooltip, then click it.
+            zoom_subject:move_pointer()
             ds.redraw()
             assert.is_true(surface_subject:inspect().visible,
                 'pointer transfer from stop to rail closed the rendered rail')
+            ds.await('zoom action tooltip is presented by the singleton service',
+                function()
+                    local tooltip_state = ds.tooltip_state()
+                    return tooltip_state.target == action and
+                        tooltip_state.screen.renderer.visible and
+                        tooltip_state.screen.renderer.tooltip_text ==
+                            'Zoom to this stop'
+                end)
             local before_route_id, before_stop_id = stop.route.id, stop.stop.id
             local before_pos = copy_coord(stop.stop.pos)
             local before_route_object = hauling.view_routes[stop.index]

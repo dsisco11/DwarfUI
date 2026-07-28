@@ -7,6 +7,7 @@ local guidm = require('gui.dwarfmode')
 local route_model = reqscript('dwarfui/minecart_route')
 local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
+local tooltip = reqscript('dwarfui/tooltip')
 
 local HAULING_FOCUS = 'dwarfmode/Hauling'
 local ZOOM_ACTION_ID = 'recenter'
@@ -45,18 +46,12 @@ local STOCKS_RECENTER_PENS = {
     {transparent_pen(3), transparent_pen(4), transparent_pen(0)},
     {transparent_pen(0), transparent_pen(0), transparent_pen(0)},
 }
-local STOCKS_RECENTER_TOOLTIP = string.char(26) .. ' X'
+local STOCKS_RECENTER_TOOLTIP = 'Zoom to this stop'
 
 ---Returns the active native Hauling state.
 ---@return df.hauling_handlerst|nil
 local function get_hauling()
     return df.global.plotinfo and df.global.plotinfo.hauling or nil
-end
-
----Returns the current native DF viewscreen focus paths.
----@return string|string[]
-local function get_focus()
-    return dfhack.gui.getCurFocus()
 end
 
 ---Returns whether a screen cell belongs to a native graphics-backed panel.
@@ -109,7 +104,7 @@ end
 ---@field projection dwarfui.MinecartRouteMarkerProjection
 ---@field stop_rail dwarfui.HoverActionRail
 ---@field hauling_provider fun(): df.hauling_handlerst|nil
----@field focus_provider fun(): string|string[]
+---@field focus_provider fun(): string[]
 ---@field viewport_provider fun(): gui.dwarfmode.Viewport
 ---@field map_overlay_renderer fun(callback: fun(pos: table): any, bounds: table)
 ---@field reveal_provider fun(pos: table, center: boolean, highlight: boolean)
@@ -130,7 +125,9 @@ MinecartRouteMarkersOverlay.ATTRS{
     fullscreen=true,
     frame={l=0, t=0, w=1, h=1},
     hauling_provider=get_hauling,
-    focus_provider=get_focus,
+    focus_provider=function()
+        return dfhack.gui.getFocusStrings(dfhack.gui.getDFViewscreen(true))
+    end,
     viewport_provider=guidm.Viewport.get,
     map_overlay_renderer=guidm.renderMapOverlay,
     reveal_provider=dfhack.gui.revealInDwarfmodeMap,
@@ -145,13 +142,24 @@ function MinecartRouteMarkersOverlay:init()
     local zoom = rail_model.HoverAction{
         id=ZOOM_ACTION_ID,
         widget_factory=function(activate)
-            return AssetButton{view_id=ZOOM_ACTION_ID, frame={w=3,h=3}, asset={page='INTERFACE_BITS',x=32,y=0}, chars=STOCKS_RECENTER_CHARS, pens=STOCKS_RECENTER_PENS, tooltip=STOCKS_RECENTER_TOOLTIP, on_activate=activate}
+            local button = AssetButton{
+                view_id=ZOOM_ACTION_ID,
+                frame={w=3, h=3},
+                asset={page='INTERFACE_BITS', x=32, y=0},
+                chars=STOCKS_RECENTER_CHARS,
+                pens=STOCKS_RECENTER_PENS,
+                tooltip=STOCKS_RECENTER_TOOLTIP,
+                on_activate=activate,
+            }
+            tooltip.register(button)
+            return button
         end,
         activate=function(target) return self:activate_zoom_action(target.payload) end,
     }
     self.stop_rail = rail_model.HoverActionRail{
         view_id='stop_action_rail',
         actions={zoom}, placement_order={'left'},
+        pointer_policy='pass',
         background_pen=RAIL_BACKGROUND, border_style=RAIL_BORDER,
         content_inset=RAIL_CONTENT_INSET, consume_scroll=true,
         target_at=function(x,y) return self:target_at_stop(x,y) end,

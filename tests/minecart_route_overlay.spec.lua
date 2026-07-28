@@ -74,6 +74,12 @@ local function load_overlay(state)
     local projection = {
         project=function() return state.markers end,
     }
+    local tooltip = {
+        register=function(widget)
+            state.tooltip_registrations = state.tooltip_registrations or {}
+            table.insert(state.tooltip_registrations, widget)
+        end,
+    }
     local _, asset_button = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/widgets/asset_button.lua', {
             globals={
@@ -111,7 +117,12 @@ local function load_overlay(state)
                 df={global={gps={dimy=25}, plotinfo={hauling=state.hauling}}},
                 dfhack={
                     gui={
-                        getCurFocus=function() return state.focus end,
+                        getDFViewscreen=function()
+                            return state.native_screen or {}
+                        end,
+                        getFocusStrings=function()
+                            return state.focus
+                        end,
                         revealInDwarfmodeMap=function(pos, center, highlight)
                             table.insert(state.reveals, {
                                 pos=pos,
@@ -151,6 +162,7 @@ local function load_overlay(state)
                 },
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
+                ['dwarfui/tooltip']=tooltip,
             },
         })
     local instance = module.MinecartRouteMarkersOverlay{}
@@ -255,18 +267,25 @@ describe('DwarfUI minecart route markers overlay', function()
         layout_overlay(overlay)
         overlay:render(painter())
         assert.is_not_nil(overlay.stop_rail:get_target())
+        assert.same({overlay.stop_rail.action_widgets[1]},
+            state.tooltip_registrations)
         selection.selected_route_id = 8
         state.focus = {'dwarfmode/Default'}
 
         overlay:overlay_onupdate()
         assert.is_nil(selection.selected_route_id)
         assert.is_nil(overlay.stop_rail:get_target())
+        assert.same({overlay.stop_rail.action_widgets[1]},
+            state.tooltip_registrations)
         selection.selected_route_id = 8
         state.focus = {'dwarfmode/Hauling'}
+        state.mouse_x = 6
         overlay:render(painter())
         overlay.overlay_ondisable()
         assert.is_nil(selection.selected_route_id)
         assert.is_nil(overlay.stop_rail:get_target())
+        assert.same({overlay.stop_rail.action_widgets[1]},
+            state.tooltip_registrations)
     end)
 
     it('shows one left-side hover rail only for a current stop entry',
@@ -310,7 +329,12 @@ describe('DwarfUI minecart route markers overlay', function()
                     'recenter asset cells must preserve the native panel')
             end
         end
-        assert.equals(string.char(26) .. ' X', action.tooltip)
+        assert.equals('Zoom to this stop', action.tooltip)
+        assert.same({action}, state.tooltip_registrations)
+        state.mouse_x, state.mouse_y = 2, 11
+        overlay:render(painter())
+        assert.same({action}, state.tooltip_registrations)
+        assert.equals('pass', overlay.stop_rail.pointer_policy)
         assert.is_true(overlay.stop_rail.surface.visible)
         assert.equals('left', overlay.stop_rail.placement)
         assert.same({fg=0, bg=0, keep_lower=true},
