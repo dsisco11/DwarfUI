@@ -1,7 +1,5 @@
 -- Focused native coverage for the minecart stop zoom tooltip.
 
-local utils = require('utils')
-
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
 
@@ -38,20 +36,17 @@ describe('native minecart zoom tooltip', function()
         local initial_scroll
         local ok, failure = xpcall(function()
             native_subject = ds.mountNativeScreen()
-            initially_open = utils.linear_index(
-                native_subject:getFocusList(), 'dwarfmode/Hauling') ~= nil
+            initially_open = ds.hasFocus('dwarfmode/Hauling')
             if initially_open then
                 ds.input('LEAVESCREEN')
                 ds.await('pre-existing Hauling menu closes', function()
-                    return utils.linear_index(native_subject:getFocusList(),
-                        'dwarfmode/Default') ~= nil
+                    return ds.hasFocus('dwarfmode/Default')
                 end)
             end
 
             ds.input('D_HAULING')
             ds.await('native Hauling menu opens', function()
-                return utils.linear_index(native_subject:getFocusList(),
-                    'dwarfmode/Hauling') ~= nil
+                return ds.hasFocus('dwarfmode/Hauling')
             end)
 
             local hauling = assert(df.global.plotinfo.hauling,
@@ -115,6 +110,12 @@ describe('native minecart zoom tooltip', function()
             assert.is_equal(action, state.target)
             assert.equals('Zoom to this stop',
                 state.screen.renderer.tooltip_text)
+            assert.is_true(state.screen:isActive())
+            assert.is_equal(state.screen._native,
+                dfhack.gui.getCurViewscreen(true))
+            assert.is_true(state.screen.defocused)
+            assert.is_false(state.screen:hasFocus())
+            assert.is_true(ds.hasFocus('dwarfmode/Hauling'))
         end, debug.traceback)
 
         if overlay then overlay:clear_overlay_state() end
@@ -122,19 +123,16 @@ describe('native minecart zoom tooltip', function()
                 df.global.plotinfo.hauling then
             df.global.plotinfo.hauling.scroll_position = initial_scroll
         end
-        local is_open = native_subject and utils.linear_index(
-            native_subject:getFocusList(), 'dwarfmode/Hauling') ~= nil
+        local is_open = native_subject and ds.hasFocus('dwarfmode/Hauling')
         if native_subject and initially_open and not is_open then
             ds.input('D_HAULING')
             ds.await('original Hauling menu reopens', function()
-                return utils.linear_index(native_subject:getFocusList(),
-                    'dwarfmode/Hauling') ~= nil
+                return ds.hasFocus('dwarfmode/Hauling')
             end)
         elseif native_subject and not initially_open and is_open then
             ds.input('LEAVESCREEN')
             ds.await('test Hauling menu closes', function()
-                return utils.linear_index(native_subject:getFocusList(),
-                    'dwarfmode/Default') ~= nil
+                return ds.hasFocus('dwarfmode/Default')
             end)
         end
         if native_subject then ds.unmount() end

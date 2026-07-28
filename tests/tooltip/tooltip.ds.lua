@@ -45,10 +45,15 @@ function TooltipScreen:onInput(keys)
         self.last_key = 'CUSTOM_A'
         return true
     end
+    if keys.CUSTOM_B then
+        self.last_key = 'CUSTOM_B'
+        self:show_cover()
+        return true
+    end
     return TooltipScreen.super.onInput(self, keys)
 end
 
----Creates a temporary native screen above the singleton service.
+---Creates a temporary Lua screen above the singleton service.
 function TooltipScreen:show_cover()
     self.cover = TooltipCoverScreen{}
     self.cover:show()
@@ -135,7 +140,7 @@ describe('mounted singleton tooltip service component', function()
         assert.is_false(diagnostics().screen.renderer.visible)
     end)
 
-    it('recovers z-order and forwards input over a newly opened screen',
+    it('recovers z-order without taking focus from a newly opened screen',
             function()
         -- Setup presents the singleton over a test-owned mounted target.
         local target = ds.get('tooltip_target')
@@ -149,13 +154,19 @@ describe('mounted singleton tooltip service component', function()
         assert.equals('CUSTOM_A', screen.last_key)
         assert.is_false(state.screen:isMouseOver())
 
-        -- Direct show/dismiss calls intentionally establish and remove a
-        -- temporary modal screen; this case explicitly tests that lifecycle.
-        screen:show_cover()
-        ds.await('tooltip singleton recovers focus above the cover', function()
-            return state.screen:hasFocus()
+        -- Forwarded input synchronously opens another screen. The service must
+        -- recover top position before returning while remaining defocused.
+        root:input('CUSTOM_B')
+        assert.equals('CUSTOM_B', screen.last_key)
+        ds.await('tooltip singleton recovers above the cover', function()
+            return dfhack.gui.getCurViewscreen(true) ==
+                    state.screen._native and
+                state.screen:isActive() and
+                not state.screen:hasFocus()
         end)
-        assert.is_true(state.screen:hasFocus())
+        assert.is_true(state.screen:isActive())
+        assert.is_true(state.screen.defocused)
+        assert.is_false(state.screen:hasFocus())
         screen:dismiss_cover()
     end)
 end)
