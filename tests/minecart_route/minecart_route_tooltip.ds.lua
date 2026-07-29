@@ -96,25 +96,21 @@ describe('native minecart zoom tooltip', function()
 
             zoom_subject:move_pointer()
             ds.redraw()
-            ds.await('singleton presents the zoom action tooltip',
+            ds.await('singleton publishes the zoom action tooltip intent',
                 function()
                     local state = ds.tooltip_state()
                     return state.target == action and
-                        state.screen and state.screen.renderer.visible and
-                        state.screen.renderer.tooltip_text ==
-                            'Zoom to this stop'
+                        state.intent and
+                        state.intent.text == 'Zoom to this stop'
                 end)
 
             local state = ds.tooltip_state()
-            assert.equals(1, state.renderer_count)
             assert.is_equal(action, state.target)
             assert.equals('Zoom to this stop',
-                state.screen.renderer.tooltip_text)
-            assert.is_true(state.screen:isActive())
-            assert.is_equal(state.screen._native,
-                dfhack.gui.getCurViewscreen(true))
-            assert.is_true(state.screen.defocused)
-            assert.is_false(state.screen:hasFocus())
+                state.intent.text)
+            assert.is_true(state.poller_running)
+            assert.is_true(state.poller_scheduled)
+            assert.is_true(state.poller_current)
             assert.is_true(ds.hasFocus('dwarfmode/Hauling'))
         end, debug.traceback)
 

@@ -240,33 +240,35 @@ local function load_public_module(package_path)
         }
     elseif package_path ==
             'scripts_modinstalled/dwarfui/tooltip_registration.lua' then
-        local widget_harness = require('support.widget_harness')
-        local default_nil = widget_harness.default_nil()
-        local widgets = widget_harness.widgets(nil, default_nil)
-        widgets.Widget.ATTRS{visible=true, active=true}
-        ---@class tests.PackageContractZScreen
-        local ZScreen = widget_harness.defclass(nil, widgets.Widget)
         options = {
             globals={
-                defclass=widget_harness.defclass,
-                SC_MAP_LOADED='map-loaded',
-                SC_MAP_UNLOADED='map-unloaded',
-                SC_WORLD_UNLOADED='world-unloaded',
                 dfhack={
-                    isMapLoaded=function() return false end,
-                    onStateChange={},
-                    gui={
-                        getDFViewscreen=function() return nil end,
-                        matchFocusString=function() return false end,
-                    },
                     screen={getMousePos=function() return nil, nil end},
                     timeout=function() end,
                 },
             },
-            require_modules={
-                gui={ZScreen=ZScreen, Painter={new=function() return {} end}},
-            },
+            require_modules={},
             reqscript={
+                ['dwarfui/pointer_poller']={
+                    PointerPoller={
+                        new=function()
+                            return {
+                                start=function() return false end,
+                                stop=function() return false end,
+                                get_diagnostics=function()
+                                    return {
+                                        module_generation=1,
+                                        generation=0,
+                                        running=false,
+                                        scheduled=false,
+                                        current=true,
+                                        sample_sequence=0,
+                                    }
+                                end,
+                            }
+                        end,
+                    },
+                },
                 ['dwarfui/tooltip_service']={
                     service={
                         get_registrations=function()
@@ -289,7 +291,6 @@ local function load_public_module(package_path)
                         end,
                     },
                 },
-                ['dwarfui/tooltip']={TooltipRenderer=function() return {} end},
                 ['dwarfui/tooltip_target_detector']={
                     TooltipTargetDetector={
                         new=function()

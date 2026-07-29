@@ -252,6 +252,35 @@ describe('DwarfUI pointer poller', function()
         assert.equals(1, #state.notifications)
     end)
 
+    it('reports generation, scheduling, and sample lifecycle', function()
+        local harness = load_harness{mouse_x=3, mouse_y=8}
+        local poller = harness.new_poller()
+        local initial = poller:get_diagnostics()
+        assert.equals(0, initial.generation)
+        assert.equals(0, initial.sample_sequence)
+        assert.is_false(initial.running)
+        assert.is_false(initial.scheduled)
+        assert.is_true(initial.current)
+
+        poller:start()
+        local started = poller:get_diagnostics()
+        assert.equals(1, started.generation)
+        assert.is_true(started.running)
+        assert.is_true(started.scheduled)
+
+        harness.run_next()
+        local sampled = poller:get_diagnostics()
+        assert.equals(1, sampled.sample_sequence)
+        assert.is_true(sampled.running)
+        assert.is_true(sampled.scheduled)
+
+        poller:stop()
+        local stopped = poller:get_diagnostics()
+        assert.equals(2, stopped.generation)
+        assert.is_false(stopped.running)
+        assert.is_false(stopped.scheduled)
+    end)
+
     it('uses one production pointer read and one-frame scheduling', function()
         local harness = load_harness{
             use_defaults=true,
