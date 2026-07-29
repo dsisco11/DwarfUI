@@ -2,6 +2,7 @@
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
+local class_helpers = reqscript('dwarfui/class')
 
 ---Returns whether a value is an integer.
 ---@param value any
@@ -53,25 +54,11 @@ local function copy_anchor(anchor)
     return {x1=anchor.x1, y1=anchor.y1, x2=anchor.x2, y2=anchor.y2}
 end
 
----Returns whether an instance derives from one expected DFHack class.
----@param value any
----@param expected_class table
----@return boolean
-local function is_instance_of(value, expected_class)
-    if type(value) ~= 'table' then return false end
-    local class = getmetatable(value)
-    while class do
-        if class == expected_class then return true end
-        class = rawget(class, 'super') or rawget(class, '__index')
-    end
-    return false
-end
-
 ---Returns whether an instance derives from the DFHack widget base class.
 ---@param value any
 ---@return boolean
 local function is_widget_instance(value)
-    return is_instance_of(value, widgets.Widget)
+    return class_helpers.is_instance_of(value, widgets.Widget)
 end
 
 ---Returns the default action visibility policy.
@@ -151,7 +138,7 @@ local function copy_actions(actions)
     local result = copy_sequence(actions, 'HoverActionRail.actions')
     local seen_ids = {}
     for index, action in ipairs(result) do
-        assert(is_instance_of(action, HoverAction),
+        assert(class_helpers.is_instance_of(action, HoverAction),
             ('HoverActionRail.actions[%d] must be a HoverAction'):format(index))
         assert(type(action.id) == 'string' and action.id ~= '',
             ('HoverActionRail.actions[%d] has no stable ID'):format(index))
@@ -486,7 +473,7 @@ end
 ---Binds a fresh target snapshot and updates its rendered surface.
 ---@param target dwarfui.HoverActionTarget
 function HoverActionRail:bind_target(target)
-    assert(is_instance_of(target, HoverActionTarget),
+    assert(class_helpers.is_instance_of(target, HoverActionTarget),
         'HoverActionRail.bind_target requires a HoverActionTarget')
     self.active_target = target
     self:refresh_surface()
@@ -510,7 +497,8 @@ function HoverActionRail:update_hover()
     local retained = self.active_target
     if not retained then return false end
     local fresh = self.validate_target(retained)
-    assert(fresh == nil or is_instance_of(fresh, HoverActionTarget),
+    assert(fresh == nil or
+        class_helpers.is_instance_of(fresh, HoverActionTarget),
         'HoverActionRail.validate_target must return a HoverActionTarget or nil')
     if not fresh or fresh.key ~= retained.key then
         self:clear()
@@ -534,7 +522,8 @@ function HoverActionRail:resolve_target_at_pointer(x, y)
     if x == nil or y == nil then x, y = self:getMousePos() end
     if x == nil or y == nil then return nil end
     local target = self.target_at(x, y)
-    assert(target == nil or is_instance_of(target, HoverActionTarget),
+    assert(target == nil or
+        class_helpers.is_instance_of(target, HoverActionTarget),
         'HoverActionRail.target_at must return a HoverActionTarget or nil')
     return target
 end
@@ -693,12 +682,13 @@ end
 ---@param action dwarfui.HoverAction
 ---@return boolean activated
 function HoverActionRail:activate(action)
-    assert(is_instance_of(action, HoverAction),
+    assert(class_helpers.is_instance_of(action, HoverAction),
         'HoverActionRail.activate requires a HoverAction')
     local target = self.active_target
     if not target then return false end
     local fresh = self.validate_target(target)
-    if not fresh or not is_instance_of(fresh, HoverActionTarget) or
+    if not fresh or not
+            class_helpers.is_instance_of(fresh, HoverActionTarget) or
             fresh.key ~= target.key then
         self:clear()
         return false

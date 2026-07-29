@@ -108,6 +108,10 @@ local function load_overlay(state)
                 gui={paint_frame=function() end},
                 ['gui.widgets']=widgets,
             },
+            reqscript={
+                ['dwarfui/class']=select(2, module_loader.load(repo_root,
+                    'src/scripts_modinstalled/dwarfui/class.lua')),
+            },
         })
     local _, module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui-minecart-route-markers.lua', {

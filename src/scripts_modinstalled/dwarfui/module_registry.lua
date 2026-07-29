@@ -8,6 +8,7 @@
 ---Dependencies precede consumers so reload constructs one coherent generation.
 ---@type dwarfui.ModuleSpec[]
 MODULES = {
+    {name='dwarfui/class', contract='is_instance_of'},
     {name='dwarfui/text', contract='wrap_text'},
     {name='dwarfui/widget_extensions', contract='install_pointer_attributes'},
     {
@@ -31,8 +32,18 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/tooltip_root_resolver',
+        contract='TooltipRootResolver',
+        contract_type='table',
+    },
+    {
         name='dwarfui/tooltip_target_detector',
         contract='TooltipTargetDetector',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/tooltip_map_target',
+        contract='TooltipMapTargetRegistry',
         contract_type='table',
     },
     {
