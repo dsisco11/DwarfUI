@@ -439,6 +439,16 @@ describe('DwarfUI package contract', function()
         assert.is_nil(module.TooltipAgent)
     end)
 
+    it('ships the exact map-tile public registration contract ' ..
+            '#map_tile_contract', function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/tooltip.lua')
+
+        assert.equals('function', type(module.register_map_tile))
+        assert.equals('function', type(module.update_map_tile))
+        assert.equals('function', type(module.unregister_map_tile))
+    end)
+
     it('keeps tooltip input and registration free of UI hosts', function()
         local registration = read_source(
             'scripts_modinstalled/dwarfui/tooltip_registration.lua')
