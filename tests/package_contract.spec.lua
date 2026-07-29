@@ -184,15 +184,28 @@ local function load_public_module(package_path)
                 defclass=widget_harness.defclass,
                 dfhack={
                     pen={parse=function(value) return value end},
+                    gui={
+                        getDFViewscreen=function() return nil end,
+                        getCurViewscreen=function() return nil end,
+                    },
                     screen={
                         getMousePos=function() return nil, nil end,
                         getWindowSize=function() return 80, 25 end,
+                        invalidate=function() end,
                     },
                 },
             },
             require_modules={
-                gui={FRAME_INTERIOR='interior', paint_frame=function() end},
+                gui={
+                    Screen={},
+                    FRAME_INTERIOR='interior',
+                    Painter={new=function()
+                        return widget_harness.rect(0, 0, 80, 25)
+                    end},
+                    paint_frame=function() end,
+                },
                 ['gui.widgets']=widgets,
+                ['plugins.overlay']={OverlayWidget={}},
             },
             reqscript={
                 ['dwarfui/widget_extensions']={},
@@ -201,6 +214,24 @@ local function load_public_module(package_path)
                     PointerDispatcher={sample=function() return {kind='miss'} end},
                 },
                 ['dwarfui/text']={wrap_text=function() return {''} end},
+                ['dwarfui/tooltip_service']={
+                    service={
+                        get_intent=function() return nil end,
+                        get_diagnostics=function() return {revision=0} end,
+                        set_intent_observer=function() end,
+                    },
+                },
+                ['dwarfui/tooltip_render_hook']={
+                    TooltipRenderTransport={OVERLAY=1, SCREEN=2},
+                    manager={
+                        get_diagnostics=function()
+                            return {generation=1}
+                        end,
+                        set_presenter=function() end,
+                        ensure_overlay=function() end,
+                        clear_selection=function() end,
+                    },
+                },
                 ['dwarfui/tooltip_registration']={
                     register=function() return true end,
                     unregister=function() return true end,
@@ -397,6 +428,38 @@ describe('DwarfUI package contract', function()
             module.TooltipRenderHookManager, getmetatable(module.manager))
         assert.equals('function', type(module.manager.ensure_overlay))
         assert.equals('function', type(module.manager.ensure_screen))
+    end)
+
+    it('ships the process-wide intent-driven tooltip presenter', function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/tooltip.lua')
+
+        assert.equals('table', type(module.TooltipPresenter))
+        assert.equals('table', type(module.presenter))
+        assert.is_equal(module.TooltipPresenter,
+            getmetatable(module.presenter))
+        assert.equals('function', type(module.presenter.present))
+        assert.equals('function', type(module.presenter.get_diagnostics))
+    end)
+
+    it('keeps tooltip input layers independent of presentation modules',
+            function()
+        for _, relative_path in ipairs({
+                'scripts_modinstalled/dwarfui/pointer.lua',
+                'scripts_modinstalled/dwarfui/pointer_poller.lua',
+                'scripts_modinstalled/dwarfui/tooltip_target_detector.lua',
+                'scripts_modinstalled/dwarfui/tooltip_service.lua',
+                'scripts_modinstalled/dwarfui/tooltip_registration.lua',
+            }) do
+            local source = read_source(relative_path)
+            assert.is_nil(source:find(
+                "reqscript('dwarfui/tooltip')", 1, true), relative_path)
+            assert.is_nil(source:find(
+                "reqscript('dwarfui/tooltip_render_hook')", 1, true),
+                relative_path)
+            assert.is_nil(source:find(
+                'TooltipPresenter', 1, true), relative_path)
+        end
     end)
 
     it('roots shipped modules in the package', function()
