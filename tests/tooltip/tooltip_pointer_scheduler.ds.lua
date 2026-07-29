@@ -56,7 +56,6 @@ describe('tooltip pointer scheduler feasibility', function()
         assert.is_equal(native.widgets, root:raw())
         assert.is_equal(native, dfhack.gui.getDFViewscreen(true))
 
-        ds.unmount()
     end)
 
     it('samples independently of pause and consumed mouse input', function()
@@ -117,7 +116,6 @@ describe('tooltip pointer scheduler feasibility', function()
         end, debug.traceback)
 
         running = false
-        if root then ds.unmount() end
         assert.is_true(ok, failure)
     end)
 end)

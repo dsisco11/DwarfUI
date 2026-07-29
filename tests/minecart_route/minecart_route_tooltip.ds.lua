@@ -150,9 +150,6 @@ describe('native minecart zoom tooltip polling', function()
         local modified_action
         local initially_open
         local initial_scroll
-        local initial_pause
-        local initial_pointer_x
-        local initial_pointer_y
         local saved_action_fields
         local registration_to_restore
 
@@ -171,9 +168,6 @@ describe('native minecart zoom tooltip polling', function()
 
         local ok, failure = xpcall(function()
             native_subject = ds.mountNativeScreen()
-            initial_pause = ds.isGamePaused()
-            initial_pointer_x, initial_pointer_y =
-                dfhack.screen.getMousePos()
             initially_open = ds.hasFocus('dwarfmode/Hauling')
             if initially_open then
                 ds.input('LEAVESCREEN')
@@ -403,13 +397,6 @@ describe('native minecart zoom tooltip polling', function()
                 controls.overlay:clear_overlay_state()
             end
         end)
-        cleanup_step('restore pointer position', function()
-            if native_subject and initial_pointer_x ~= nil and
-                    initial_pointer_y ~= nil and initial_pointer_x >= 0 and
-                    initial_pointer_y >= 0 then
-                ds.move_pointer(initial_pointer_x, initial_pointer_y)
-            end
-        end)
         cleanup_step('restore native menu state', function()
             if not native_subject then return end
             local is_open = ds.hasFocus('dwarfmode/Hauling')
@@ -430,19 +417,6 @@ describe('native minecart zoom tooltip polling', function()
                 df.global.plotinfo.hauling.scroll_position = initial_scroll
             end
         end)
-        cleanup_step('restore pause state', function()
-            if native_subject and initial_pause ~= nil and
-                    ds.isGamePaused() ~= initial_pause then
-                ds.setGamePaused(initial_pause)
-            end
-        end)
-        cleanup_step('unmount native screen', function()
-            if native_subject then
-                ds.unmount()
-                native_subject = nil
-            end
-        end)
-
         if #cleanup_failures > 0 then
             local cleanup_message =
                 'cleanup failures: ' .. table.concat(cleanup_failures, '; ')

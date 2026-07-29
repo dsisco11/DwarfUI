@@ -320,14 +320,15 @@ describe('registered Minecart Route overlay against the native menu', function()
         local zoom_subject
         local rail, action
         local initial_scroll, initial_selection, initially_open
-        local initial_view_pos
         local paint_tile_spy
         local ok, failure = xpcall(function()
             -- Mount the real fortress screen as the input subject for the
             -- DwarfUI route-overlay behavior exercised below.
             native_subject = ds.mountNativeScreen()
             initially_open = ds.hasFocus('dwarfmode/Hauling')
-            initial_view_pos = ds.getViewPos()
+            local initial_view_pos = ds.getViewPos()
+            -- The production zoom action writes the native viewport directly.
+            -- Claim its original value through DwarfSpec before that happens.
             ds.setViewPos(initial_view_pos)
 
             -- Establish a known native focus through the same mounted input
@@ -646,9 +647,6 @@ describe('registered Minecart Route overlay against the native menu', function()
             overlay.selection.selected_route_id = initial_selection
         end
         if paint_tile_spy then paint_tile_spy:revert() end
-        if native_subject and initial_view_pos then
-            ds.setViewPos(initial_view_pos)
-        end
         local is_open = native_subject and ds.hasFocus('dwarfmode/Hauling')
         if native_subject and initially_open and not is_open then
             ds.input('D_HAULING')
@@ -661,7 +659,6 @@ describe('registered Minecart Route overlay against the native menu', function()
                 return ds.hasFocus('dwarfmode/Default')
             end)
         end
-        if native_subject then ds.unmount() end
         assert.same(saved.indicator, copy_coord(
             df.global.game.main_interface.recenter_indicator_m))
         assert.is_true(ok, failure)

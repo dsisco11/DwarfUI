@@ -75,9 +75,6 @@ describe('live singleton tooltip overlay registration', function()
                     return ds.hasFocus('dwarfmode/Hauling')
                 end)
         end
-        if native_subject then
-            ds.unmount()
-        end
     end)
 
     it('honors real discovery, enablement, and focus eligibility', function()

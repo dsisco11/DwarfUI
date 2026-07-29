@@ -5,7 +5,7 @@ describe('registered mood popover component with injected providers', function()
             function()
         -- Setup uses the real registry-owned instance while its data sources
         -- are replaced with deterministic component providers.
-        local native_subject = ds.mountNativeScreen()
+        ds.mountNativeScreen()
         local initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
         if initially_hauling_open then
             ds.input('LEAVESCREEN')
@@ -66,7 +66,6 @@ describe('registered mood popover component with injected providers', function()
                     return ds.hasFocus('dwarfmode/Hauling')
                 end)
         end
-        ds.unmount()
         assert.is_true(ok, failure)
     end)
 end)

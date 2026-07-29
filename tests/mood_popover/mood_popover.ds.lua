@@ -314,10 +314,9 @@ describe('registered mood overlay with native top-bar data', function()
             end
         end, debug.traceback)
 
-        -- Release the borrowed attachment before restoring all game-owned
-        -- viewport and unit-card state. DwarfSpec restores pointer state.
+        -- Restore the game-owned viewport and unit-card state. DwarfSpec owns
+        -- the borrowed attachment and virtual pointer cleanup.
         local popover_cleanup = popover_subject and popover_subject:raw() or nil
-        if native_subject then ds.unmount() end
         df.global.window_x = saved.window_x
         df.global.window_y = saved.window_y
         df.global.window_z = saved.window_z
@@ -346,19 +345,16 @@ describe('registered mood overlay with native top-bar data', function()
                 popover_cleanup.parent_view:clear()
             end
         end
-        -- These game-owned lifecycle calls are cleanup-only synchronization:
-        -- they apply restored DF state after the borrowed attachment has been
-        -- released and are not evidence for any interaction assertion.
+        -- These game-owned lifecycle calls are cleanup-only synchronization
+        -- and are not evidence for any interaction assertion.
         borrowed_screen:logic()
         borrowed_screen:render(df.global.cur_year_tick)
         if initially_hauling_open then
-            native_subject = ds.mountNativeScreen()
             ds.input('D_HAULING')
             ds.await('original Hauling menu reopens after moodlet coverage',
                 function()
                     return ds.hasFocus('dwarfmode/Hauling')
                 end)
-            ds.unmount()
         end
         assert.is_true(ok, failure)
     end)
