@@ -37,6 +37,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/tooltip_target',
+        contract='TooltipTargetAdapter',
+        contract_type='table',
+    },
+    {
         name='dwarfui/tooltip_target_detector',
         contract='TooltipTargetDetector',
         contract_type='table',
