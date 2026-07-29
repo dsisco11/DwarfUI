@@ -7,16 +7,27 @@ local overlay = require('plugins.overlay')
 
 local PROBE_X = 2
 local PROBE_Y = 2
+local PROCESS_STATE_SLOT = 'tooltip_final_render_probe'
 
----Paints one screen-global sentinel through the supplied overlay painter.
----@param dc gui.Painter
+---Paints one screen-global sentinel during an overlay render.
+---@param _dc gui.Painter
 ---@param character string
 ---@param background integer
-local function paint_sentinel(dc, character, background)
-    gui.Painter.new():seek(PROBE_X, PROBE_Y):char(character, {
+local function paint_sentinel(_dc, character, background)
+    local process = dfhack.dwarfui and
+        dfhack.dwarfui[PROCESS_STATE_SLOT] or nil
+    if process and process.enabled == false then return end
+    local x = process and process.x or PROBE_X
+    local y = process and process.y or PROBE_Y
+    gui.Painter.new():seek(x, y):char(character, {
         fg=COLOR_WHITE,
         bg=background,
     })
+    if process then
+        process.overlay_paint_order =
+            process.overlay_paint_order or {}
+        table.insert(process.overlay_paint_order, character)
+    end
 end
 
 ---@class tests.TooltipRenderViewscreenOverlay:

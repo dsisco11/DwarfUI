@@ -1,7 +1,13 @@
 -- Focused native coverage for input-independent minecart zoom tooltip intent.
 
+local gui = require('gui')
+local overlay = require('plugins.overlay')
+
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
+local RENDER_OVERLAY_SOURCE =
+    'tests/tooltip/support/tooltip_render_seam_overlays.lua'
+local RENDER_PROBE_SLOT = 'tooltip_final_render_probe'
 
 ---Returns one fully visible native minecart stop row.
 ---@param hauling df.hauling_handlerst
@@ -154,6 +160,132 @@ local function select_zoom_action(controls)
             state.intent.text == 'Zoom to this stop'
     end)
     return x, y, ds.tooltip_state()
+end
+
+---Returns the first rendered text cell for one tooltip intent.
+---@param intent table
+---@return integer x
+---@return integer y
+local function tooltip_text_cell(intent)
+    local screen_width, screen_height = dfhack.screen.getWindowSize()
+    local content_width = math.max(1, math.min(60, screen_width - 2))
+    local lines = reqscript('dwarfui/text').wrap_text(
+        intent.text, content_width)
+    local width = 2
+    for _, line in ipairs(lines) do
+        width = math.max(width, #line + 2)
+    end
+    local height = #lines + 2
+    local left = math.max(0,
+        math.min(intent.anchor_x + 2, screen_width - width))
+    local top = math.max(0,
+        math.min(intent.anchor_y + 1, screen_height - height))
+    return left + 1, top + 1
+end
+
+---Returns the display character currently occupying one screen cell.
+---@param x integer
+---@param y integer
+---@return string|nil
+local function read_character(x, y)
+    local pen = dfhack.screen.readTile(x, y)
+    if not pen or pen.ch == nil then return nil end
+    if type(pen.ch) == 'number' then return string.char(pen.ch) end
+    return pen.ch
+end
+
+---Finds one staged overlay widget by its local registration suffix.
+---@param staged table
+---@param local_name string
+---@return table
+local function staged_overlay_widget(staged, local_name)
+    local suffix = '.' .. local_name
+    for _, name in ipairs(staged.registered_names) do
+        if name:sub(-#suffix) == suffix then
+            local entry = assert(overlay.get_state().db[name],
+                'staged overlay entry is unavailable: ' .. name)
+            return assert(entry.widget,
+                'staged overlay widget is unavailable: ' .. name)
+        end
+    end
+    error('staged overlay name is unavailable: ' .. local_name)
+end
+
+---Returns one staged overlay's current render count.
+---@param staged table
+---@param local_name string
+---@return integer
+local function staged_overlay_render_count(staged, local_name)
+    return staged_overlay_widget(staged, local_name).render_count or 0
+end
+
+---Asserts one coherent active native-overlay tooltip render generation.
+---@param state table
+---@param minimum_rendered_revision integer
+local function assert_native_render_diagnostics(
+        state, minimum_rendered_revision)
+    local transport =
+        reqscript('dwarfui/tooltip_render_hook').TooltipRenderTransport
+    assert.is_true(state.presenter.active)
+    assert.is_true(state.presenter.supported_surface)
+    assert.equals(transport.OVERLAY,
+        state.presenter.selected_transport)
+    assert.equals(state.intent.revision,
+        state.presenter.current_intent_revision)
+    assert.is_true(state.presenter.last_rendered_revision >=
+        minimum_rendered_revision)
+    assert.is_true(state.presenter.last_rendered_revision <=
+        state.intent.revision)
+    assert.is_true(state.render_hook.presenter_installed)
+    assert.equals(state.presenter.generation,
+        state.render_hook.generation)
+    assert.equals(transport.OVERLAY,
+        state.render_hook.selected_transport)
+    assert.equals(state.intent.revision,
+        state.render_hook.current_intent_revision)
+    assert.equals(state.presenter.last_rendered_revision,
+        state.render_hook.last_rendered_revision)
+    assert.equals(transport.OVERLAY,
+        state.render_hook.last_transport)
+    assert.is_true(state.render_hook.overlay.installed)
+    assert.is_true(state.render_hook.overlay.outermost)
+    assert.equals(0, state.render_hook.screen_hook_count)
+end
+
+---Installs a reversible foreign wrapper outside the active tooltip hook.
+---@return table record
+local function install_foreign_overlay_wrapper()
+    local hook = reqscript('dwarfui/tooltip_render_hook')
+    local active_record = assert(hook.manager._state.overlay_hook,
+        'active tooltip overlay hook is unavailable')
+    assert.is_equal(active_record.active_trampoline,
+        overlay.render_viewscreen_widgets)
+    local record = {
+        predecessor=overlay.render_viewscreen_widgets,
+        base_export=active_record.predecessor,
+        call_count=0,
+    }
+
+    ---Preserves the predecessor and paints a conflicting final sentinel.
+    ---@param ... any
+    ---@return ...
+    record.installed = function(...)
+        local results = table.pack(record.predecessor(...))
+        record.call_count = record.call_count + 1
+        local probe = dfhack.dwarfui and
+            dfhack.dwarfui[RENDER_PROBE_SLOT] or nil
+        if probe and probe.enabled ~= false then
+            gui.Painter.new():seek(probe.x, probe.y):char('F', {
+                fg=COLOR_WHITE,
+                bg=COLOR_MAGENTA,
+            })
+            probe.foreign_paint_count =
+                (probe.foreign_paint_count or 0) + 1
+        end
+        return table.unpack(results, 1, results.n)
+    end
+    overlay.render_viewscreen_widgets = record.installed
+    return record
 end
 
 describe('native minecart zoom tooltip polling', function()
@@ -439,6 +571,284 @@ describe('native minecart zoom tooltip polling', function()
             reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
             ds.unmount()
             native_subject = nil
+        end)
+        cleanup_step('restore current DwarfUI runtime', function()
+            dfhack.run_command('dwarfui', 'reload')
+        end)
+        if #cleanup_failures > 0 then
+            local cleanup_message =
+                'cleanup failures: ' .. table.concat(cleanup_failures, '; ')
+            failure = failure and
+                (tostring(failure) .. '\n' .. cleanup_message) or
+                cleanup_message
+            ok = false
+        end
+        assert.is_true(ok, failure)
+    end)
+end)
+
+describe('native minecart zoom tooltip final rendering', function()
+    it('paints after native overlays and repaired foreign wrappers',
+            function()
+        local native_subject
+        local controls
+        local staged
+        local probe
+        local foreign
+        local initially_open
+        local initial_scroll
+        local environment
+
+        local ok, failure = xpcall(function()
+            native_subject = ds.mountNativeScreen()
+            initially_open = ds.hasFocus('dwarfmode/Hauling')
+            if initially_open then
+                ds.input('LEAVESCREEN')
+                ds.await('pre-existing Hauling menu closes', function()
+                    return ds.hasFocus('dwarfmode/Default')
+                end)
+            end
+            ds.input('D_HAULING')
+            ds.await('native Hauling menu opens for final rendering',
+                function()
+                    return ds.hasFocus('dwarfmode/Hauling')
+                end)
+
+            local hauling = assert(df.global.plotinfo.hauling,
+                'native Hauling state is unavailable')
+            initial_scroll = hauling.scroll_position
+            environment = capture_environment(native_subject)
+            staged = ds.stage_overlay_registration(
+                RENDER_OVERLAY_SOURCE, 'tooltip_final_native')
+            controls = resolve_controls()
+            local stop = reveal_action(hauling, controls)
+
+            local zoom_x, zoom_y, state = select_zoom_action(controls)
+            assert.equals(zoom_x, state.intent.anchor_x)
+            assert.equals(zoom_y, state.intent.anchor_y)
+            local text_x, text_y = tooltip_text_cell(state.intent)
+            probe = {
+                enabled=true,
+                x=text_x,
+                y=text_y,
+                overlay_paint_order={},
+                foreign_paint_count=0,
+            }
+            dfhack.dwarfui[RENDER_PROBE_SLOT] = probe
+
+            local minimum_rendered_revision = state.intent.revision
+            local viewscreen_before = staged_overlay_render_count(
+                staged, 'viewscreen_probe')
+            local all_before = staged_overlay_render_count(
+                staged, 'all_probe')
+            ds.redraw()
+            assert.same({'V', 'A'}, probe.overlay_paint_order)
+            assert.equals(viewscreen_before + 1,
+                staged_overlay_render_count(
+                    staged, 'viewscreen_probe'))
+            assert.equals(all_before + 1,
+                staged_overlay_render_count(staged, 'all_probe'))
+            assert.equals('Z', read_character(text_x, text_y),
+                'tooltip was not final above both overlay groups')
+            state = ds.tooltip_state()
+            assert_native_render_diagnostics(
+                state, minimum_rendered_revision)
+            assert_environment(environment, native_subject,
+                'native tooltip final rendering')
+
+            probe.overlay_paint_order = {}
+            ds.move_pointer(stop.x, stop.y)
+            ds.await('moving off clears the rendered zoom tooltip',
+                function()
+                    local current = ds.tooltip_state()
+                    return current.target == nil and
+                        current.intent == nil
+                end)
+            probe.overlay_paint_order = {}
+            ds.redraw()
+            assert.same({'V', 'A'}, probe.overlay_paint_order)
+            assert.equals('A', read_character(text_x, text_y),
+                'tooltip cells were not restored by the normal render pass')
+            assert_environment(environment, native_subject,
+                'native tooltip clearing')
+
+            zoom_x, zoom_y, state = select_zoom_action(controls)
+            text_x, text_y = tooltip_text_cell(state.intent)
+            probe.x, probe.y = text_x, text_y
+            foreign = install_foreign_overlay_wrapper()
+            local pending = ds.tooltip_state()
+            assert.is_false(pending.render_hook.overlay.outermost)
+            assert.is_true(
+                pending.render_hook.overlay.method_replacement_pending)
+
+            zoom_x, zoom_y =
+                ds.move_pointer(controls.zoom_subject, 'top_left')
+            ds.await('intent notification repairs around foreign wrapper',
+                function()
+                    local current = ds.tooltip_state()
+                    return current.intent and
+                        current.intent.anchor_x == zoom_x and
+                        current.intent.anchor_y == zoom_y and
+                        current.render_hook.overlay.outermost and
+                        current.render_hook.overlay.repair_count > 0 and
+                        current.render_hook.overlay.
+                            method_replacement_count > 0
+                end)
+            state = ds.tooltip_state()
+            text_x, text_y = tooltip_text_cell(state.intent)
+            probe.x, probe.y = text_x, text_y
+            probe.overlay_paint_order = {}
+            local foreign_before = foreign.call_count
+            local foreign_paints_before = probe.foreign_paint_count
+            local presenter_renders_before =
+                state.presenter.render_count
+            minimum_rendered_revision = state.intent.revision
+            viewscreen_before = staged_overlay_render_count(
+                staged, 'viewscreen_probe')
+            all_before = staged_overlay_render_count(
+                staged, 'all_probe')
+            ds.redraw()
+            state = ds.tooltip_state()
+            assert.equals(foreign_before + 1, foreign.call_count)
+            assert.equals(foreign_paints_before + 1,
+                probe.foreign_paint_count)
+            assert.equals(presenter_renders_before + 1,
+                state.presenter.render_count,
+                'one native render invoked the tooltip more than once')
+            assert.equals(viewscreen_before + 1,
+                staged_overlay_render_count(
+                    staged, 'viewscreen_probe'))
+            assert.equals(all_before + 1,
+                staged_overlay_render_count(staged, 'all_probe'))
+            assert.same({'V', 'A'}, probe.overlay_paint_order)
+            assert.equals('Z', read_character(text_x, text_y),
+                'tooltip did not paint after the foreign wrapper')
+            assert_native_render_diagnostics(
+                state, minimum_rendered_revision)
+            assert_environment(environment, native_subject,
+                'foreign wrapper repair')
+
+            local module_generation_before =
+                state.poller_module_generation
+            local presenter_generation_before =
+                state.presenter.generation
+            local hook_generation_before =
+                state.render_hook.generation
+            dfhack.run_command('dwarfui', 'reload')
+            ds.await('native tooltip generations recover after reload',
+                function()
+                    local current = ds.tooltip_state()
+                    return current.poller_module_generation ==
+                            module_generation_before + 1 and
+                        current.presenter.generation ==
+                            presenter_generation_before + 1 and
+                        current.render_hook.generation ==
+                            hook_generation_before + 1 and
+                        current.poller_current and
+                        current.presenter.active and
+                        current.render_hook.presenter_installed
+                end)
+
+            controls = resolve_controls()
+            stop = reveal_action(hauling, controls)
+            zoom_x, zoom_y, state = select_zoom_action(controls)
+            text_x, text_y = tooltip_text_cell(state.intent)
+            probe.x, probe.y = text_x, text_y
+            probe.overlay_paint_order = {}
+            foreign_before = foreign.call_count
+            foreign_paints_before = probe.foreign_paint_count
+            presenter_renders_before = state.presenter.render_count
+            minimum_rendered_revision = state.intent.revision
+            viewscreen_before = staged_overlay_render_count(
+                staged, 'viewscreen_probe')
+            all_before = staged_overlay_render_count(
+                staged, 'all_probe')
+            ds.redraw()
+            state = ds.tooltip_state()
+            assert.equals(foreign_before + 1, foreign.call_count)
+            assert.equals(foreign_paints_before + 1,
+                probe.foreign_paint_count)
+            assert.equals(presenter_renders_before + 1,
+                state.presenter.render_count,
+                'reload produced duplicate tooltip painting')
+            assert.equals(viewscreen_before + 1,
+                staged_overlay_render_count(
+                    staged, 'viewscreen_probe'))
+            assert.equals(all_before + 1,
+                staged_overlay_render_count(staged, 'all_probe'))
+            assert.same({'V', 'A'}, probe.overlay_paint_order)
+            assert.equals('Z', read_character(text_x, text_y))
+            assert_native_render_diagnostics(
+                state, minimum_rendered_revision)
+            assert_environment(environment, native_subject,
+                'native tooltip reload recovery')
+        end, debug.traceback)
+
+        local cleanup_failures = {}
+
+        ---Runs one cleanup step without suppressing later restoration.
+        ---@param label string
+        ---@param callback function
+        local function cleanup_step(label, callback)
+            local step_ok, step_failure =
+                xpcall(callback, debug.traceback)
+            if not step_ok then
+                table.insert(cleanup_failures,
+                    label .. ': ' .. tostring(step_failure))
+            end
+        end
+
+        cleanup_step('disable final-render sentinels', function()
+            if probe then probe.enabled = false end
+        end)
+        cleanup_step('retire tooltip render hooks', function()
+            reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
+        end)
+        cleanup_step('restore foreign and displaced overlay wrappers',
+            function()
+                if not foreign then return end
+                local current = overlay.render_viewscreen_widgets
+                assert.is_true(current == foreign.installed or
+                    current == foreign.predecessor,
+                    'unexpected overlay wrapper remained during cleanup')
+                overlay.render_viewscreen_widgets = foreign.base_export
+                foreign = nil
+            end)
+        cleanup_step('clear production overlay state', function()
+            if controls and controls.overlay then
+                controls.overlay:clear_overlay_state()
+            end
+        end)
+        cleanup_step('restore native menu state', function()
+            if not native_subject then return end
+            local is_open = ds.hasFocus('dwarfmode/Hauling')
+            if initially_open and not is_open then
+                ds.input('D_HAULING')
+                ds.await('original Hauling menu reopens', function()
+                    return ds.hasFocus('dwarfmode/Hauling')
+                end)
+            elseif not initially_open and is_open then
+                ds.input('LEAVESCREEN')
+                ds.await('test Hauling menu closes', function()
+                    return ds.hasFocus('dwarfmode/Default')
+                end)
+            end
+        end)
+        cleanup_step('restore Hauling scroll position', function()
+            if initial_scroll ~= nil and df.global.plotinfo.hauling then
+                df.global.plotinfo.hauling.scroll_position = initial_scroll
+            end
+        end)
+        cleanup_step('release native render observation', function()
+            if not native_subject then return end
+            ds.unmount()
+            native_subject = nil
+        end)
+        cleanup_step('clear final-render process probe', function()
+            if dfhack.dwarfui then
+                dfhack.dwarfui[RENDER_PROBE_SLOT] = nil
+            end
+            probe = nil
         end)
         cleanup_step('restore current DwarfUI runtime', function()
             dfhack.run_command('dwarfui', 'reload')
