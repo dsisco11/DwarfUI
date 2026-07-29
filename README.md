@@ -75,6 +75,24 @@ native overlay or foreground Lua screen has completed rendering. Lua-screen
 support wraps only the root instance's effective `onRender()` method; it does
 not add subviews or modify focus, input, logic, or screen configuration.
 
+Transport selection is limited to the registered target's currently presented
+root. A target in a native `OverlayWidget` uses the process-wide wrapper around
+DFHack's exported overlay-render function. A target in the current foreground
+Lua screen uses an on-demand wrapper around that root instance's callable
+`onRender()` method. Covered Lua screens and roots that match neither supported
+surface do not paint a tooltip.
+
+DFHack does not expose an engine-level post-compositor callback to Lua. These
+hooks therefore guarantee final ordering only within the supported native
+overlay render pass or wrapped foreground Lua screen. Content painted later by
+an unrelated engine or extension hook can still cover the tooltip. If another
+extension wraps DwarfUI's active render function, DwarfUI remains in that
+predecessor chain without taking ownership of the extension's exported
+function slot; this preserves the other extension's exact cleanup contract.
+A wrapper that performs post-render painting can explicitly mark itself
+reorderable through the render-hook manager when it wants DwarfUI to repair
+above that work.
+
 ## Runtime validation and reload
 
 Run `dwarfui` to load the registered module graph and validate each module's
@@ -102,8 +120,8 @@ the installed command:
 ```powershell
 luarocks test --prepare dwarfui.rockspec
 .\tools\Run-AutomationTests.ps1 tests/mood_popover/mood_popover.ds.lua
-.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip.ds.lua
-.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_tooltip.ds.lua
+.\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_screen_final_render.ds.lua
 .\tools\Run-AutomationTests.ps1 tests/tooltip/tooltip_overlay_registration_integration.ds.lua
 ```
 

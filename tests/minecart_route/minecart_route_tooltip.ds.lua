@@ -222,8 +222,9 @@ end
 ---Asserts one coherent active native-overlay tooltip render generation.
 ---@param state table
 ---@param minimum_rendered_revision integer
+---@param expected_outermost boolean
 local function assert_native_render_diagnostics(
-        state, minimum_rendered_revision)
+        state, minimum_rendered_revision, expected_outermost)
     local transport =
         reqscript('dwarfui/tooltip_render_hook').TooltipRenderTransport
     assert.is_true(state.presenter.active)
@@ -248,7 +249,8 @@ local function assert_native_render_diagnostics(
     assert.equals(transport.OVERLAY,
         state.render_hook.last_transport)
     assert.is_true(state.render_hook.overlay.installed)
-    assert.is_true(state.render_hook.overlay.outermost)
+    assert.equals(expected_outermost,
+        state.render_hook.overlay.outermost)
     assert.equals(0, state.render_hook.screen_hook_count)
 end
 
@@ -258,11 +260,10 @@ local function install_foreign_overlay_wrapper()
     local hook = reqscript('dwarfui/tooltip_render_hook')
     local active_record = assert(hook.manager._state.overlay_hook,
         'active tooltip overlay hook is unavailable')
-    assert.is_equal(active_record.active_trampoline,
-        overlay.render_viewscreen_widgets)
+    local current_export = overlay.render_viewscreen_widgets
     local record = {
-        predecessor=overlay.render_viewscreen_widgets,
-        base_export=active_record.predecessor,
+        predecessor=current_export,
+        base_export=current_export,
         call_count=0,
     }
 
@@ -284,6 +285,7 @@ local function install_foreign_overlay_wrapper()
         end
         return table.unpack(results, 1, results.n)
     end
+    hook.manager:mark_wrapper_reorderable(record.installed)
     overlay.render_viewscreen_widgets = record.installed
     return record
 end
@@ -493,8 +495,6 @@ describe('native minecart zoom tooltip polling', function()
                 sequence_after_frames - sequence_before_frames,
                 'poller did not produce exactly one sample per frame')
 
-            local registration_count =
-                ds.tooltip_state().registration_count
             ds.input('LEAVESCREEN')
             ds.await('Hauling close clears an ineligible target', function()
                 local current = ds.tooltip_state()
@@ -511,8 +511,11 @@ describe('native minecart zoom tooltip polling', function()
             stop = reveal_action(hauling, controls)
             select_zoom_action(controls)
             state = ds.tooltip_state()
-            assert.equals(registration_count, state.registration_count,
-                'Hauling reopen required tooltip re-registration')
+            assert.is_equal(controls.action, state.target,
+                'recreated Hauling action did not become the tooltip target')
+            assert.is_table(reqscript('dwarfui/tooltip_service').service:
+                get_registrations()[controls.action],
+                'recreated Hauling action was not automatically registered')
             assert_input_only_diagnostics(state)
         end, debug.traceback)
 
@@ -565,10 +568,6 @@ describe('native minecart zoom tooltip polling', function()
         end)
         cleanup_step('release native render observation', function()
             if not native_subject then return end
-            -- DwarfUI may have repaired its global trampoline around
-            -- DwarfSpec's temporary observer during the reload assertion.
-            -- Retire that outer wrapper before DwarfSpec restores its seam.
-            reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
             ds.unmount()
             native_subject = nil
         end)
@@ -652,7 +651,7 @@ describe('native minecart zoom tooltip final rendering', function()
                 'tooltip was not final above both overlay groups')
             state = ds.tooltip_state()
             assert_native_render_diagnostics(
-                state, minimum_rendered_revision)
+                state, minimum_rendered_revision, false)
             assert_environment(environment, native_subject,
                 'native tooltip final rendering')
 
@@ -724,7 +723,7 @@ describe('native minecart zoom tooltip final rendering', function()
             assert.equals('Z', read_character(text_x, text_y),
                 'tooltip did not paint after the foreign wrapper')
             assert_native_render_diagnostics(
-                state, minimum_rendered_revision)
+                state, minimum_rendered_revision, true)
             assert_environment(environment, native_subject,
                 'foreign wrapper repair')
 
@@ -779,7 +778,7 @@ describe('native minecart zoom tooltip final rendering', function()
             assert.same({'V', 'A'}, probe.overlay_paint_order)
             assert.equals('Z', read_character(text_x, text_y))
             assert_native_render_diagnostics(
-                state, minimum_rendered_revision)
+                state, minimum_rendered_revision, true)
             assert_environment(environment, native_subject,
                 'native tooltip reload recovery')
         end, debug.traceback)
