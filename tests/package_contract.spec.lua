@@ -12,6 +12,7 @@ local shipped_modules = {
     'dwarfui/pointer_poller.lua',
     'dwarfui/tooltip_target_detector.lua',
     'dwarfui/tooltip_service.lua',
+    'dwarfui/tooltip_render_hook.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
     'dwarfui/popover.lua',
@@ -160,6 +161,16 @@ local function load_public_module(package_path)
             'scripts_modinstalled/dwarfui/tooltip_service.lua' then
         options = {
             globals={dfhack={dwarfui={}}},
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/tooltip_render_hook.lua' then
+        options = {
+            globals={dfhack={dwarfui={}}},
+            require_modules={
+                ['plugins.overlay']={
+                    render_viewscreen_widgets=function() end,
+                },
+            },
         }
     elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
         local widget_harness = require('support.widget_harness')
@@ -369,6 +380,23 @@ describe('DwarfUI package contract', function()
         assert.is_equal(module.TooltipService, getmetatable(module.service))
         assert.equals('function',
             type(module.service.accept_pointer_observation))
+    end)
+
+    it('ships the process-wide tooltip render-hook manager', function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/tooltip_render_hook.lua')
+
+        assert.equals('table', type(module.TooltipRenderHookManager))
+        assert.equals('table', type(module.TooltipRenderTransport))
+        assert.equals('number', type(module.TooltipRenderTransport.OVERLAY))
+        assert.equals('number', type(module.TooltipRenderTransport.SCREEN))
+        assert.is_not_equal(module.TooltipRenderTransport.OVERLAY,
+            module.TooltipRenderTransport.SCREEN)
+        assert.equals('table', type(module.manager))
+        assert.is_equal(
+            module.TooltipRenderHookManager, getmetatable(module.manager))
+        assert.equals('function', type(module.manager.ensure_overlay))
+        assert.equals('function', type(module.manager.ensure_screen))
     end)
 
     it('roots shipped modules in the package', function()
