@@ -15,12 +15,22 @@ local CP437_STOP = string.char(9)
 local CP437_UP = string.char(30)
 local CP437_DOWN = string.char(31)
 
+---@enum dwarfui.MinecartRouteMarkerKind
+MinecartRouteMarkerKind = {
+    SAME_Z=1,
+    ABOVE=2,
+    BELOW=3,
+}
+
 local MARKER_STYLES = {
-    same_z={kind='same_z', glyph=CP437_STOP,
+    [MinecartRouteMarkerKind.SAME_Z]={
+        kind=MinecartRouteMarkerKind.SAME_Z, glyph=CP437_STOP,
         pen={ch=CP437_STOP:byte(), fg=10, keep_lower=true}},
-    above={kind='above', glyph=CP437_UP,
+    [MinecartRouteMarkerKind.ABOVE]={
+        kind=MinecartRouteMarkerKind.ABOVE, glyph=CP437_UP,
         pen={ch=CP437_UP:byte(), fg=14, keep_lower=true}},
-    below={kind='below', glyph=CP437_DOWN,
+    [MinecartRouteMarkerKind.BELOW]={
+        kind=MinecartRouteMarkerKind.BELOW, glyph=CP437_DOWN,
         pen={ch=CP437_DOWN:byte(), fg=12, keep_lower=true}},
 }
 
@@ -239,7 +249,7 @@ end
 ---@field world_pos {x: integer, y: integer, z: integer}
 ---@field screen_pos {x: integer, y: integer, z: integer}
 ---@field z_delta integer
----@field marker_kind 'same_z'|'above'|'below'
+---@field marker_kind dwarfui.MinecartRouteMarkerKind
 ---@field marker_glyph string
 ---@field marker_pen table
 ---@field label string
@@ -253,7 +263,7 @@ MinecartRouteMarkerDescriptor.ATTRS{
     world_pos=false,
     screen_pos=false,
     z_delta=0,
-    marker_kind='same_z',
+    marker_kind=MinecartRouteMarkerKind.SAME_Z,
     marker_glyph=' ',
     marker_pen=false,
     label='',
@@ -367,8 +377,11 @@ function MinecartRouteMarkerProjection:project(route, viewport)
             local visible = z_delta == 0 and viewport:isVisible(pos) or
                 z_delta ~= 0 and viewport:isVisibleXY(pos)
             if visible then
-                local style = z_delta == 0 and MARKER_STYLES.same_z or
-                    z_delta > 0 and MARKER_STYLES.above or MARKER_STYLES.below
+                local style = z_delta == 0 and
+                    MARKER_STYLES[MinecartRouteMarkerKind.SAME_Z] or
+                    z_delta > 0 and
+                    MARKER_STYLES[MinecartRouteMarkerKind.ABOVE] or
+                    MARKER_STYLES[MinecartRouteMarkerKind.BELOW]
                 local screen_pos = self.ui_position_provider(pos, viewport)
                 local label, label_x, label_y = layout_label(
                     make_label(stop.name or '', z_delta), screen_pos.x,

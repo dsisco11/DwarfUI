@@ -2,6 +2,12 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
+local MarkerKind = {
+    SAME_Z=1,
+    ABOVE=2,
+    BELOW=3,
+}
+
 ---Loads the route-marker overlay with isolated DFHack collaborators.
 ---@param state table
 ---@return table
@@ -42,7 +48,16 @@ local function load_overlay(state)
             return true
         end,
         resolve_selected_route=function(self, routes)
-            return routes and routes[0] or nil
+            if not routes or self.selected_route_id == nil then return nil end
+            local index = 0
+            while routes[index] do
+                if routes[index].id == self.selected_route_id then
+                    return routes[index]
+                end
+                index = index + 1
+            end
+            self.selected_route_id = nil
+            return nil
         end,
         observe_input=function(self, keys, x, y, hauling, focus)
             self.input = {keys=keys, x=x, y=y, hauling=hauling, focus=focus}
@@ -78,6 +93,43 @@ local function load_overlay(state)
         register=function(widget)
             state.tooltip_registrations = state.tooltip_registrations or {}
             table.insert(state.tooltip_registrations, widget)
+        end,
+        register_map_tile=function(options)
+            state.map_tooltip_sequence =
+                (state.map_tooltip_sequence or 0) + 1
+            local handle = {sequence=state.map_tooltip_sequence}
+            state.map_tooltips = state.map_tooltips or {}
+            state.map_tooltips[handle] = {
+                owner=options.owner,
+                pos={
+                    x=options.pos.x,
+                    y=options.pos.y,
+                    z=options.pos.z,
+                },
+                tooltip=options.tooltip,
+            }
+            return handle
+        end,
+        update_map_tile=function(handle, update)
+            local record = state.map_tooltips and
+                state.map_tooltips[handle] or nil
+            if not record then return false end
+            record.pos = {
+                x=update.pos.x,
+                y=update.pos.y,
+                z=update.pos.z,
+            }
+            record.tooltip = update.tooltip
+            return true
+        end,
+        unregister_map_tile=function(handle)
+            local record = state.map_tooltips and
+                state.map_tooltips[handle] or nil
+            if not record then return false end
+            state.map_tooltips[handle] = nil
+            state.map_tooltip_removals =
+                (state.map_tooltip_removals or 0) + 1
+            return true
         end,
     }
     local _, asset_button = module_loader.load(repo_root,
@@ -163,6 +215,7 @@ local function load_overlay(state)
                     MinecartRouteMenuLayout=function() return layout end,
                     MinecartRouteSelection=function() return selection end,
                     MinecartRouteMarkerProjection=function() return projection end,
+                    MinecartRouteMarkerKind=MarkerKind,
                 },
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
@@ -170,6 +223,7 @@ local function load_overlay(state)
             },
         })
     local instance = module.MinecartRouteMarkersOverlay{}
+    instance.hauling_provider = function() return state.hauling end
     instance.bounds_provider = function()
         state.bounds_reads = (state.bounds_reads or 0) + 1
         return state.bounds or {x1=4, y1=4, x2=59, y2=74}
@@ -203,6 +257,33 @@ local function painter()
         return self
     end
     return dc
+end
+
+---Creates a complete marker descriptor for overlay integration tests.
+---@param stop_id integer
+---@param marker_kind integer
+---@param name string
+---@param pos {x: integer, y: integer, z: integer}
+---@return table
+local function marker(stop_id, marker_kind, name, pos)
+    return {
+        stop_id=stop_id,
+        marker_kind=marker_kind,
+        world_pos={x=pos.x, y=pos.y, z=pos.z},
+        marker_pen={ch=9, fg='green', keep_lower=true},
+        label=name ~= '' and name or '(unnamed)',
+        label_x=pos.x + 20,
+        label_y=pos.y + 20,
+    }
+end
+
+---Counts active map-tooltip records in a test state.
+---@param state table
+---@return integer
+local function map_tooltip_count(state)
+    local count = 0
+    for _ in pairs(state.map_tooltips or {}) do count = count + 1 end
+    return count
 end
 
 describe('DwarfUI minecart route markers overlay', function()
@@ -256,10 +337,148 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals(1, state.bounds_reads)
     end)
 
+    it('registers only same-z markers at their exact world tiles', function()
+        local route = {id=8}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local above = marker(81, MarkerKind.ABOVE, 'Upper',
+            {x=18, y=29, z=5})
+        local below = marker(82, MarkerKind.BELOW, 'Lower',
+            {x=19, y=29, z=3})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z, above, below},
+            map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+
+        overlay:render(painter())
+
+        assert.equals(1, map_tooltip_count(state))
+        local handle = overlay.map_tooltip_handles[80]
+        assert.is_not_nil(handle)
+        assert.same({x=17, y=29, z=4},
+            state.map_tooltips[handle].pos)
+        assert.equals('Depot', state.map_tooltips[handle].tooltip)
+        assert.is_equal(overlay, state.map_tooltips[handle].owner)
+        assert.is_nil(overlay.map_tooltip_handles[81])
+        assert.is_nil(overlay.map_tooltip_handles[82])
+        assert.equals(3, #state.map_calls,
+            'off-z descriptors must keep rendering as markers')
+        assert.is_nil(overlay.map_tooltip_handles[same_z.label_x],
+            'the adjacent label cell must not become a map target')
+    end)
+
+    it('refreshes names, positions, membership, and duplicate order', function()
+        local route = {id=8}
+        local first = marker(80, MarkerKind.SAME_Z, 'First',
+            {x=17, y=29, z=4})
+        local second = marker(81, MarkerKind.SAME_Z, '',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={first, second},
+            map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+        overlay:render(painter())
+        local first_handle = overlay.map_tooltip_handles[80]
+        local second_handle = overlay.map_tooltip_handles[81]
+
+        assert.equals('(unnamed)',
+            state.map_tooltips[second_handle].tooltip)
+        first.world_pos = {x=18, y=30, z=4}
+        first.label = 'Renamed'
+        overlay:render(painter())
+        assert.is_equal(first_handle, overlay.map_tooltip_handles[80])
+        assert.same({x=18, y=30, z=4},
+            state.map_tooltips[first_handle].pos)
+        assert.equals('Renamed', state.map_tooltips[first_handle].tooltip)
+
+        state.markers = {second, first}
+        overlay:render(painter())
+        assert.is_not.equal(first_handle, overlay.map_tooltip_handles[80])
+        assert.is_not.equal(second_handle, overlay.map_tooltip_handles[81])
+        assert.same({81, 80}, overlay.map_tooltip_order)
+        assert.equals(2, map_tooltip_count(state))
+
+        table.remove(state.markers, 1)
+        overlay:render(painter())
+        assert.same({80}, overlay.map_tooltip_order)
+        assert.equals(1, map_tooltip_count(state))
+
+        table.insert(state.markers, marker(82, MarkerKind.SAME_Z, 'Added',
+            {x=21, y=31, z=4}))
+        overlay:render(painter())
+        assert.same({80, 82}, overlay.map_tooltip_order)
+        assert.equals(2, map_tooltip_count(state))
+
+        local stale_handle = overlay.map_tooltip_handles[80]
+        state.map_tooltips = {}
+        overlay:render(painter())
+        assert.is_not.equal(stale_handle, overlay.map_tooltip_handles[80])
+        assert.equals(2, map_tooltip_count(state),
+            'lost registry handles must be rebuilt after module reload')
+    end)
+
+    it('replaces route targets and removes targets after z or context changes',
+            function()
+        local first_route = {id=8}
+        local second_route = {id=9}
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={marker(80, MarkerKind.SAME_Z, 'First route',
+                {x=17, y=29, z=4})},
+            map_calls={}, reveals={}, viewport={},
+            hauling={
+                routes={[0]=first_route},
+                view_routes={[0]=first_route},
+            },
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = first_route.id
+        overlay:render(painter())
+        local old_handle = overlay.map_tooltip_handles[80]
+
+        state.hauling.routes[0] = second_route
+        state.hauling.view_routes[0] = second_route
+        selection.selected_route_id = second_route.id
+        state.markers = {marker(90, MarkerKind.SAME_Z, 'Second route',
+            {x=40, y=41, z=4})}
+        overlay:render(painter())
+        assert.is_nil(state.map_tooltips[old_handle])
+        assert.is_nil(overlay.map_tooltip_handles[80])
+        assert.equals('Second route',
+            state.map_tooltips[overlay.map_tooltip_handles[90]].tooltip)
+
+        local rendered_before_z_change = #state.map_calls
+        state.markers[1].marker_kind = MarkerKind.ABOVE
+        overlay:render(painter())
+        assert.equals(0, map_tooltip_count(state))
+        assert.equals(rendered_before_z_change + 1, #state.map_calls,
+            'the off-z marker must remain rendered')
+
+        state.markers = {marker(90, MarkerKind.SAME_Z, 'Second route',
+            {x=40, y=41, z=5})}
+        overlay:render(painter())
+        assert.equals(1, map_tooltip_count(state))
+        state.hauling.routes = {}
+        overlay:overlay_onupdate()
+        assert.is_nil(selection.selected_route_id)
+        assert.equals(0, map_tooltip_count(state))
+    end)
+
     it('clears selection when the Hauling screen closes or the overlay disables',
             function()
+        local marker_descriptor = marker(
+            80, MarkerKind.SAME_Z, 'Depot', {x=17, y=29, z=4})
         local state = {
-            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11, markers={},
+            focus={'dwarfmode/Hauling'}, mouse_x=6, mouse_y=11,
+            markers={marker_descriptor},
             map_calls={}, reveals={}, viewport={},
             bounds={x1=4, y1=4, x2=59, y2=12},
             hauling={
@@ -268,26 +487,41 @@ describe('DwarfUI minecart route markers overlay', function()
             },
         }
         local overlay, selection = load_overlay(state)
+        selection.selected_route_id = 8
         layout_overlay(overlay)
         overlay:render(painter())
         assert.is_not_nil(overlay.stop_rail:get_target())
+        assert.equals(1, map_tooltip_count(state))
         assert.same({overlay.stop_rail.action_widgets[1]},
             state.tooltip_registrations)
-        selection.selected_route_id = 8
         state.focus = {'dwarfmode/Default'}
 
         overlay:overlay_onupdate()
         assert.is_nil(selection.selected_route_id)
         assert.is_nil(overlay.stop_rail:get_target())
+        assert.equals(0, map_tooltip_count(state))
         assert.same({overlay.stop_rail.action_widgets[1]},
             state.tooltip_registrations)
         selection.selected_route_id = 8
         state.focus = {'dwarfmode/Hauling'}
         state.mouse_x = 6
         overlay:render(painter())
+        assert.equals(1, map_tooltip_count(state))
+
+        local hauling = state.hauling
+        state.hauling = nil
+        overlay:overlay_onupdate()
+        assert.is_nil(selection.selected_route_id)
+        assert.equals(0, map_tooltip_count(state))
+
+        state.hauling = hauling
+        selection.selected_route_id = 8
+        overlay:render(painter())
+        assert.equals(1, map_tooltip_count(state))
         overlay.overlay_ondisable()
         assert.is_nil(selection.selected_route_id)
         assert.is_nil(overlay.stop_rail:get_target())
+        assert.equals(0, map_tooltip_count(state))
         assert.same({overlay.stop_rail.action_widgets[1]},
             state.tooltip_registrations)
     end)
@@ -421,10 +655,11 @@ describe('DwarfUI minecart route markers overlay', function()
             },
         }
         local overlay, selection = load_overlay(state)
-        selection.selected_route_id = 77
+        selection.selected_route_id = 8
         layout_overlay(overlay)
         overlay:render(painter())
         local button = overlay.stop_rail.action_widgets[1]
+        selection.selected_route_id = 77
 
         stop.id = 81
         assert.has_no.errors(function() button:activate() end)

@@ -8,6 +8,7 @@ local route_model = reqscript('dwarfui/minecart_route')
 local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
 local tooltip = reqscript('dwarfui/tooltip')
+local MarkerKind = route_model.MinecartRouteMarkerKind
 
 local HAULING_FOCUS = 'dwarfmode/Hauling'
 local ZOOM_ACTION_ID = 'recenter'
@@ -111,6 +112,9 @@ end
 ---@field bounds_provider fun(sample_y: integer): table|nil
 ---@field bounds_screen_width integer|nil
 ---@field bounds_screen_height integer|nil
+---@field map_tooltip_handles table<integer, dwarfui.MapTileTooltipRegistration>
+---@field map_tooltip_order integer[]
+---@field map_tooltip_route_id integer|nil
 MinecartRouteMarkersOverlay = defclass(MinecartRouteMarkersOverlay,
     overlay.OverlayWidget)
 MinecartRouteMarkersOverlay.ATTRS{
@@ -136,6 +140,9 @@ MinecartRouteMarkersOverlay.ATTRS{
 
 ---Constructs route-marker models and the one contextual stop-action rail.
 function MinecartRouteMarkersOverlay:init()
+    self.map_tooltip_handles = {}
+    self.map_tooltip_order = {}
+    self.map_tooltip_route_id = nil
     self.layout = route_model.MinecartRouteMenuLayout{}
     self.selection = route_model.MinecartRouteSelection{layout=self.layout}
     self.projection = route_model.MinecartRouteMarkerProjection{}
@@ -175,9 +182,84 @@ function MinecartRouteMarkersOverlay:init()
     self.overlay_ondisable = function() self:clear_overlay_state() end
 end
 
----Clears selected-route state without mutating native route data.
+---Removes every exact-tile tooltip owned by this overlay.
+function MinecartRouteMarkersOverlay:clear_map_tooltips()
+    for _, handle in pairs(self.map_tooltip_handles) do
+        tooltip.unregister_map_tile(handle)
+    end
+    self.map_tooltip_handles = {}
+    self.map_tooltip_order = {}
+    self.map_tooltip_route_id = nil
+end
+
+---Returns whether the registered same-z stop order matches fresh descriptors.
+---@param stop_ids integer[]
+---@return boolean
+function MinecartRouteMarkersOverlay:has_map_tooltip_order(stop_ids)
+    if #stop_ids ~= #self.map_tooltip_order then return false end
+    for index, stop_id in ipairs(stop_ids) do
+        if self.map_tooltip_order[index] ~= stop_id then return false end
+    end
+    return true
+end
+
+---Rebuilds exact-tile registrations in current route order.
+---@param route_id integer
+---@param markers dwarfui.MinecartRouteMarkerDescriptor[]
+---@param stop_ids integer[]
+function MinecartRouteMarkersOverlay:rebuild_map_tooltips(
+        route_id, markers, stop_ids)
+    self:clear_map_tooltips()
+    self.map_tooltip_route_id = route_id
+    for _, marker in ipairs(markers) do
+        if marker.marker_kind == MarkerKind.SAME_Z and
+                type(marker.stop_id) == 'number' then
+            self.map_tooltip_handles[marker.stop_id] =
+                tooltip.register_map_tile{
+                    owner=self,
+                    pos=marker.world_pos,
+                    tooltip=marker.label,
+                }
+        end
+    end
+    self.map_tooltip_order = stop_ids
+end
+
+---Synchronizes same-z marker tooltips from fresh selected-route descriptors.
+---@param route df.hauling_route
+---@param markers dwarfui.MinecartRouteMarkerDescriptor[]
+function MinecartRouteMarkersOverlay:sync_map_tooltips(route, markers)
+    local stop_ids = {}
+    for _, marker in ipairs(markers) do
+        if marker.marker_kind == MarkerKind.SAME_Z and
+                type(marker.stop_id) == 'number' then
+            table.insert(stop_ids, marker.stop_id)
+        end
+    end
+    if route.id ~= self.map_tooltip_route_id or
+            not self:has_map_tooltip_order(stop_ids) then
+        self:rebuild_map_tooltips(route.id, markers, stop_ids)
+        return
+    end
+    for _, marker in ipairs(markers) do
+        if marker.marker_kind == MarkerKind.SAME_Z and
+                type(marker.stop_id) == 'number' then
+            local handle = self.map_tooltip_handles[marker.stop_id]
+            if not handle or not tooltip.update_map_tile(handle, {
+                    pos=marker.world_pos,
+                    tooltip=marker.label,
+                }) then
+                self:rebuild_map_tooltips(route.id, markers, stop_ids)
+                return
+            end
+        end
+    end
+end
+
+---Clears selected-route state and map targets without mutating native data.
 function MinecartRouteMarkersOverlay:clear_selection()
     self.selection:clear()
+    self:clear_map_tooltips()
 end
 
 ---Clears selection and every pooled stop-row binding.
@@ -313,7 +395,12 @@ end
 ---@return boolean activated
 function MinecartRouteMarkersOverlay:activate_zoom_action(descriptor)
     local pos, route = self:resolve_stop_action_position(descriptor)
-    if not pos or not self.selection:select_route(route) then return false end
+    if not pos then return false end
+    local previous_route_id = self.selection:get_selected_route_id()
+    if not self.selection:select_route(route) then return false end
+    if self.selection:get_selected_route_id() ~= previous_route_id then
+        self:clear_map_tooltips()
+    end
     self.reveal_provider(pos, true, true)
     return true
 end
@@ -327,7 +414,9 @@ function MinecartRouteMarkersOverlay:resolve_selected_route()
         self:clear_selection()
         return nil
     end
-    return self.selection:resolve_selected_route(hauling.routes)
+    local route = self.selection:resolve_selected_route(hauling.routes)
+    if not route then self:clear_map_tooltips() end
+    return route
 end
 
 ---Renders one full map-tile marker while preserving the underlying map
@@ -373,8 +462,11 @@ function MinecartRouteMarkersOverlay:render(dc)
     if hauling and route then
         self:render_selection_indicator(dc, hauling)
         local markers = self.projection:project(route, self.viewport_provider())
+        self:sync_map_tooltips(route, markers)
         for _, marker in ipairs(markers) do self:render_marker(marker) end
         self:render_labels(dc, markers)
+    else
+        self:clear_map_tooltips()
     end
     MinecartRouteMarkersOverlay.super.render(self, dc)
 end
@@ -387,8 +479,12 @@ function MinecartRouteMarkersOverlay:onInput(keys)
     local hauling = self.hauling_provider()
     if self:inputToSubviews(keys) then return true end
     local mouse_x, mouse_y = self:getMousePos()
+    local previous_route_id = self.selection:get_selected_route_id()
     self.selection:observe_input(keys, mouse_x, mouse_y,
         hauling, self.focus_provider())
+    if self.selection:get_selected_route_id() ~= previous_route_id then
+        self:clear_map_tooltips()
+    end
     return false
 end
 
@@ -400,7 +496,9 @@ function MinecartRouteMarkersOverlay:overlay_onupdate()
         self:clear_overlay_state()
         return
     end
-    self.selection:resolve_selected_route(hauling.routes)
+    if not self.selection:resolve_selected_route(hauling.routes) then
+        self:clear_map_tooltips()
+    end
 end
 
 OVERLAY_WIDGETS = {

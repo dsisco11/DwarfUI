@@ -30,6 +30,7 @@ local MinecartRouteMenuLayout = route_environment.MinecartRouteMenuLayout
 local MinecartRouteSelection = route_environment.MinecartRouteSelection
 local MinecartRouteMarkerProjection =
     route_environment.MinecartRouteMarkerProjection
+local MarkerKind = route_environment.MinecartRouteMarkerKind
 
 ---Creates a zero-based vector fixture.
 ---@param values table[]
@@ -299,7 +300,7 @@ describe('DwarfUI minecart route marker projection', function()
         assert.same({x=12, y=23, z=5}, markers[1].world_pos)
         assert.same({x=2, y=3, z=0}, markers[1].screen_pos)
         assert.equals(0, markers[1].z_delta)
-        assert.equals('same_z', markers[1].marker_kind)
+        assert.equals(MarkerKind.SAME_Z, markers[1].marker_kind)
         assert.equals(string.char(9), markers[1].marker_glyph)
         assert.equals('North', markers[1].label)
         assert.equals(2, markers[1].label_x)
@@ -321,11 +322,11 @@ describe('DwarfUI minecart route marker projection', function()
             {id=2, name='Below', pos={x=6, y=4, z=7}},
         }), viewport)
 
-        assert.equals('above', markers[1].marker_kind)
+        assert.equals(MarkerKind.ABOVE, markers[1].marker_kind)
         assert.equals(string.char(30), markers[1].marker_glyph)
         assert.equals(2, markers[1].z_delta)
         assert.equals('Above (z+2)', markers[1].label)
-        assert.equals('below', markers[2].marker_kind)
+        assert.equals(MarkerKind.BELOW, markers[2].marker_kind)
         assert.equals(string.char(31), markers[2].marker_glyph)
         assert.equals(-3, markers[2].z_delta)
         assert.equals('Below (z-3)', markers[2].label)
