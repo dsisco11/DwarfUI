@@ -12,10 +12,18 @@ local function load_harness(state)
     state.callbacks = state.callbacks or {}
     state.dwarfui = state.dwarfui or {}
     state.mouse_reads = state.mouse_reads or 0
+    state.map_reads = state.map_reads or 0
     state.notifications = state.notifications or {}
     if state.demand == nil then state.demand = true end
+    if state.map_demand == nil then state.map_demand = false end
     local dfhack = state.dfhack or {
         dwarfui=state.dwarfui,
+        gui={
+            getMousePos=function()
+                state.map_reads = state.map_reads + 1
+                return state.map_pos
+            end,
+        },
         screen={
             getMousePos=function()
                 state.mouse_reads = state.mouse_reads + 1
@@ -54,12 +62,20 @@ local function load_harness(state)
             state.demand_checks = (state.demand_checks or 0) + 1
             return state.demand
         end,
+        has_map_demand=function()
+            state.map_demand_checks = (state.map_demand_checks or 0) + 1
+            return state.map_demand
+        end,
     }
     if not state.use_defaults then
         options.scheduler = schedule
         options.sample_pointer = function()
             state.mouse_reads = state.mouse_reads + 1
             return state.mouse_x, state.mouse_y
+        end
+        options.sample_map_pointer = function()
+            state.map_reads = state.map_reads + 1
+            return state.map_pos
         end
     end
 
@@ -97,10 +113,127 @@ describe('DwarfUI pointer poller', function()
         assert.equals(1, sample.sequence)
         assert.equals(12, sample.x)
         assert.equals(7, sample.y)
+        assert.is_nil(sample.map_x)
+        assert.is_nil(sample.map_y)
+        assert.is_nil(sample.map_z)
         assert.equals('screen-cells', sample.coordinate_space)
         assert.has_error(function() sample.x = 99 end,
             'DwarfUI pointer samples are immutable.')
         assert.equals(1, #harness.state.callbacks)
+    end)
+
+    it('publishes one coherent copied screen and exact-map snapshot', function()
+        local map_pos = {x=101, y=202, z=7}
+        local harness = load_harness{
+            mouse_x=12,
+            mouse_y=7,
+            map_demand=true,
+            map_pos=map_pos,
+        }
+        local poller = harness.new_poller()
+
+        assert.is_true(poller:start())
+        assert.is_true(harness.run_next())
+
+        assert.equals(1, harness.state.mouse_reads)
+        assert.equals(1, harness.state.map_reads)
+        assert.equals(1, #harness.state.notifications)
+        local sample = harness.state.notifications[1]
+        assert.equals(1, sample.sequence)
+        assert.same({12, 7, 101, 202, 7}, {
+            sample.x,
+            sample.y,
+            sample.map_x,
+            sample.map_y,
+            sample.map_z,
+        })
+
+        map_pos.x, map_pos.y, map_pos.z = 301, 302, 8
+        assert.same({101, 202, 7}, {
+            sample.map_x,
+            sample.map_y,
+            sample.map_z,
+        })
+        assert.has_error(function() sample.map_x = 999 end,
+            'DwarfUI pointer samples are immutable.')
+    end)
+
+    it('keeps valid screen coordinates when exact map position is missing',
+            function()
+        local harness = load_harness{
+            mouse_x=4,
+            mouse_y=8,
+            map_demand=true,
+            map_pos=nil,
+        }
+        local poller = harness.new_poller()
+        poller:start()
+
+        assert.is_true(harness.run_next())
+        local missing = harness.state.notifications[1]
+        assert.same({4, 8}, {missing.x, missing.y})
+        assert.is_nil(missing.map_x)
+        assert.is_nil(missing.map_y)
+        assert.is_nil(missing.map_z)
+
+        harness.state.map_pos = {x=10, y=20, z=3}
+        assert.is_true(harness.run_next())
+        local present = harness.state.notifications[2]
+        assert.same({4, 8}, {present.x, present.y})
+        assert.same({10, 20, 3}, {
+            present.map_x,
+            present.map_y,
+            present.map_z,
+        })
+
+        harness.state.map_pos = {x=10, y=nil, z=3}
+        assert.is_true(harness.run_next())
+        local partial = harness.state.notifications[3]
+        assert.same({4, 8}, {partial.x, partial.y})
+        assert.is_nil(partial.map_x)
+        assert.is_nil(partial.map_y)
+        assert.is_nil(partial.map_z)
+        assert.equals(3, harness.state.mouse_reads)
+        assert.equals(3, harness.state.map_reads)
+    end)
+
+    it('samples map coordinates only while explicit map demand exists',
+            function()
+        local harness = load_harness{
+            mouse_x=6,
+            mouse_y=9,
+            map_pos={x=16, y=19, z=4},
+        }
+        local poller = harness.new_poller()
+        poller:start()
+
+        assert.is_true(harness.run_next())
+        assert.equals(1, harness.state.mouse_reads)
+        assert.equals(0, harness.state.map_reads)
+        assert.is_nil(harness.state.notifications[1].map_x)
+
+        harness.state.map_demand = true
+        assert.is_true(harness.run_next())
+        assert.equals(2, harness.state.mouse_reads)
+        assert.equals(1, harness.state.map_reads)
+        assert.same({16, 19, 4}, {
+            harness.state.notifications[2].map_x,
+            harness.state.notifications[2].map_y,
+            harness.state.notifications[2].map_z,
+        })
+
+        harness.state.map_demand = false
+        assert.is_true(harness.run_next())
+        assert.equals(3, harness.state.mouse_reads)
+        assert.equals(1, harness.state.map_reads)
+        assert.is_nil(harness.state.notifications[3].map_x)
+
+        harness.state.demand = false
+        assert.is_true(harness.run_next())
+        assert.equals(3, harness.state.mouse_reads)
+        assert.equals(1, harness.state.map_reads)
+        assert.equals(3, #harness.state.notifications)
+        assert.equals(0, #harness.state.callbacks)
     end)
 
     it('does not create a second callback chain on duplicate start', function()
@@ -167,7 +300,12 @@ describe('DwarfUI pointer poller', function()
     end)
 
     it('does not let a stale callback stop a restarted chain', function()
-        local harness = load_harness{mouse_x=5, mouse_y=6}
+        local harness = load_harness{
+            mouse_x=5,
+            mouse_y=6,
+            map_demand=true,
+            map_pos={x=15, y=16, z=2},
+        }
         local poller = harness.new_poller()
         poller:start()
         poller:stop()
@@ -176,11 +314,18 @@ describe('DwarfUI pointer poller', function()
 
         assert.is_true(harness.run_next())
         assert.equals(0, harness.state.mouse_reads)
+        assert.equals(0, harness.state.map_reads)
         assert.equals(1, #harness.state.callbacks)
 
         assert.is_true(harness.run_next())
         assert.equals(1, harness.state.mouse_reads)
+        assert.equals(1, harness.state.map_reads)
         assert.equals(1, #harness.state.notifications)
+        assert.same({15, 16, 2}, {
+            harness.state.notifications[1].map_x,
+            harness.state.notifications[1].map_y,
+            harness.state.notifications[1].map_z,
+        })
         assert.equals(1, #harness.state.callbacks)
     end)
 
@@ -232,7 +377,12 @@ describe('DwarfUI pointer poller', function()
     end)
 
     it('makes callbacks from an older module generation inert', function()
-        local state = {mouse_x=3, mouse_y=8}
+        local state = {
+            mouse_x=3,
+            mouse_y=8,
+            map_demand=true,
+            map_pos={x=13, y=18, z=2},
+        }
         local old_harness = load_harness(state)
         local old_poller = old_harness.new_poller()
         old_poller:start()
@@ -245,11 +395,18 @@ describe('DwarfUI pointer poller', function()
 
         assert.is_true(old_harness.run_next())
         assert.equals(0, state.mouse_reads)
+        assert.equals(0, state.map_reads)
         assert.equals(1, #state.callbacks)
 
         assert.is_true(new_harness.run_next())
         assert.equals(1, state.mouse_reads)
+        assert.equals(1, state.map_reads)
         assert.equals(1, #state.notifications)
+        assert.same({13, 18, 2}, {
+            state.notifications[1].map_x,
+            state.notifications[1].map_y,
+            state.notifications[1].map_z,
+        })
     end)
 
     it('reports generation, scheduling, and sample lifecycle', function()
@@ -286,6 +443,8 @@ describe('DwarfUI pointer poller', function()
             use_defaults=true,
             mouse_x=14,
             mouse_y=10,
+            map_demand=true,
+            map_pos={x=24, y=20, z=6},
         }
         local poller = harness.new_poller()
 
@@ -294,10 +453,14 @@ describe('DwarfUI pointer poller', function()
             harness.state.default_schedule)
         assert.is_true(harness.run_next())
         assert.equals(1, harness.state.mouse_reads)
+        assert.equals(1, harness.state.map_reads)
         assert.equals(1, #harness.state.notifications)
-        assert.same({14, 10}, {
+        assert.same({14, 10, 24, 20, 6}, {
             harness.state.notifications[1].x,
             harness.state.notifications[1].y,
+            harness.state.notifications[1].map_x,
+            harness.state.notifications[1].map_y,
+            harness.state.notifications[1].map_z,
         })
     end)
 
