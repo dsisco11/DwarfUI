@@ -81,6 +81,20 @@ local function assert_input_only_diagnostics(state)
     assert.is_true(state.poller_running)
     assert.is_true(state.poller_scheduled)
     assert.is_true(state.poller_current)
+    assert.is_table(state.presenter)
+    assert.is_number(state.presenter.generation)
+    assert.is_boolean(state.presenter.active)
+    assert.is_nil(state.presenter.selected_owner)
+    assert.is_boolean(state.presenter.selected_owner_present)
+    assert.is_table(state.render_hook)
+    assert.is_number(state.render_hook.generation)
+    assert.is_boolean(state.render_hook.presenter_installed)
+    assert.is_nil(state.render_hook.selected_owner)
+    assert.is_boolean(state.render_hook.selected_owner_present)
+    assert.is_table(state.render_hook.overlay)
+    assert.is_nil(state.render_hook.overlay.owner)
+    assert.is_boolean(state.render_hook.overlay.owner_present)
+    assert.is_table(state.render_hook.screens)
 end
 
 ---Resolves the current registered production rail controls.
@@ -416,6 +430,18 @@ describe('native minecart zoom tooltip polling', function()
             if initial_scroll ~= nil and df.global.plotinfo.hauling then
                 df.global.plotinfo.hauling.scroll_position = initial_scroll
             end
+        end)
+        cleanup_step('release native render observation', function()
+            if not native_subject then return end
+            -- DwarfUI may have repaired its global trampoline around
+            -- DwarfSpec's temporary observer during the reload assertion.
+            -- Retire that outer wrapper before DwarfSpec restores its seam.
+            reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
+            ds.unmount()
+            native_subject = nil
+        end)
+        cleanup_step('restore current DwarfUI runtime', function()
+            dfhack.run_command('dwarfui', 'reload')
         end)
         if #cleanup_failures > 0 then
             local cleanup_message =

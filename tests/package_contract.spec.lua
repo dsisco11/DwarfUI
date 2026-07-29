@@ -189,7 +189,6 @@ local function load_public_module(package_path)
                         getCurViewscreen=function() return nil end,
                     },
                     screen={
-                        getMousePos=function() return nil, nil end,
                         getWindowSize=function() return 80, 25 end,
                         invalidate=function() end,
                     },
@@ -209,10 +208,6 @@ local function load_public_module(package_path)
             },
             reqscript={
                 ['dwarfui/widget_extensions']={},
-                ['dwarfui/pointer']={
-                    PointerContext={new=function() return {} end},
-                    PointerDispatcher={sample=function() return {kind='miss'} end},
-                },
                 ['dwarfui/text']={wrap_text=function() return {''} end},
                 ['dwarfui/tooltip_service']={
                     service={
@@ -441,6 +436,53 @@ describe('DwarfUI package contract', function()
             getmetatable(module.presenter))
         assert.equals('function', type(module.presenter.present))
         assert.equals('function', type(module.presenter.get_diagnostics))
+        assert.is_nil(module.TooltipAgent)
+    end)
+
+    it('keeps tooltip input and registration free of UI hosts', function()
+        local registration = read_source(
+            'scripts_modinstalled/dwarfui/tooltip_registration.lua')
+        local service = read_source(
+            'scripts_modinstalled/dwarfui/tooltip_service.lua')
+        for _, source in ipairs({registration, service}) do
+            for _, forbidden in ipairs({
+                    "require('gui')",
+                    "require('gui.widgets')",
+                    'gui.ZScreen',
+                    'OverlayWidget{',
+                    'TooltipRenderer',
+                    'TooltipPresenter',
+                }) do
+                assert.is_nil(source:find(forbidden, 1, true), forbidden)
+            end
+        end
+        for _, forbidden in ipairs({
+                'show(',
+                'raise(',
+                'dismiss(',
+                'sendInputToParent',
+                'onInput',
+                'onIdle',
+            }) do
+            assert.is_nil(registration:find(forbidden, 1, true), forbidden)
+        end
+    end)
+
+    it('does not construct a tooltip screen or overlay widget', function()
+        for _, relative_path in ipairs({
+                'scripts_modinstalled/dwarfui/tooltip.lua',
+                'scripts_modinstalled/dwarfui/tooltip_registration.lua',
+                'scripts_modinstalled/dwarfui/tooltip_service.lua',
+                'scripts_modinstalled/dwarfui/tooltip_target_detector.lua',
+                'scripts_modinstalled/dwarfui/tooltip_render_hook.lua',
+            }) do
+            local source = read_source(relative_path)
+            assert.is_nil(source:find('gui.ZScreen{', 1, true), relative_path)
+            assert.is_nil(source:find(
+                'overlay.OverlayWidget{', 1, true), relative_path)
+            assert.is_nil(source:find(
+                'TooltipServiceScreen', 1, true), relative_path)
+        end
     end)
 
     it('keeps tooltip input layers independent of presentation modules',
