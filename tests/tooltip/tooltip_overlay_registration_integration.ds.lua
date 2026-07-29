@@ -1,4 +1,4 @@
--- Real overlay-discovery integration contracts for the singleton tooltip.
+-- Real overlay-discovery integration contracts for tooltip input intent.
 
 local tooltip = reqscript('dwarfui/tooltip')
 local overlay = require('plugins.overlay')
@@ -9,7 +9,7 @@ local function diagnostics()
     return ds.tooltip_state()
 end
 
-describe('live singleton tooltip overlay registration', function()
+describe('live tooltip input overlay registration', function()
     local native_subject
     local borrowed_screen
     local overlay_name
@@ -95,13 +95,15 @@ describe('live singleton tooltip overlay registration', function()
         ds.redraw()
         ds.await('registered overlay tooltip target selected', function()
             local state = diagnostics()
-            return state.target == target and state.screen.renderer.visible
+            return state.target == target and state.intent and
+                state.intent.text ==
+                    'Automation overlay tooltip outside its narrow root.'
         end)
 
         local state = diagnostics()
-        assert.is_true(state.screen.renderer.frame.l +
-            state.screen.renderer.frame.w - 1 >
-            widget.frame_body.clip_x2)
+        assert.is_nil(state.screen)
+        assert.is_nil(state.renderer)
+        assert.is_nil(state.overlay)
 
         -- The staged overlay becomes ineligible solely through its viewscreen
         -- contract while its borrowed backing screen remains unchanged.
@@ -111,7 +113,7 @@ describe('live singleton tooltip overlay registration', function()
         local ineligible_state = target_subject:inspect()
         assert.equals(target_state.tooltip, ineligible_state.tooltip)
         assert.is_nil(diagnostics().target)
-        assert.is_false(state.screen.renderer.visible)
+        assert.is_nil(diagnostics().intent)
 
         widget.viewscreens = original_viewscreens
         ds.redraw()
@@ -120,7 +122,8 @@ describe('live singleton tooltip overlay registration', function()
         ds.await('focus-eligible tooltip target selected again', function()
             local selected = diagnostics()
             return selected.target == target and
-                selected.screen.renderer.visible
+                selected.intent and
+                selected.intent.text == target_state.tooltip
         end)
 
         assert.is_true(overlay.overlay_command(
@@ -128,7 +131,7 @@ describe('live singleton tooltip overlay registration', function()
         ds.redraw()
         assert.is_false(overlay.isOverlayEnabled(overlay_name))
         assert.is_nil(diagnostics().target)
-        assert.is_false(state.screen.renderer.visible)
+        assert.is_nil(diagnostics().intent)
         assert.is_equal(borrowed_screen, dfhack.gui.getDFViewscreen(true),
             'tooltip overlay dismissed or replaced the native game screen')
     end)

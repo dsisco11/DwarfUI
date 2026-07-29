@@ -479,17 +479,17 @@ describe('registered Minecart Route overlay against the native menu', function()
             assert_recenter_asset(action)
 
             -- Cross from the stop to the action surface without losing the
-            -- target, present its registered tooltip, then click it.
+            -- target, publish its registered tooltip intent, then click it.
             zoom_subject:move_pointer()
             ds.redraw()
             assert.is_true(surface_subject:inspect().visible,
                 'pointer transfer from stop to rail closed the rendered rail')
-            ds.await('zoom action tooltip is presented by the singleton service',
+            ds.await('zoom action tooltip intent is published by the service',
                 function()
                     local tooltip_state = ds.tooltip_state()
                     return tooltip_state.target == action and
-                        tooltip_state.screen.renderer.visible and
-                        tooltip_state.screen.renderer.tooltip_text ==
+                        tooltip_state.intent and
+                        tooltip_state.intent.text ==
                             'Zoom to this stop'
                 end)
             local before_route_id, before_stop_id = stop.route.id, stop.stop.id
@@ -538,9 +538,9 @@ describe('registered Minecart Route overlay against the native menu', function()
             local pan_origin_x, pan_origin_y = expected_center_origin{
                 x=pan_x, y=before_pos.y, z=before_pos.z,
             }
-            ds.setViewPos{
+            ds.setViewPos({
                 x=pan_origin_x, y=pan_origin_y, z=before_pos.z,
-            }
+            }, ds.EScreenOrigin.TOP_LEFT)
             ds.await('native viewport applies the marker-follow pan',
                 function()
                     local corner = df.global.world.viewport.corner
