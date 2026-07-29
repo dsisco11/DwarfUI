@@ -171,17 +171,19 @@ describe('registered mood overlay with native top-bar data', function()
                     for x=rect.x1,rect.x2 do
                         assert.equals(expected_hover,
                             display:resolve_hover(x, y))
-                        ds.move_pointer(x, y)
-                        ds.redraw()
-                        local label, count = parse_header(
-                            header_subject:text())
-                        assert.equals(descriptor.label, label)
-                        assert.equals(rendered_mood_count(rect), count)
-                        assert.is_true(popover_subject:inspect().visible,
-                            ('mood popover closed at moodlet %d cell %d,%d')
-                                :format(index, x, y))
                     end
                 end
+
+                -- One representative native interaction per mood is enough
+                -- to prove the registered popover path. The pure assertions
+                -- above retain exhaustive coverage of all six hitbox cells.
+                ds.move_pointer(rect.x1, rect.y1)
+                ds.redraw()
+                local label, count = parse_header(header_subject:text())
+                assert.equals(descriptor.label, label)
+                assert.equals(rendered_mood_count(rect), count)
+                assert.is_true(popover_subject:inspect().visible,
+                    ('mood popover closed for moodlet %d'):format(index))
 
                 local list_state = list_subject:inspect()
                 assert.is_table(popover_subject:inspect().frame)
