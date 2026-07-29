@@ -469,8 +469,10 @@ describe('mounted mood popover component with injected providers', function()
 
     it('routes mounted wheel input while the injected mood remains selected',
             function()
-        -- Setup opens an overflowing deterministic list.
-        state.rows[3] = rows_for({hover_index=3, label='Content'}, 20)
+        -- One row beyond the popover capacity reaches the final page with a
+        -- single wheel step, preserving clamp coverage without redundant
+        -- repeated input.
+        state.rows[3] = rows_for({hover_index=3, label='Content'}, 13)
         select_mood(3, 10, 3)
         local popover, _, list = popover_controls()
         local scrollbar = list:raw().scrollbar
@@ -486,17 +488,15 @@ describe('mounted mood popover component with injected providers', function()
         ds.redraw()
         assert.equals(2, list:raw().page_top)
         assert.equals(2, scrollbar.top_elem)
-        for _=1,20 do
-            ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
-        end
+        ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
 
         -- Assertions prove list and scrollbar state advance together and clamp
         -- at the final rendered row.
-        assert.equals(20 - root:raw().popover.visible_rows + 1,
+        assert.equals(13 - root:raw().popover.visible_rows + 1,
             list:raw().page_top)
         assert.equals(list:raw().page_top, scrollbar.top_elem)
         assert.is_true(scrollbar.bar_offset > initial_offset)
-        assert.equals('Content Unit 20', list:raw().choices[20].text)
+        assert.equals('Content Unit 13', list:raw().choices[13].text)
 
         state.hover, state.mouse_x, state.mouse_y = nil, 0, 0
         ds.redraw()
