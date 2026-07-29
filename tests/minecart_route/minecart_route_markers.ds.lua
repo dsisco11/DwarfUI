@@ -494,6 +494,9 @@ describe('registered Minecart Route overlay against the native menu', function()
                 end)
             local before_route_id, before_stop_id = stop.route.id, stop.stop.id
             local before_pos = copy_coord(stop.stop.pos)
+            assert.is_false(initial_view_pos.z == before_pos.z,
+                'prepared save must begin on a different z-level from the ' ..
+                    'first clicked stop')
             local before_route_object = hauling.view_routes[stop.index]
             local before_stop_object = hauling.view_stops[stop.index]
             local before_route_rows, before_stop_rows =
@@ -501,6 +504,11 @@ describe('registered Minecart Route overlay against the native menu', function()
             zoom_subject:click()
             assert_centered_and_highlighted(before_pos,
                 'production rail click centers and highlights the stop')
+            assert.equals(before_pos.z, df.global.window_z,
+                'first production rail click did not change z-level')
+            zoom_subject:click()
+            assert_centered_and_highlighted(before_pos,
+                'production rail click on the current z-level changed target')
             local resolved_after_zoom = stop.route
             assert_selection_indicator(overlay, hauling, before_route_id)
             ds.await('native map viewport applies the zoomed stop origin',
