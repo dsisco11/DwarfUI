@@ -7,6 +7,8 @@
 
 local spy = require('luassert.spy')
 local utils = require('utils')
+local MarkerKind =
+    reqscript('dwarfui/minecart_route').MinecartRouteMarkerKind
 
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
@@ -157,6 +159,44 @@ local function captured_cell(capture, x, y)
     return row and row[x + 1] or nil
 end
 
+---Returns the first rendered text cell for one tooltip intent.
+---@param intent dwarfui.TooltipIntent
+---@return integer
+---@return integer
+local function tooltip_text_cell(intent)
+    local screen_width, screen_height = dfhack.screen.getWindowSize()
+    local content_width = math.max(1, math.min(60, screen_width - 2))
+    local lines = reqscript('dwarfui/text').wrap_text(
+        intent.text, content_width)
+    local width = 2
+    for _, line in ipairs(lines) do
+        width = math.max(width, #line + 2)
+    end
+    local height = #lines + 2
+    local left = math.max(0,
+        math.min(intent.anchor_x + 2, screen_width - width))
+    local top = math.max(0,
+        math.min(intent.anchor_y + 1, screen_height - height))
+    return left + 1, top + 1
+end
+
+---Asserts that one tooltip's current native text reached the final screen.
+---@param intent dwarfui.TooltipIntent
+---@param expected string
+local function assert_rendered_tooltip_text(intent, expected)
+    local x, y = tooltip_text_cell(intent)
+    ds.await('map tooltip reaches the final native render seam', function()
+        local state = ds.tooltip_state()
+        return state.presenter.last_rendered_revision and
+            state.presenter.last_rendered_revision >= intent.revision
+    end)
+    for offset=1,#expected do
+        local cell = dfhack.screen.readTile(x + offset - 1, y)
+        assert.equals(expected:byte(offset), cell and cell.ch,
+            ('tooltip text %q mismatch at offset %d'):format(expected, offset))
+    end
+end
+
 ---Returns a stable character signature for one native panel.
 ---@param capture dwarfspec.ScreenCapture
 ---@param bounds {x1: integer, y1: integer, x2: integer, y2: integer}
@@ -207,7 +247,6 @@ end
 local function assert_selection_indicator(overlay, hauling, route_id)
     local y = assert(overlay.layout:find_route_header_y(hauling, route_id,
         overlay.focus_provider()), 'selected route header is not visible') + 1
-    ds.redraw()
     ds.await('selection indicator renders on the native route header', function()
         local capture = capture_panel('minecart_selection_indicator',
             overlay.layout.bounds)
@@ -220,7 +259,6 @@ end
 ---Asserts that every cell in the Premium recenter asset reached the screen.
 ---@param action dwarfui.AssetButton
 local function assert_recenter_asset(action)
-    ds.redraw()
     local body = assert(action.frame_body,
         'production recenter action has no rendered body')
     assert.equals(3, body.width)
@@ -285,7 +323,6 @@ end
 ---Asserts one rendered marker label and its foreground color.
 ---@param marker dwarfui.MinecartRouteMarkerDescriptor
 local function assert_rendered_marker_label(marker)
-    ds.redraw()
     local capture = ds.capture_screen('minecart_marker_label', {
         max_width=marker.label_x + #marker.label,
         max_height=marker.label_y + 1,
@@ -320,11 +357,17 @@ describe('registered Minecart Route overlay against the native menu', function()
         local zoom_subject
         local rail, action
         local initial_scroll, initial_selection, initially_open
+        local initial_overlay_enabled
         local paint_tile_spy
         local ok, failure = xpcall(function()
             -- Mount the real fortress screen as the input subject for the
             -- DwarfUI route-overlay behavior exercised below.
             native_subject = ds.mountNativeScreen()
+            initial_overlay_enabled =
+                require('plugins.overlay').isOverlayEnabled(
+                    REGISTERED_WIDGET)
+            assert.is_true(initial_overlay_enabled,
+                'production marker overlay must begin enabled')
             initially_open = ds.hasFocus('dwarfmode/Hauling')
             local initial_view_pos = ds.getViewPos()
             -- The production zoom action writes the native viewport directly.
@@ -401,7 +444,6 @@ describe('registered Minecart Route overlay against the native menu', function()
 
             -- Route headers are never hover targets.
             ds.move_pointer(header.x, header.y)
-            ds.redraw()
             assert.is_false(surface_subject:inspect().visible,
                 'route header incorrectly rendered the stop action rail')
             ds.mouseInput(ds.EMouseButton.LEFT)
@@ -412,7 +454,6 @@ describe('registered Minecart Route overlay against the native menu', function()
             for _, y in ipairs({stop.y1, stop.y1 + 1, stop.y2}) do
                 for _, x in ipairs({stop.x1, stop.x1 + 2, stop.x2}) do
                     ds.move_pointer(x, y)
-                    ds.redraw()
                     local state = surface_subject:inspect()
                     assert.is_true(state.visible,
                         ('stop cell %d,%d did not render the action rail')
@@ -423,7 +464,6 @@ describe('registered Minecart Route overlay against the native menu', function()
                         'action rail is not aligned with the hovered stop bottom')
                 end
             end
-            local rail = overlay.stop_rail
             assert.equals(1, #rail.subviews,
                 'production rail must own exactly one moving surface')
             assert.is_equal(rail.surface, rail.subviews[1])
@@ -467,11 +507,9 @@ describe('registered Minecart Route overlay against the native menu', function()
             -- Select a different route first so the following native stop-row
             -- click must visibly change the selection back to this stop's route.
             ds.move_pointer(other_header.x, other_header.y)
-            ds.redraw()
             ds.mouseInput(ds.EMouseButton.LEFT)
             assert_selection_indicator(overlay, hauling, other_header.route.id)
             ds.move_pointer(stop.x1 + 2, stop.y1 + 1)
-            ds.redraw()
             assert.is_true(surface_subject:inspect().visible,
                 'stop action rail did not return after another route selection')
             ds.mouseInput(ds.EMouseButton.LEFT)
@@ -481,7 +519,6 @@ describe('registered Minecart Route overlay against the native menu', function()
             -- Cross from the stop to the action surface without losing the
             -- target, publish its registered tooltip intent, then click it.
             zoom_subject:move_pointer()
-            ds.redraw()
             assert.is_true(surface_subject:inspect().visible,
                 'pointer transfer from stop to rail closed the rendered rail')
             ds.await('zoom action tooltip intent is published by the service',
@@ -518,16 +555,18 @@ describe('registered Minecart Route overlay against the native menu', function()
                         corner.y == df.global.window_y and
                         corner.z == df.global.window_z
                 end)
+            -- DwarfSpec centers the real tile and places the native pointer
+            -- over it. Reproject after the camera movement.
+            ds.move_pointer(before_pos, ds.EPointerSpace.WORLD_TILE)
             local marker = find_stop_marker(overlay.projection:project(
                 resolved_after_zoom, overlay.viewport_provider()), stop.stop)
-            assert.equals('same_z', marker.marker_kind)
+            assert.equals(MarkerKind.SAME_Z, marker.marker_kind)
             assert.equals(string.char(9), marker.marker_glyph)
             assert.same(expected_premium_ui_position(before_pos),
                 marker.screen_pos,
                 'marker does not use the Premium world-to-UI transform')
             assert.equals(marker.screen_pos.x, marker.label_x)
             assert.equals(marker.screen_pos.y + 2, marker.label_y)
-            assert_rendered_marker(marker, paint_tile_spy)
             assert.is_true(marker.label_x >= overlay.frame_body.x1 and
                 marker.label_x + #marker.label - 1 <= overlay.frame_body.x2 and
                 marker.label_y >= overlay.frame_body.y1 and
@@ -537,7 +576,105 @@ describe('registered Minecart Route overlay against the native menu', function()
                         marker.label_x + #marker.label - 1,
                         overlay.frame_body.x1, overlay.frame_body.y1,
                         overlay.frame_body.x2, overlay.frame_body.y2))
+            ds.move_pointer(header.x, header.y)
+            assert_rendered_marker(marker, paint_tile_spy)
             assert_rendered_marker_label(marker)
+
+            local map_handle = assert(
+                overlay.map_tooltip_handles[stop.stop.id],
+                'same-z marker did not register its exact native tile')
+            ds.move_pointer(before_pos, ds.EPointerSpace.WORLD_TILE)
+            local hover_screen_x, hover_screen_y =
+                dfhack.screen.getMousePos()
+            ds.await('native marker publishes its map-tile tooltip',
+                function()
+                    local state = ds.tooltip_state()
+                    return state.target == map_handle and state.intent and
+                        state.intent.text == stop.stop.name
+                end)
+            local sampled_pos = assert(dfhack.gui.getMousePos(),
+                'physical marker pointer has no native map position')
+            assert.same(before_pos, copy_coord(sampled_pos),
+                'physical marker pointer did not sample the native stop tile')
+            local map_state = ds.tooltip_state()
+            assert.is_equal(map_handle, map_state.target)
+            assert.equals(hover_screen_x, map_state.intent.anchor_x)
+            assert.equals(hover_screen_y, map_state.intent.anchor_y)
+            assert.equals(stop.stop.name, marker.name)
+            assert_rendered_tooltip_text(map_state.intent, stop.stop.name)
+
+            -- Recenter the same x/y on another z-level. The projected marker
+            -- remains visible, but its exact-tile registration clears.
+            local off_z = before_pos.z + 1 < df.global.world.map.z_count and
+                before_pos.z + 1 or before_pos.z - 1
+            assert.is_true(off_z >= 0 and off_z ~= before_pos.z,
+                'prepared map requires an adjacent z-level')
+            ds.move_pointer({
+                x=before_pos.x,
+                y=before_pos.y,
+                z=off_z,
+            }, ds.EPointerSpace.WORLD_TILE)
+            local off_z_marker = find_stop_marker(
+                overlay.projection:project(resolved_after_zoom,
+                    overlay.viewport_provider()), stop.stop)
+            assert.is_false(
+                off_z_marker.marker_kind == MarkerKind.SAME_Z,
+                'different-z marker retained same-z marker kind')
+            assert.equals(marker.screen_pos.x, off_z_marker.screen_pos.x,
+                'z-only viewport change moved the projected marker x')
+            assert.equals(marker.screen_pos.y, off_z_marker.screen_pos.y,
+                'z-only viewport change moved the projected marker y')
+            local off_z_state = ds.tooltip_state()
+            assert.is_nil(overlay.map_tooltip_handles[stop.stop.id])
+            assert.is_nil(off_z_state.target)
+            assert.is_nil(off_z_state.intent)
+            local off_z_sample = assert(dfhack.gui.getMousePos(),
+                'off-z physical pointer has no native map position')
+            assert.same({x=before_pos.x, y=before_pos.y, z=off_z},
+                copy_coord(off_z_sample))
+            assert_rendered_marker(off_z_marker, paint_tile_spy)
+
+            ds.move_pointer(before_pos, ds.EPointerSpace.WORLD_TILE)
+            marker = find_stop_marker(overlay.projection:project(
+                resolved_after_zoom, overlay.viewport_provider()), stop.stop)
+            map_handle = assert(overlay.map_tooltip_handles[stop.stop.id],
+                'same-z registration did not return after z restoration')
+            ds.await('same-z marker tooltip returns after z restoration',
+                function()
+                    local state = ds.tooltip_state()
+                    return state.target == map_handle and state.intent and
+                        state.intent.text == stop.stop.name
+                end)
+
+            -- The DwarfUI-owned action rail is painted over the map. Its
+            -- widget target takes precedence over any map tile beneath it.
+            ds.move_pointer(stop.x1 + 2, stop.y1 + 1)
+            assert.is_true(surface_subject:inspect().visible,
+                'stop row did not reopen the action rail for occlusion')
+            zoom_subject:move_pointer()
+            ds.await('DwarfUI surface occludes the map tooltip', function()
+                local state = ds.tooltip_state()
+                return state.target == action and state.intent and
+                    state.intent.text == 'Zoom to this stop'
+            end)
+
+            overlay:clear_selection()
+            assert.is_nil(overlay.selection:get_selected_route_id())
+            assert.is_nil(overlay.map_tooltip_handles[stop.stop.id],
+                'selection clear retained a native map target')
+            local cleared_state = ds.tooltip_state()
+            assert.is_false(cleared_state.target == map_handle,
+                'selection clear retained the active native map target')
+            assert.is_false(cleared_state.intent and
+                cleared_state.intent.text == stop.stop.name,
+                'selection clear retained the native map tooltip intent')
+
+            ds.move_pointer(stop.x1 + 2, stop.y1 + 1)
+            ds.mouseInput(ds.EMouseButton.LEFT)
+            assert_selection_indicator(
+                overlay, hauling, stop.route.id)
+            assert.is_table(overlay.map_tooltip_handles[stop.stop.id],
+                'native route reselection did not restore map targets')
 
             -- Pan the real map a few tiles while keeping this stop visible,
             -- then prove the registered overlay follows the native viewport.
@@ -568,8 +705,6 @@ describe('registered Minecart Route overlay against the native menu', function()
                 'route marker did not follow the changed native viewport')
             assert_rendered_marker(marker_after_pan, paint_tile_spy)
             assert_rendered_marker_label(marker_after_pan)
-            assert.equals(before_route_id, hauling.view_routes[stop.index].id)
-            assert.equals(before_stop_id, hauling.view_stops[stop.index].id)
             assert.is_equal(before_route_object,
                 hauling.view_routes[stop.index])
             assert.is_equal(before_stop_object,
@@ -582,6 +717,7 @@ describe('registered Minecart Route overlay against the native menu', function()
 
             -- Wheel input over the rail belongs to the rail and must neither
             -- scroll the list nor change the map z-level.
+            ds.move_pointer(rail.rail_bounds.x2, rail.rail_bounds.y1 + 1)
             local z_before_wheel, scroll_before_wheel = df.global.window_z,
                 hauling.scroll_position
             ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
@@ -592,7 +728,6 @@ describe('registered Minecart Route overlay against the native menu', function()
             -- the native list. Find a newly occupied row and prove a later
             -- rail click targets that current stop, not the old one.
             ds.move_pointer(stop.x1 + 2, stop.y1 + 1)
-            ds.redraw()
             local before_scroll_capture = capture_panel(
                 'minecart_rows_before_scroll', overlay.layout.bounds)
             local before_scroll_signature = panel_signature(
@@ -603,7 +738,6 @@ describe('registered Minecart Route overlay against the native menu', function()
                 -- DwarfSpec dispatches the wheel at its current virtual pointer
                 -- position and mirrors that position to native mouse input.
                 ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)
-                ds.redraw()
                 if hauling.scroll_position ~= before_scroll then
                     moved_stop = visible_stop_at(hauling, overlay.layout,
                         stop.x1 + 2, stop.y1 + 1)
@@ -627,29 +761,109 @@ describe('registered Minecart Route overlay against the native menu', function()
             assert.is_true(surface_subject:inspect().visible,
                 'rail did not rebind to the newly visible native stop')
             ds.move_pointer(rail.rail_bounds.x2, rail.rail_bounds.y1 + 1)
-            ds.redraw()
             zoom_subject:click()
             assert_centered_and_highlighted(copy_coord(moved_stop.stop.pos),
                 'rebound rail click targets the new native stop')
+            assert.is_true(next(overlay.map_tooltip_handles) ~= nil,
+                'selected route has no map targets before menu close')
 
             ds.input('LEAVESCREEN')
             ds.await('native Hauling menu closes', function()
                 return ds.hasFocus('dwarfmode/Default')
             end)
-            ds.redraw()
             ds.await('rail clears after native menu closure', function()
                 return overlay.stop_rail:get_target() == nil and
-                    not overlay.stop_rail.surface.visible
+                    not overlay.stop_rail.surface.visible and
+                    next(overlay.map_tooltip_handles) == nil and
+                    ds.tooltip_state().intent == nil
             end)
             assert.is_false(overlay.layout:is_supported_focus(
                 overlay.focus_provider()),
                 'registered overlay remained eligible after Hauling closed')
+
+            -- Recreate native registrations, then prove configuration and
+            -- module lifecycle boundaries retire their owning handles.
+            hauling.scroll_position = initial_scroll
+            ds.input('D_HAULING')
+            ds.await('Hauling reopens for overlay lifecycle checks',
+                function()
+                    return ds.hasFocus('dwarfmode/Hauling')
+                end)
+            ds.move_pointer(
+                copy_coord(stop.stop.pos), ds.EPointerSpace.WORLD_TILE)
+            ds.move_pointer(stop.x1 + 2, stop.y1 + 1)
+            ds.mouseInput(ds.EMouseButton.LEFT)
+            assert.is_true(next(overlay.map_tooltip_handles) ~= nil,
+                'native reselection did not create lifecycle test handles')
+
+            dfhack.run_command(
+                'overlay', 'disable', REGISTERED_WIDGET)
+            ds.await('overlay disable retires native map handles',
+                function()
+                    return next(overlay.map_tooltip_handles) == nil and
+                        ds.tooltip_state().intent == nil
+                end)
+            dfhack.run_command(
+                'overlay', 'enable', REGISTERED_WIDGET)
+
+            ds.await('reenabled marker overlay returns', function()
+                local rail_ok, candidate = pcall(
+                    ds.get, 'stop_action_rail', overlay_source)
+                if not rail_ok then return false end
+                local candidate_overlay = candidate:raw().parent_view
+                if not candidate_overlay or
+                        not candidate_overlay.layout.bounds then
+                    return false
+                end
+                overlay = candidate_overlay
+                return true
+            end)
+            hauling.scroll_position = initial_scroll
+            ds.move_pointer(
+                copy_coord(stop.stop.pos), ds.EPointerSpace.WORLD_TILE)
+            ds.move_pointer(stop.x1 + 2, stop.y1 + 1)
+            ds.mouseInput(ds.EMouseButton.LEFT)
+            assert.is_true(next(overlay.map_tooltip_handles) ~= nil,
+                'reenabled overlay did not recreate native map handles')
+
+            local pre_reload_overlay = overlay
+            dfhack.run_command('dwarfui', 'reload')
+            ds.await('reload retires old native map handles', function()
+                return next(pre_reload_overlay.map_tooltip_handles) == nil and
+                    ds.tooltip_state().intent == nil
+            end)
+            ds.await('reloaded marker overlay returns', function()
+                local rail_ok, candidate = pcall(
+                    ds.get, 'stop_action_rail', overlay_source)
+                if not rail_ok then return false end
+                local candidate_overlay = candidate:raw().parent_view
+                if not candidate_overlay or
+                        candidate_overlay == pre_reload_overlay then
+                    return false
+                end
+                overlay = candidate_overlay
+                return true
+            end)
+            assert.is_nil(overlay.selection:get_selected_route_id())
+            assert.is_nil(next(overlay.map_tooltip_handles))
         end, debug.traceback)
 
         if hauling then hauling.scroll_position = initial_scroll end
         local indicator = df.global.game.main_interface.recenter_indicator_m
         indicator.x, indicator.y, indicator.z = saved.indicator.x,
             saved.indicator.y, saved.indicator.z
+        if initial_overlay_enabled ~= nil then
+            local overlay_plugin = require('plugins.overlay')
+            local enabled =
+                overlay_plugin.isOverlayEnabled(REGISTERED_WIDGET)
+            if initial_overlay_enabled and not enabled then
+                dfhack.run_command(
+                    'overlay', 'enable', REGISTERED_WIDGET)
+            elseif not initial_overlay_enabled and enabled then
+                dfhack.run_command(
+                    'overlay', 'disable', REGISTERED_WIDGET)
+            end
+        end
         if overlay then
             overlay:clear_overlay_state()
             overlay.selection.selected_route_id = initial_selection

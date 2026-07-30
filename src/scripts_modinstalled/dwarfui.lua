@@ -24,6 +24,20 @@ local OVERLAY_SCRIPTS = {
     'dwarfui-unit-card-task-details',
 }
 
+---Retires every current DwarfUI overlay before DFHack discards its registry.
+local function retire_overlays()
+    local db = require('plugins.overlay').get_state().db
+    for _, script in ipairs(OVERLAY_SCRIPTS) do
+        local prefix = script .. '.'
+        for name, entry in pairs(db) do
+            if name:sub(1, #prefix) == prefix and
+                    entry.widget.overlay_ondisable then
+                entry.widget.overlay_ondisable()
+            end
+        end
+    end
+end
+
 ---Returns whether a value implements the DwarfUI registry contract.
 ---@param registry any
 ---@return boolean
@@ -90,6 +104,7 @@ function reload()
             table.insert(old_modules, name)
         end
     end
+    retire_overlays()
     clear_script_environments(old_modules)
 
     dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)
