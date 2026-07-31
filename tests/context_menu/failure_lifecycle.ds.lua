@@ -42,16 +42,29 @@ local function probe()
         'context-menu failure probe state is unavailable')
 end
 
----Reloads the complete DwarfUI generation and verifies a clean service.
+---Reloads the complete DwarfUI generation and returns its unregistered target.
+---@return any
 local function reload_clean()
     dfhack.run_command('dwarfui', 'reload')
-    ds.await('fresh context-menu generation is active', function()
-        local diagnostics = service():get_diagnostics()
-        return diagnostics.started and not diagnostics.disabled and
+    ds.wait_frames(2)
+    local diagnostics = service():get_diagnostics()
+    assert.is_true(
+        diagnostics.started and not diagnostics.disabled and
             not diagnostics.open and
             diagnostics.registrations.widget_registration_count == 0 and
-            diagnostics.registrations.map_registration_count == 0
-    end)
+            diagnostics.registrations.map_registration_count == 0,
+        ('reload was not clean: started=%s disabled=%s open=%s ' ..
+            'widgets=%s maps=%s error=%s'):format(
+                tostring(diagnostics.started),
+                tostring(diagnostics.disabled),
+                tostring(diagnostics.open),
+                tostring(diagnostics.registrations
+                    .widget_registration_count),
+                tostring(diagnostics.registrations
+                    .map_registration_count),
+                tostring(diagnostics.last_error)))
+    return assert(probe().context_target,
+        'reload did not recreate the failure probe target')
 end
 
 describe('live context-menu failure lifecycle', function()
@@ -66,7 +79,7 @@ describe('live context-menu failure lifecycle', function()
         local original_hook_handler
         local original_discover
         local ok, failure = xpcall(function()
-            ds.mountSaveGame('current')
+            ds.mountSaveGame('TestWorld 01')
             service():clear_world_state()
             native_subject = ds.mountNativeScreen()
             initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
@@ -84,6 +97,15 @@ describe('live context-menu failure lifecycle', function()
                 source='overlay',
                 overlay=overlay_name,
             }):raw()
+            assert.is_true(api().register(target, definition()))
+            ds.await('failure probe context-menu input hook is ready',
+                function()
+                    local diagnostics = service():get_diagnostics()
+                    return diagnostics.registrations
+                            .widget_registration_count == 1 and
+                        diagnostics.hook.native_tracked and
+                        diagnostics.hook.handler_installed
+                end)
             local body = target.frame_body
             local x = math.floor((body.x1 + body.x2) / 2)
             local y = math.floor((body.y1 + body.y2) / 2)
@@ -96,7 +118,7 @@ describe('live context-menu failure lifecycle', function()
             end
             ds.move_pointer(x, y)
             local backing_before = #probe().inputs
-            ds.input({_MOUSE_R=true, CUSTOM_PRE_FAILURE=true})
+            ds.input({_MOUSE_R=true, _MOUSE_R_DOWN=true})
             ds.await('pre-ownership failure disables generation', function()
                 return service():is_disabled()
             end)
@@ -105,19 +127,19 @@ describe('live context-menu failure lifecycle', function()
                 'pre-ownership failure did not delegate unchanged')
             assert.is_true(probe().inputs[#probe().inputs]._MOUSE_R)
             assert.is_true(
-                probe().inputs[#probe().inputs].CUSTOM_PRE_FAILURE)
+                probe().inputs[#probe().inputs]._MOUSE_R_DOWN)
             assert.equals('opening resolution',
                 service():get_diagnostics().last_failure.stage)
 
             local transparent_before = #probe().inputs
-            ds.input({_MOUSE_R=true, CUSTOM_TRANSPARENT=true})
+            ds.input({_MOUSE_R=true, _MOUSE_R_DOWN=true})
             assert.equals(transparent_before + 1, #probe().inputs)
             assert.is_true(
-                probe().inputs[#probe().inputs].CUSTOM_TRANSPARENT)
+                probe().inputs[#probe().inputs]._MOUSE_R_DOWN)
             sampler.capture = original_capture
             original_capture = nil
 
-            reload_clean()
+            target = reload_clean()
             assert.is_true(api().register(target, definition()))
             ds.redraw()
             ds.await('native hook is installed for hook-failure coverage',
@@ -130,7 +152,7 @@ describe('live context-menu failure lifecycle', function()
                 error('expected input-hook dispatch failure')
             end
             local hook_backing_before = #probe().inputs
-            ds.input({_MOUSE_R=true, CUSTOM_HOOK_FAILURE=true})
+            ds.input({_MOUSE_R=true, _MOUSE_R_DOWN=true})
             ds.await('input-hook failure disables generation', function()
                 return service():is_disabled()
             end)
@@ -138,7 +160,7 @@ describe('live context-menu failure lifecycle', function()
                 'pre-ownership hook failure did not delegate unchanged')
             assert.is_true(probe().inputs[#probe().inputs]._MOUSE_R)
             assert.is_true(
-                probe().inputs[#probe().inputs].CUSTOM_HOOK_FAILURE)
+                probe().inputs[#probe().inputs]._MOUSE_R_DOWN)
             assert.equals('input hook',
                 service():get_diagnostics().last_failure.stage)
             assert.equals(1,
@@ -146,7 +168,7 @@ describe('live context-menu failure lifecycle', function()
             hook_state.handler = original_hook_handler
             original_hook_handler = nil
 
-            reload_clean()
+            target = reload_clean()
             assert.is_true(api().register(target, definition()))
             ds.redraw()
             ds.move_pointer(x, y)
@@ -162,7 +184,7 @@ describe('live context-menu failure lifecycle', function()
             local owned_backing_before = #probe().inputs
             gui.simulateInput(dfhack.gui.getCurViewscreen(), {
                 SELECT=true,
-                CUSTOM_OWNED_FAILURE=true,
+                D_PAUSE=true,
             })
             ds.redraw()
             assert.is_false(service():is_open())
@@ -173,7 +195,7 @@ describe('live context-menu failure lifecycle', function()
                 service():get_diagnostics().last_failure.stage)
             screen.menu_window.onInput = original_on_input
 
-            reload_clean()
+            target = reload_clean()
             assert.is_true(api().register(target, definition()))
             ds.redraw()
             ds.move_pointer(x, y)
@@ -194,7 +216,7 @@ describe('live context-menu failure lifecycle', function()
             assert.equals('screen render',
                 service():get_diagnostics().last_failure.stage)
 
-            reload_clean()
+            target = reload_clean()
             local manager = registrations()
             original_discover = manager._discover_attachment_roots
             manager._discover_attachment_roots = function()
@@ -212,7 +234,7 @@ describe('live context-menu failure lifecycle', function()
             manager._discover_attachment_roots = original_discover
             original_discover = nil
 
-            reload_clean()
+            target = reload_clean()
             local clean = service():get_diagnostics()
             assert.is_false(clean.open)
             assert.is_false(clean.disabled)
@@ -227,8 +249,7 @@ describe('live context-menu failure lifecycle', function()
             assert.is_function(
                 dfhack.onStateChange.dwarfui_context_menu)
             assert.is_false(
-                dfhack.gui.getCurFocus():find('dwarfui/context-menu',
-                    1, true) ~= nil)
+                ds.hasFocus('dfhack/lua/dwarfui/context-menu'))
         end, debug.traceback)
 
         if sampler and original_capture then

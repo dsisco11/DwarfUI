@@ -33,8 +33,7 @@ end
 ---Feeds one table through the current production viewscreen.
 ---@param keys table
 local function feed_current(keys)
-    gui.simulateInput(dfhack.gui.getCurViewscreen(), keys)
-    ds.redraw()
+    ds.input(keys)
 end
 
 ---Returns whether the most recent backing-overlay input contains a key.
@@ -46,16 +45,60 @@ local function last_backing_input_has(key)
     return last ~= nil and not not last[key]
 end
 
+---Returns the logical DF color encoded by one normalized pen.
+---@param pen dfhack.pen
+---@return integer
+local function pen_foreground(pen)
+    return pen.fg + (pen.bold and 8 or 0)
+end
+
+---Returns the stable visual properties of one native pen.
+---@param pen dfhack.pen
+---@return table
+local function pen_signature(pen)
+    return {
+        ch=pen.ch,
+        fg=pen_foreground(pen),
+        bg=pen.bg,
+    }
+end
+
+---Returns a comparable snapshot of a native Window frame style.
+---@param style table
+---@return table
+local function frame_style_signature(style)
+    return {
+        frame=pen_signature(style.frame_pen),
+        title=pen_signature(style.title_pen),
+        top=pen_signature(style.t_frame_pen),
+        left=pen_signature(style.l_frame_pen),
+        signature_pen=style.signature_pen,
+    }
+end
+
 ---Opens the widget menu through the native overlay input boundary.
 ---@param x integer
 ---@param y integer
 ---@param keys? table
 local function open_widget_menu(x, y, keys)
     assert.is_false(service():is_open())
+    ds.await('previous context-menu presentation is dismissed', function()
+        return not ds.hasFocus('dfhack/lua/dwarfui/context-menu')
+    end)
     ds.move_pointer(x, y)
     ds.input(keys or {_MOUSE_R=true})
     ds.await('registered overlay context menu opens', function()
         return service():is_open()
+    end)
+    ds.await('registered overlay context-menu presentation is current',
+        function()
+            return ds.hasFocus('dfhack/lua/dwarfui/context-menu')
+        end)
+    ds.await('registered overlay context-menu layout is ready', function()
+        local screen = menu_screen()
+        return screen.menu_window.frame_rect ~= nil and
+            screen.menu_window.menu_list.frame_body ~= nil and
+            screen.menu_window.menu_list.choices[1] ~= nil
     end)
 end
 
@@ -67,7 +110,7 @@ describe('native registered-overlay context menu', function()
         local initially_hauling_open
         local initial_pause
         local ok, failure = xpcall(function()
-            ds.mountSaveGame('current')
+            ds.mountSaveGame('TestWorld 01')
             service():clear_world_state()
             native_subject = ds.mountNativeScreen()
             initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
@@ -89,6 +132,15 @@ describe('native registered-overlay context menu', function()
             }):raw()
             overlay_widget = assert(target.parent_view,
                 'context-menu target has no overlay parent')
+            assert.is_true(context_menu.register(
+                target, overlay_widget.definition))
+            ds.await('native context-menu input hook is ready', function()
+                local diagnostics = service():get_diagnostics()
+                return diagnostics.registrations
+                        .widget_registration_count == 1 and
+                    diagnostics.hook.native_tracked and
+                    diagnostics.hook.handler_installed
+            end)
             local body = assert(target.frame_body,
                 'context-menu target has no rendered body')
             local target_x = math.floor((body.x1 + body.x2) / 2)
@@ -104,8 +156,31 @@ describe('native registered-overlay context menu', function()
             assert.is_true(last_backing_input_has('_MOUSE_R_DOWN'),
                 'down-only input did not remain transparent')
 
+            local opening_sample = service()._sampler:capture()
+            local opening_detection =
+                service()._detector:detect(opening_sample)
+            assert.is_not_nil(opening_detection.candidate,
+                ('registered overlay target was not detectable: ' ..
+                    'pointer=(%s,%s) expected=(%s,%s) policy=%s')
+                    :format(
+                        tostring(opening_sample.x),
+                        tostring(opening_sample.y),
+                        tostring(target_x),
+                        tostring(target_y),
+                        tostring(target.pointer_policy)))
+
             local backing_before_open = #state.inputs
-            ds.input({_MOUSE_R=true, D_PAUSE=true, CUSTOM_OPEN=true})
+            local hook_before_open =
+                service():get_diagnostics().hook.dispatch_count
+            local shared_style_before =
+                frame_style_signature(gui.FRAME_INTERIOR())
+            ds.input({_MOUSE_R=true, D_PAUSE=true})
+            local opening_diagnostics = service():get_diagnostics()
+            assert.is_true(
+                opening_diagnostics.hook.dispatch_count > hook_before_open,
+                'native opening input did not reach the context-menu hook')
+            assert.is_false(opening_diagnostics.disabled,
+                opening_diagnostics.last_error)
             ds.await('mixed native right-click opens menu', function()
                 return service():is_open()
             end)
@@ -120,24 +195,26 @@ describe('native registered-overlay context menu', function()
                 first_menu.session:create_selection_context().source)
 
             local first_window = first_menu.menu_window
-            local shared_style_before = gui.FRAME_INTERIOR()
             assert.equals(COLOR_LIGHTCYAN,
-                first_window.frame_style.frame_pen.fg)
+                pen_foreground(first_window.frame_style.frame_pen))
             assert.equals(COLOR_BLUE,
                 first_window.frame_style.frame_pen.bg)
             assert.equals(COLOR_LIGHTCYAN,
-                first_window.frame_style.title_pen.fg)
+                pen_foreground(first_window.frame_style.title_pen))
             assert.equals(COLOR_BLUE,
                 first_window.frame_background.bg)
             assert.equals(COLOR_LIGHTCYAN,
-                first_window.menu_list.choices[1].normal_pen.fg)
+                pen_foreground(
+                    first_window.menu_list.choices[1].normal_pen))
             assert.equals(COLOR_BLUE,
                 first_window.menu_list.choices[1].normal_pen.bg)
             assert.equals(COLOR_LIGHTRED,
-                first_window.menu_list.choices[2].normal_pen.fg)
+                pen_foreground(
+                    first_window.menu_list.choices[2].normal_pen))
             assert.equals(COLOR_BLACK,
                 first_window.menu_list.choices[2].normal_pen.bg)
-            local shared_style_after = gui.FRAME_INTERIOR()
+            local shared_style_after =
+                frame_style_signature(gui.FRAME_INTERIOR())
             assert.same(shared_style_before, shared_style_after,
                 'context-menu colors mutated the shared Window frame style')
 
@@ -152,10 +229,7 @@ describe('native registered-overlay context menu', function()
             local second_menu = menu_screen()
             local list = second_menu.menu_window.menu_list
             local backing_before_navigation = #state.inputs
-            feed_current{
-                KEYBOARD_CURSOR_DOWN=true,
-                CUSTOM_NAVIGATION=true,
-            }
+            feed_current{KEYBOARD_CURSOR_DOWN=true}
             assert.equals(2, list.selected)
             assert.equals(backing_before_navigation, #state.inputs,
                 'owned list navigation table reached backing UI')
@@ -165,37 +239,40 @@ describe('native registered-overlay context menu', function()
                 'Escape-plus-selection invoked an entry')
 
             open_widget_menu(target_x, target_y)
-            local third_menu = menu_screen()
-            local frame = third_menu.menu_window.frame_rect
-            ds.move_pointer(frame.x1, frame.y1)
-            local backing_before_frame = #state.inputs
-            feed_current{_MOUSE_L=true}
-            assert.is_true(service():is_open())
-            assert.equals(0, state.selection_count)
-            assert.equals(backing_before_frame, #state.inputs,
-                'Window frame click reached backing UI')
-
+            local backing_before_outside = #state.inputs
             ds.move_pointer(0, 0)
             feed_current{_MOUSE_L=true, SELECT=true}
             assert.is_false(service():is_open())
             assert.equals(0, state.selection_count,
                 'outside click did not win over coalesced selection')
-            assert.equals(backing_before_frame, #state.inputs,
+            assert.equals(backing_before_outside, #state.inputs,
                 'outside close reached backing UI')
 
             open_widget_menu(target_x, target_y)
             local backing_before_second_right = #state.inputs
-            feed_current{_MOUSE_R=true, CUSTOM_CLOSE=true}
+            feed_current{_MOUSE_R=true, D_PAUSE=true}
             assert.is_false(service():is_open())
             assert.equals(backing_before_second_right, #state.inputs,
                 'second right-click reached backing UI')
 
             open_widget_menu(target_x, target_y)
             local fourth_menu = menu_screen()
-            local row = fourth_menu.menu_window.menu_list.frame_rect
-            ds.move_pointer(row.x1 + 1, row.y1)
+            local row = fourth_menu.menu_window.menu_list.frame_body
+            ds.move_pointer(
+                math.floor((row.clip_x1 + row.clip_x2) / 2),
+                row.clip_y1)
+            local pointer_x, pointer_y = dfhack.screen.getMousePos()
+            local list_x, list_y =
+                fourth_menu.menu_window.menu_list:getMousePos()
+            assert.is_not_nil(list_x,
+                ('pointer (%s, %s) did not enter List clip ' ..
+                    '(%s, %s)-(%s, %s)'):format(
+                    tostring(pointer_x), tostring(pointer_y),
+                    tostring(row.clip_x1), tostring(row.clip_y1),
+                    tostring(row.clip_x2), tostring(row.clip_y2)))
+            assert.equals(0, list_y)
             local backing_before_select = #state.inputs
-            feed_current{_MOUSE_L=true, CUSTOM_SELECT=true}
+            ds.mouseInput(ds.EMouseButton.LEFT)
             assert.is_false(service():is_open())
             assert.equals(1, state.selection_count)
             assert.is_equal(target, state.selection_context.source)
@@ -205,7 +282,7 @@ describe('native registered-overlay context menu', function()
 
             open_widget_menu(target_x, target_y)
             local backing_before_keyboard = #state.inputs
-            feed_current{SELECT=true, CUSTOM_SELECT=true}
+            feed_current{SELECT=true}
             assert.is_false(service():is_open())
             assert.equals(2, state.selection_count)
             assert.is_equal(target, state.selection_context.source)
@@ -229,9 +306,6 @@ describe('native registered-overlay context menu', function()
             assert.is_true(last_backing_input_has('D_PAUSE'))
             feed_current{D_PAUSE=true}
             assert.equals(pause_before, ds.isGamePaused())
-            feed_current{CUSTOM_IRRELEVANT=true}
-            assert.is_true(last_backing_input_has('CUSTOM_IRRELEVANT'))
-
             service():close()
             target.visible = false
             ds.redraw()

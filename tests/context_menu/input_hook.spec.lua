@@ -29,8 +29,14 @@ describe('context-menu input hook', function()
             function()
         local calls = {}
         local overlay = {
-            feed_viewscreen_widgets=function(keys)
-                table.insert(calls, keys)
+            feed_viewscreen_widgets=function(viewscreen_name, viewscreen,
+                    keys, marker)
+                table.insert(calls, {
+                    viewscreen_name=viewscreen_name,
+                    viewscreen=viewscreen,
+                    keys=keys,
+                    marker=marker,
+                })
                 return 'first', nil, 'third'
             end,
         }
@@ -40,16 +46,24 @@ describe('context-menu input hook', function()
         end)
         module.manager:ensure_native()
 
+        local viewscreen = {}
         local handled = {_MOUSE_R=true, CUSTOM=true}
-        assert.is_true(overlay.feed_viewscreen_widgets(handled))
+        assert.is_true(overlay.feed_viewscreen_widgets(
+            'dwarfmode', viewscreen, handled, 'handled marker'))
         assert.equals(0, #calls)
         local missed = {CUSTOM=true}
         local first, second, third =
-            overlay.feed_viewscreen_widgets(missed)
+            overlay.feed_viewscreen_widgets(
+                'dwarfmode', viewscreen, missed, 'miss marker')
         assert.equals('first', first)
         assert.is_nil(second)
         assert.equals('third', third)
-        assert.is_equal(missed, calls[1])
+        assert.same({
+            viewscreen_name='dwarfmode',
+            viewscreen=viewscreen,
+            keys=missed,
+            marker='miss marker',
+        }, calls[1])
     end)
 
     it('wraps Lua screens reversibly and leaves inherited methods inherited',
@@ -118,7 +132,8 @@ describe('context-menu input hook', function()
         second.manager:set_handler(function() return true end)
         assert.is_true(second.manager:ensure_native())
         assert.is_not_equal(trampoline, overlay.feed_viewscreen_widgets)
-        assert.is_true(overlay.feed_viewscreen_widgets({_MOUSE_R=true}))
+        assert.is_true(overlay.feed_viewscreen_widgets(
+            'dwarfmode', {}, {_MOUSE_R=true}))
         assert.equals(0, predecessor_count)
     end)
 
@@ -136,7 +151,8 @@ describe('context-menu input hook', function()
 
         assert.is_false(module.manager:shutdown())
         assert.is_equal(foreign, overlay.feed_viewscreen_widgets)
-        assert.equals('base', overlay.feed_viewscreen_widgets({_MOUSE_R=true}))
+        assert.equals('base', overlay.feed_viewscreen_widgets(
+            'dwarfmode', {}, {_MOUSE_R=true}))
         assert.equals(1,
             module.manager:get_diagnostics().inert_superseded_hook_count)
     end)
@@ -186,13 +202,15 @@ describe('context-menu input hook', function()
         module.manager:ensure_native()
 
         assert.equals('delegated',
-            overlay.feed_viewscreen_widgets({_MOUSE_R=true}))
+            overlay.feed_viewscreen_widgets(
+                'dwarfmode', {}, {_MOUSE_R=true}))
         assert.equals(1, predecessor_count)
         assert.is_truthy(observed:find('hook exploded', 1, true))
         assert.equals(1, #printed)
         assert.is_true(module.manager:get_diagnostics().disabled)
         assert.equals('delegated',
-            overlay.feed_viewscreen_widgets({_MOUSE_R=true}))
+            overlay.feed_viewscreen_widgets(
+                'dwarfmode', {}, {_MOUSE_R=true}))
         assert.equals(2, predecessor_count)
     end)
 end)

@@ -4,6 +4,8 @@ local gui = require('gui')
 local widgets = require('gui.widgets')
 local context_menu = reqscript('dwarfui/context_menu/api')
 local services = reqscript('dwarfui/context_menu/service')
+local PointerPolicy =
+    reqscript('dwarfui/pointer').PointerPolicy
 
 ---@class tests.ContextMenuSourceScreen: gui.ZScreen
 local ContextMenuSourceScreen = defclass(nil, gui.ZScreen)
@@ -17,6 +19,7 @@ function ContextMenuSourceScreen:init()
     self.input_events = {}
     self.context_target = widgets.Panel{
         view_id='context_target',
+        pointer_policy=PointerPolicy.TARGET,
         frame={l=8, t=6, w=18, h=3},
         subviews={
             widgets.Label{
@@ -46,15 +49,9 @@ ContextMenuUpperScreen.ATTRS{
     initial_pause=false,
 }
 
----Builds the upper-screen paint sentinel.
+---Initializes input observations for the upper screen.
 function ContextMenuUpperScreen:init()
     self.input_count = 0
-    self:addviews{
-        widgets.Label{
-            frame={l=0, t=0},
-            text={{text='U', pen=COLOR_LIGHTMAGENTA}},
-        },
-    }
 end
 
 ---Consumes input as the naturally current upper screen.
@@ -98,12 +95,13 @@ describe('Lua-screen context menu', function()
         local source
         local target
         local upper
+        local upper_render_spy
         local ephemeral
         local initial_pause = ds.isGamePaused()
         local selections = 0
         local last_context
         local ok, failure = xpcall(function()
-            ds.mountSaveGame('current')
+            ds.mountSaveGame('TestWorld 01')
             services.service:clear_world_state()
             source_subject = ds.mount(ContextMenuSourceScreen, {
                 initial_pause=false,
@@ -131,7 +129,10 @@ describe('Lua-screen context menu', function()
                 source.input_events[#source.input_events]._MOUSE_R_DOWN)
 
             local input_count = #source.input_events
-            ds.input({_MOUSE_R=true, CUSTOM_OPEN=true}, source_subject)
+            ds.input({
+                _MOUSE_R=true,
+                _MOUSE_R_DOWN=true,
+            }, source_subject)
             ds.await('Lua-screen context menu opens', function()
                 return services.service:is_open()
             end)
@@ -146,22 +147,26 @@ describe('Lua-screen context menu', function()
 
             upper = ContextMenuUpperScreen{}
             upper:show()
-            assert.is_equal(upper, dfhack.gui.getCurViewscreen())
+            assert.is_equal(upper._native, dfhack.gui.getCurViewscreen())
+            assert.is_equal(opened._native, upper._native.parent,
+                'upper screen is not stacked above the context menu')
+            upper_render_spy = spy.on(upper, 'render')
+            ds.redraw()
+            assert.spy(upper_render_spy).was_called()
+            upper_render_spy:revert()
+            upper_render_spy = nil
             gui.simulateInput(dfhack.gui.getCurViewscreen(), {
-                CUSTOM_UPPER=true,
+                D_PAUSE=true,
             })
             dfhack.screen.invalidate()
             ds.wait_frames(2)
             assert.equals(1, upper.input_count)
             assert.is_true(services.service:is_open(),
                 'upper screen dismissed the covered context menu')
-            local sentinel = dfhack.screen.readTile(0, 0)
-            assert.equals(('U'):byte(), sentinel.ch,
-                'upper screen did not paint after the context menu')
             upper:dismiss()
             upper = nil
             ds.wait_frames(1)
-            assert.is_equal(opened, dfhack.gui.getCurViewscreen())
+            assert.is_equal(opened._native, dfhack.gui.getCurViewscreen())
             assert.same(fixed_anchor, opened.anchor.screen_position)
 
             feed_current{SELECT=true}
@@ -199,6 +204,8 @@ describe('Lua-screen context menu', function()
             feed_current{LEAVESCREEN=true}
 
             local failing_calls = 0
+            local handler_failure_count =
+                services.service:get_diagnostics().handler_failure_count
             assert.is_true(context_menu.update(target, definition(
                 function()
                     failing_calls = failing_calls + 1
@@ -213,7 +220,7 @@ describe('Lua-screen context menu', function()
             assert.equals(1, failing_calls)
             assert.is_false(services.service:is_open())
             assert.is_false(services.service:is_disabled())
-            assert.equals(1,
+            assert.equals(handler_failure_count + 1,
                 services.service:get_diagnostics().handler_failure_count)
 
             assert.is_true(context_menu.update(target, definition(
@@ -230,6 +237,7 @@ describe('Lua-screen context menu', function()
 
             ephemeral = widgets.Panel{
                 frame={l=30, t=6, w=8, h=3},
+                pointer_policy=PointerPolicy.TARGET,
             }
             source:addviews{ephemeral}
             source:updateLayout()
@@ -250,13 +258,24 @@ describe('Lua-screen context menu', function()
             local ephemeral_y = math.floor(
                 (ephemeral_body.y1 + ephemeral_body.y2) / 2)
             ds.move_pointer(ephemeral_x, ephemeral_y)
+            local open_count =
+                services.service:get_diagnostics().open_count
             ds.input({_MOUSE_R=true}, source_subject)
+            assert.equals(open_count + 1,
+                services.service:get_diagnostics().open_count,
+                'disposable target input did not open synchronously')
             ds.await('disposable source menu opens', function()
                 return services.service:is_open()
             end)
             for index, view in ipairs(source.subviews) do
                 if view == ephemeral then
                     table.remove(source.subviews, index)
+                    break
+                end
+            end
+            for index, view in ipairs(source.focus_group) do
+                if view == ephemeral then
+                    table.remove(source.focus_group, index)
                     break
                 end
             end
@@ -271,6 +290,7 @@ describe('Lua-screen context menu', function()
             assert.equals(0, ephemeral_handler_calls)
         end, debug.traceback)
 
+        if upper_render_spy then upper_render_spy:revert() end
         if upper then upper:dismiss() end
         if services.service:is_open() then services.service:close() end
         if target then context_menu.unregister(target) end

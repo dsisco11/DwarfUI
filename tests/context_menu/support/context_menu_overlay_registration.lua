@@ -4,6 +4,8 @@
 
 local overlay = require('plugins.overlay')
 local widgets = require('gui.widgets')
+local PointerPolicy =
+    reqscript('dwarfui/pointer').PointerPolicy
 
 local PROCESS_STATE_SLOT = 'context_menu_component_probe'
 
@@ -34,6 +36,7 @@ end
 function ContextMenuRegistrationOverlay:init()
     self.context_target = widgets.Panel{
         view_id='context_target',
+        pointer_policy=PointerPolicy.TARGET,
         frame={l=1, t=1, w=18, h=3},
         subviews={
             widgets.Label{
@@ -68,8 +71,8 @@ function ContextMenuRegistrationOverlay:init()
             },
         },
     }
-    reqscript('dwarfui/context_menu/api').register(
-        self.context_target, self.definition)
+    local state = process_state()
+    state.context_target = self.context_target
 end
 
 ---Records every input table that reaches the backing overlay.
@@ -83,8 +86,13 @@ function ContextMenuRegistrationOverlay:onInput(keys)
 end
 
 ---Drops the test-owned registration before overlay teardown.
-function ContextMenuRegistrationOverlay:overlay_ondisable()
-    reqscript('dwarfui/context_menu/api').unregister(self.context_target)
+function ContextMenuRegistrationOverlay.overlay_ondisable()
+    local state = process_state()
+    if state.context_target then
+        reqscript('dwarfui/context_menu/api').unregister(
+            state.context_target)
+        state.context_target = nil
+    end
 end
 
 OVERLAY_WIDGETS = {

@@ -194,10 +194,21 @@ describe('DwarfUI context-menu screen', function()
     it('shows and closes one native screen exactly once', function()
         local fixture = screen_fixture()
         fixture.controller:show()
+        assert.is_true(fixture.screen.shown)
         fixture.controller:close()
         fixture.controller:close()
 
         assert.is_true(fixture.screen.shown)
+        assert.equals(1, fixture.screen.dismiss_count)
+    end)
+
+    it('rejects showing a presentation after it is closed', function()
+        local fixture = screen_fixture()
+        fixture.controller:close()
+
+        assert.has_error(function() fixture.controller:show() end,
+            'DwarfUI context-menu screen is already closed.')
+        assert.is_false(not not fixture.screen.shown)
         assert.equals(1, fixture.screen.dismiss_count)
     end)
 
