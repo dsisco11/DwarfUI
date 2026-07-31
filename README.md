@@ -93,6 +93,107 @@ A wrapper that performs post-render painting can explicitly mark itself
 reorderable through the render-hook manager when it wants DwarfUI to repair
 above that work.
 
+## Context menus
+
+The registration-driven context-menu API is exposed by
+`dwarfui/context_menu/api`. A widget registration opens at the current
+interface-cell pointer position when the registered widget wins pointer hit
+testing:
+
+```lua
+local context_menu = reqscript('dwarfui/context_menu/api')
+
+local action_label = widgets.Label{text='Right-click me'}
+context_menu.register(action_label, {
+    title='Label actions',
+    fg=COLOR_WHITE,
+    bg=COLOR_BLACK,
+    entries={
+        {
+            label='Inspect',
+            on_select=function(context)
+                print(('widget registration %d selected'):format(
+                    context.registration_identity))
+            end,
+        },
+        {
+            label='Remove',
+            fg=COLOR_LIGHTRED,
+            on_select=function(context)
+                context.source.visible = false
+            end,
+        },
+    },
+})
+```
+
+`register(widget, definition)` creates a weak registration or replaces the
+definition of an existing registration while retaining its identity and
+precedence. `update(widget, definition)` returns `false` for an unknown widget,
+and `unregister(widget)` removes it immediately. A widget must be attached,
+visible, enabled, and part of the currently presented eligible root to open.
+The captured screen-position anchor remains fixed while the menu is open.
+
+Exact map tiles use disposable handles:
+
+```lua
+local route_menu = context_menu.register_map_tile{
+    owner=route_overlay,
+    pos={x=stop.pos.x, y=stop.pos.y, z=stop.pos.z},
+    definition={
+        title='Route stop',
+        entries={{
+            label='Move stop',
+            on_select=function(context)
+                begin_move(context.map_position)
+            end,
+        }},
+    },
+}
+
+context_menu.update_map_tile(route_menu, {
+    pos={x=new_pos.x, y=new_pos.y, z=new_pos.z},
+    definition=updated_definition,
+})
+context_menu.unregister_map_tile(route_menu)
+```
+
+Map positions are copied signed 16-bit integer `x`, `y`, and `z` coordinates.
+Both `pos` and `definition` are required by the atomic update operation. A map
+registration is weakly owned by both its handle and `owner`; retaining neither
+does not keep the registration alive. Its owner must resolve to an attached,
+visible, enabled root on the current viewscreen. If several eligible
+registrations occupy the same exact tile, the most recently registered one
+wins. Updating a registration preserves that original precedence.
+
+A definition contains an optional non-empty `title`, optional menu `fg` and
+`bg`, and a non-empty `entries` array. Each entry requires a non-empty `label`
+and an `on_select` Lua function, and may specify its own `fg` and `bg`.
+Colors are integer display colors from `COLOR_BLACK` through `COLOR_WHITE`;
+pens, `COLOR_RESET`, and other representations are rejected. Each missing
+entry color falls back independently to the menu color, then to
+`COLOR_WHITE` foreground or `COLOR_BLACK` background. Menu colors paint the
+Window frame, title, and body. Entry colors paint their complete rows, with a
+readable active-row treatment for hover and keyboard selection. Definitions
+are validated and copied at registration or update time, and an opening takes
+another snapshot.
+
+The `on_select(context)` value contains `target_kind`, `anchor_kind`,
+`registration_identity`, a copied opening `screen_position`, `source`,
+`source_root`, and optional `owner`. Map selections also receive a copied
+`map_position`. The menu closes before the handler is invoked. Selection and
+an outside left-click both close and consume their complete input event; Escape
+or a second right-click also closes and consumes. Other input is delegated.
+There is no public programmatic open or replacement operation, and
+right-clicking while a menu is already open only closes it.
+
+An open map menu reprojects its copied tile before every render, so camera
+movement keeps the Window attached to the tile. It closes if the tile leaves
+the visible viewport, changes z-level relative to the view, or its registration
+or owner becomes invalid. Reload, DwarfUI teardown, and world unload close the
+active menu and discard every context-menu registration. Consumers must
+register again afterward.
+
 ## Runtime validation and reload
 
 Run `dwarfui` to load the registered module graph and validate each module's

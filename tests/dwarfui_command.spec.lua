@@ -30,12 +30,14 @@ describe('dwarfui command', function()
         local events = {}
         local old_names = {
             'dwarfui/context_menu/registration',
+            'dwarfui/context_menu/service',
             'dwarfui/consumer',
             'dwarfui/dependency',
         }
         local fresh_names = {
             'dwarfui/dependency',
             'dwarfui/context_menu/registration',
+            'dwarfui/context_menu/service',
             'dwarfui/consumer',
         }
         local old_registry = make_registry(old_names, 'old', events)
@@ -45,6 +47,7 @@ describe('dwarfui command', function()
         local all_names = {
             'dwarfui/module_registry',
             'dwarfui/context_menu/registration',
+            'dwarfui/context_menu/service',
             'dwarfui/consumer',
             'dwarfui/dependency',
             'dwarfui-mood-popover',
@@ -97,9 +100,9 @@ describe('dwarfui command', function()
                 },
                 reqscript=setmetatable({}, {__index=function(_, name)
                     if name == 'dwarfui/module_registry' then return registry end
-                    if name == 'dwarfui/context_menu/registration' then
+                    if name == 'dwarfui/context_menu/service' then
                         return {
-                            manager={
+                            service={
                                 shutdown=function()
                                     table.insert(events,
                                         {'retire', 'context_menu'})
@@ -129,6 +132,7 @@ describe('dwarfui command', function()
         assert.same({'retire', 'context_menu'}, events[4])
         assert.same({'clear', 'devel/clear-script-env',
             'dwarfui/context_menu/registration',
+            'dwarfui/context_menu/service',
             'dwarfui/consumer', 'dwarfui/dependency'}, events[5])
         assert.same({'clear', 'devel/clear-script-env',
             'dwarfui/module_registry'}, events[6])
@@ -136,14 +140,17 @@ describe('dwarfui command', function()
         assert.same({'clear', 'devel/clear-script-env',
             'dwarfui/dependency',
             'dwarfui/context_menu/registration',
+            'dwarfui/context_menu/service',
             'dwarfui/consumer'}, events[8])
         assert.same({'run', 'dwarfui/dependency'}, events[9])
         assert.same(
             {'run', 'dwarfui/context_menu/registration'}, events[10])
-        assert.same({'run', 'dwarfui/consumer'}, events[11])
-        assert.same({'overlay_rescan'}, events[12])
-        assert.same({'validate', 'fresh'}, events[13])
-        assert.is_nil(events[14])
+        assert.same(
+            {'run', 'dwarfui/context_menu/service'}, events[11])
+        assert.same({'run', 'dwarfui/consumer'}, events[12])
+        assert.same({'overlay_rescan'}, events[13])
+        assert.same({'validate', 'fresh'}, events[14])
+        assert.is_nil(events[15])
         assert.is_nil(scripts['/scripts/dwarfui-mood-popover.lua'])
         assert.is_nil(scripts[
             '/scripts/dwarfui-minecart-route-markers.lua'])
@@ -167,5 +174,44 @@ describe('dwarfui command', function()
         environment.main()
 
         assert.same({{'validate', 'current'}}, events)
+    end)
+
+    it('retires partial context-menu registration state on teardown',
+            function()
+        local events = {}
+        local registration_name = 'dwarfui/context_menu/registration'
+        local registration_path = '/scripts/' .. registration_name .. '.lua'
+        local environment = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui.lua', {
+                globals={
+                    dfhack_flags={module=true},
+                    dfhack={
+                        internal={scripts={
+                            [registration_path]={generation='old'},
+                        }},
+                        findScript=function(name)
+                            return '/scripts/' .. name .. '.lua'
+                        end,
+                    },
+                },
+                reqscript={
+                    [registration_name]={
+                        manager={
+                            shutdown=function()
+                                table.insert(events, 'registration')
+                            end,
+                        },
+                    },
+                },
+                require_modules={
+                    ['plugins.overlay']={
+                        get_state=function() return {db={}} end,
+                    },
+                },
+            })
+
+        environment.teardown()
+
+        assert.same({'registration'}, events)
     end)
 end)

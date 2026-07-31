@@ -823,6 +823,22 @@ describe('DwarfUI package contract', function()
         end
     end)
 
+    it('discovers nested production, test, and package payloads recursively',
+            function()
+        local syntax = read_repository_file('tools/Check-LuaSyntax.ps1')
+        local publish = read_repository_file('tools/Publish.ps1')
+        local verify = read_repository_file('tools/VerifyPackage.ps1')
+
+        contains(syntax,
+            'Get-ChildItem -LiteralPath $sourcePath -Recurse -File')
+        contains(syntax,
+            'Get-ChildItem -LiteralPath $testPath -Recurse -File')
+        contains(publish,
+            'Copy-Item -LiteralPath $_.FullName -Destination $stagingRoot -Recurse')
+        contains(verify,
+            'Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File -Force')
+    end)
+
     it('ships the process-wide tooltip service object', function()
         local _, module = load_public_module(
             'scripts_modinstalled/dwarfui/tooltip_service.lua')
@@ -887,6 +903,7 @@ describe('DwarfUI package contract', function()
         assert.equals('function', type(module.service.open))
         assert.equals('function', type(module.service.close))
         assert.equals('function', type(module.service.select))
+        assert.equals('function', type(module.service.clear_world_state))
         assert.equals('function',
             type(module.service.set_presentation_factory))
         assert.is_false(module.service:get_diagnostics().started)

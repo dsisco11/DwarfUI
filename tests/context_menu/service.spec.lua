@@ -28,7 +28,11 @@ end
 ---Creates a fully observable registration-manager double.
 ---@return table
 local function registration_double()
-    local manager = {disabled=false, shutdown_count=0}
+    local manager = {
+        disabled=false,
+        clear_count=0,
+        shutdown_count=0,
+    }
 
     ---Stores the open-session demand predicate.
     ---@param callback function
@@ -54,6 +58,13 @@ local function registration_double()
     function manager:disable(message)
         self.disabled = true
         self.failure = message
+        return true
+    end
+
+    ---Records one non-retiring registration clear.
+    ---@return boolean
+    function manager:clear()
+        self.clear_count = self.clear_count + 1
         return true
     end
 
@@ -521,11 +532,12 @@ describe('context-menu service', function()
             service:get_diagnostics().last_failure.stage)
     end)
 
-    it('closes on world unload and releases only its owned callback',
-            function()
+    it('closes and clears registrations on world unload', function()
         local harness = load_harness()
         local factory = presenter_factory()
+        local registrations = registration_double()
         local service = create_service(harness, {
+            registrations=registrations,
             presentation_factory=factory,
         })
         service:start()
@@ -536,10 +548,27 @@ describe('context-menu service', function()
         callback(42)
 
         assert.is_false(service:is_open())
+        assert.equals(1, registrations.clear_count)
+        assert.equals(0, registrations.shutdown_count)
         assert.is_function(
             harness.process.onStateChange.dwarfui_context_menu)
         service:shutdown()
+        assert.equals(1, registrations.shutdown_count)
         assert.is_nil(
+            harness.process.onStateChange.dwarfui_context_menu)
+    end)
+
+    it('releases only its owned world-unload callback', function()
+        local harness = load_harness()
+        local service = create_service(harness)
+        service:start()
+        local foreign_callback = function() end
+        harness.process.onStateChange.dwarfui_context_menu =
+            foreign_callback
+
+        service:shutdown()
+
+        assert.is_equal(foreign_callback,
             harness.process.onStateChange.dwarfui_context_menu)
     end)
 

@@ -547,4 +547,30 @@ describe('context-menu registration', function()
         assert.equals(0, manager:registration_count())
         assert.is_false(manager:get_diagnostics().discovery.running)
     end)
+
+    it('clears world-owned state without retiring the current manager',
+            function()
+        local harness = load_harness()
+        local manager =
+            harness.create_manager(harness.load_generation())
+        local widget = harness.widgets.Panel{}
+        local root = harness.widgets.Panel{subviews={widget}}
+        harness.present_native(root)
+        manager:register(widget, definition())
+        manager:register_map_tile{
+            owner=root,
+            pos={x=1, y=2, z=3},
+            definition=definition('Map'),
+        }
+
+        assert.is_true(manager:clear())
+        local diagnostics = manager:get_diagnostics()
+        assert.equals(0, manager:registration_count())
+        assert.equals(0, diagnostics.widget_registration_sequence)
+        assert.equals(0, diagnostics.map.registration_sequence)
+        assert.is_false(diagnostics.discovery.running)
+        assert.is_true(diagnostics.current)
+        assert.is_true(manager:register(widget, definition('Again')))
+        assert.equals(1, manager:registration_count())
+    end)
 end)

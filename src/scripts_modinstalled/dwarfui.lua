@@ -18,6 +18,8 @@ Usage
 ]====]
 
 local MODULE_REGISTRY_SCRIPT = 'dwarfui/module_registry'
+local CONTEXT_MENU_SERVICE_SCRIPT =
+    'dwarfui/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfui/context_menu/registration'
 local OVERLAY_SCRIPTS = {
@@ -40,11 +42,28 @@ local function retire_overlays()
     end
 end
 
----Destructively retires loaded context-menu registrations before environment clearing.
+---Returns a loaded script environment without loading an absent script.
+---@param script_name string
+---@return table|nil environment
+local function find_loaded_script_environment(script_name)
+    local path = dfhack.findScript(script_name)
+    if not path or not dfhack.internal.scripts[path] then return nil end
+    return reqscript(script_name)
+end
+
+---Destructively retires the loaded context-menu service or partial registration state.
 local function retire_context_menu()
-    local path = dfhack.findScript(CONTEXT_MENU_REGISTRATION_SCRIPT)
-    if not path or not dfhack.internal.scripts[path] then return end
-    local registration = reqscript(CONTEXT_MENU_REGISTRATION_SCRIPT)
+    local service = find_loaded_script_environment(
+        CONTEXT_MENU_SERVICE_SCRIPT)
+    if service and service.service and
+            type(service.service.shutdown) == 'function' then
+        service.service:shutdown()
+        return
+    end
+
+    local registration = find_loaded_script_environment(
+        CONTEXT_MENU_REGISTRATION_SCRIPT)
+    if not registration then return end
     if registration.manager and
             type(registration.manager.shutdown) == 'function' then
         registration.manager:shutdown()
@@ -106,6 +125,12 @@ function initialize()
     return load_module_registry().load_all(reqscript)
 end
 
+---Retires every DwarfUI overlay and context-menu runtime owner.
+function teardown()
+    retire_overlays()
+    retire_context_menu()
+end
+
 ---Rebuilds every DwarfUI module and overlay as one runtime generation.
 ---@return table<string, table>
 function reload()
@@ -117,8 +142,7 @@ function reload()
             table.insert(old_modules, name)
         end
     end
-    retire_overlays()
-    retire_context_menu()
+    teardown()
     clear_script_environments(old_modules)
 
     dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)

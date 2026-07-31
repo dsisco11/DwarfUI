@@ -373,4 +373,23 @@ describe('context-menu exact map targets', function()
         }))
         assert.equals(0, harness.registry:registration_count())
     end)
+
+    it('clears registrations, coordinate buckets, and precedence sequence',
+            function()
+        local harness = load_harness()
+        local owner, root = {}, {}
+        harness.present(owner, root)
+        harness.registry:register{
+            owner=owner,
+            pos={x=1, y=2, z=3},
+            definition=definition(),
+        }
+
+        assert.is_true(harness.registry:clear())
+        local diagnostics = harness.registry:get_diagnostics()
+        assert.equals(0, diagnostics.registration_count)
+        assert.equals(0, diagnostics.coordinate_count)
+        assert.equals(0, diagnostics.registration_sequence)
+        assert.is_false(harness.registry:clear())
+    end)
 end)
