@@ -17,7 +17,8 @@ UiMenuHotkeysOverlay.ATTRS{
     default_pos={x=1, y=1},
     viewscreens='dwarfmode/Default',
     hotspot=true,
-    fullscreen=true,
+    fullscreen=false,
+    full_interface=true,
     frame={l=0, t=0, w=1, h=1},
     overlay_onupdate_max_freq_seconds=0,
     label_pen=COLOR_WHITE,
@@ -36,19 +37,40 @@ function UiMenuHotkeysOverlay:init()
     assert(type(self.model) == 'table' and
             type(self.model.build_snapshot) == 'function',
         'UiMenuHotkeysOverlay.model must support build_snapshot()')
-    self.latest_snapshot = {active=false, layout_signature='init', buttons={}}
+    self.latest_snapshot = {
+        active=false, layout_signature='init', buttons={}, bounds=nil,
+    }
 end
 
----Expands the transparent host to the current full parent surface.
+---Fits the transparent host to the native button group currently being labeled.
 ---@param parent_rect gui.ViewRect
 function UiMenuHotkeysOverlay:preUpdateLayout(parent_rect)
-    self.frame.w = parent_rect.width
-    self.frame.h = parent_rect.height
+    self:sync_snapshot()
+    self:apply_snapshot_frame(parent_rect)
 end
 
 ---Refreshes the most recent model snapshot.
 function UiMenuHotkeysOverlay:sync_snapshot()
     self.latest_snapshot = self.model:build_snapshot()
+end
+
+---Updates the overlay frame from the resolved native screen-space bounds.
+---@param parent_rect gui.ViewRect|nil
+---@return boolean changed
+function UiMenuHotkeysOverlay:apply_snapshot_frame(parent_rect)
+    local bounds = self.latest_snapshot and self.latest_snapshot.bounds or nil
+    local l, t, w, h = 0, 0, 1, 1
+    if bounds then
+        l = bounds.x1 - (parent_rect and parent_rect.x1 or 0)
+        t = bounds.y1 - (parent_rect and parent_rect.y1 or 0)
+        w = bounds.x2 - bounds.x1 + 1
+        h = bounds.y2 - bounds.y1 + 1
+    end
+    local changed = self.frame.l ~= l or self.frame.t ~= t or
+        self.frame.w ~= w or self.frame.h ~= h
+    self.frame.l, self.frame.t = l, t
+    self.frame.w, self.frame.h = w, h
+    return changed
 end
 
 ---Returns the top-right corner text anchor for one bounds rectangle.
@@ -77,10 +99,11 @@ function UiMenuHotkeysOverlay:render_button_label(dc, button)
     dc:seek(x, y):string(label, self.label_pen)
 end
 
----Re-samples model state and paints currently visible button labels.
+---Re-samples model state and renders the bounded overlay panel.
 ---@param dc gui.Painter
 function UiMenuHotkeysOverlay:render(dc)
     self:sync_snapshot()
+    self:apply_snapshot_frame(self.frame_parent_rect)
     UiMenuHotkeysOverlay.super.render(self, dc)
     if not self.latest_snapshot.active then return end
     for _, button in ipairs(self.latest_snapshot.buttons or {}) do
@@ -91,6 +114,10 @@ end
 ---Updates snapshots continuously so slight layout shifts are reflected quickly.
 function UiMenuHotkeysOverlay:overlay_onupdate()
     self:sync_snapshot()
+    if self:apply_snapshot_frame(self.frame_parent_rect) and
+            self.frame_parent_rect then
+        self:updateLayout()
+    end
 end
 
 ---Never consumes input so native button behavior remains unchanged.

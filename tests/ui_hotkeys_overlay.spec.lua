@@ -52,14 +52,15 @@ local function load_overlay(state)
 end
 
 describe('DwarfUI UI hotkeys overlay', function()
-    it('declares a default-enabled fullscreen dwarfmode overlay', function()
+    it('declares a default-enabled bounded dwarfmode overlay', function()
         local state = {snapshot={active=false, buttons={}}}
         local overlay = load_overlay(state)
 
         assert.is_true(overlay.default_enabled)
         assert.equals('dwarfmode/Default', overlay.viewscreens)
         assert.is_true(overlay.hotspot)
-        assert.is_true(overlay.fullscreen)
+        assert.is_false(overlay.fullscreen)
+        assert.is_true(overlay.full_interface)
         assert.equals(0, overlay.overlay_onupdate_max_freq_seconds)
         assert.is_false(overlay:onInput({_MOUSE_L=true}))
     end)
@@ -72,15 +73,16 @@ describe('DwarfUI UI hotkeys overlay', function()
                 layout_signature='80x25|test',
                 buttons={{
                     semantic_id='citizens',
-                    action_binding='D_CITIZEN',
+                    action_binding='D_UNITLIST',
                     bounds={x1=10, y1=20, x2=15, y2=22},
                     label='u',
                 }},
+                bounds={x1=10, y1=20, x2=15, y2=22},
             },
             snapshot_reads=0,
         }
         local overlay = load_overlay(state)
-        overlay:preUpdateLayout(widget_harness.rect(0, 0, 80, 25))
+        overlay:updateLayout(widget_harness.rect(0, 0, 80, 25))
 
         local dc = painter()
         overlay:render(dc)
@@ -102,6 +104,6 @@ describe('DwarfUI UI hotkeys overlay', function()
         overlay:overlay_onupdate()
         overlay:render(painter())
 
-        assert.equals(2, state.snapshot_reads)
+        assert.equals(3, state.snapshot_reads)
     end)
 end)

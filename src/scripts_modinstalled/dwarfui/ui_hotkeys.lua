@@ -5,12 +5,12 @@ local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
 ---@enum dwarfui.UiHotkeyMenuId
 UiHotkeyMenuId = immutable_enum.define({
     CITIZENS=1,
-    LABOR=2,
-    ORDERS=3,
-    NOBLES=4,
-    LOCATIONS=5,
-    MILITARY=6,
-    SQUADS=7,
+    TASKS=2,
+    PLACES=3,
+    LABOR=4,
+    ORDERS=5,
+    NOBLES=6,
+    OBJECTS=7,
     JUSTICE=8,
 }, 'UiHotkeyMenuId')
 
@@ -18,12 +18,14 @@ UiHotkeyMenuId = immutable_enum.define({
 ---@field menu_id dwarfui.UiHotkeyMenuId
 ---@field semantic_id string
 ---@field action_binding string
+---@field button_order integer
 ---@field bounds_finder fun(context: dwarfui.UiHotkeySamplingContext, entry: dwarfui.UiHotkeyButtonCatalogEntry): table|nil
 
 ---@class dwarfui.UiHotkeySamplingContext
 ---@field width integer|nil
 ---@field height integer|nil
 ---@field read_tile fun(x: integer, y: integer): table|nil
+---@field bottom_button_bounds table[]
 
 ---@class dwarfui.UiHotkeyResolvedButton
 ---@field menu_id dwarfui.UiHotkeyMenuId
@@ -36,57 +38,212 @@ UiHotkeyMenuId = immutable_enum.define({
 ---@field active boolean
 ---@field layout_signature string
 ---@field buttons dwarfui.UiHotkeyResolvedButton[]
+---@field bounds {x1: integer, y1: integer, x2: integer, y2: integer}|nil
 
 local DEFAULT_BUTTON_CATALOG = {
     {
         menu_id=UiHotkeyMenuId.CITIZENS,
         semantic_id='citizens',
-        action_binding='D_CITIZEN',
-        bounds_finder=function() return nil end,
+        action_binding='D_UNITLIST',
+        button_order=1,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
+    },
+    {
+        menu_id=UiHotkeyMenuId.TASKS,
+        semantic_id='tasks',
+        action_binding='D_JOBLIST',
+        button_order=2,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
+    },
+    {
+        menu_id=UiHotkeyMenuId.PLACES,
+        semantic_id='places',
+        action_binding='D_LOCATIONS',
+        button_order=3,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
     },
     {
         menu_id=UiHotkeyMenuId.LABOR,
         semantic_id='labor',
-        action_binding='D_JOBLIST',
-        bounds_finder=function() return nil end,
+        action_binding='D_LABOR',
+        button_order=4,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
     },
     {
         menu_id=UiHotkeyMenuId.ORDERS,
         semantic_id='orders',
         action_binding='D_ORDERS',
-        bounds_finder=function() return nil end,
+        button_order=5,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
     },
     {
         menu_id=UiHotkeyMenuId.NOBLES,
         semantic_id='nobles',
         action_binding='D_NOBLES',
-        bounds_finder=function() return nil end,
+        button_order=6,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
     },
     {
-        menu_id=UiHotkeyMenuId.LOCATIONS,
-        semantic_id='locations',
-        action_binding='D_LOCATIONS',
-        bounds_finder=function() return nil end,
-    },
-    {
-        menu_id=UiHotkeyMenuId.MILITARY,
-        semantic_id='military',
-        action_binding='D_MILITARY',
-        bounds_finder=function() return nil end,
-    },
-    {
-        menu_id=UiHotkeyMenuId.SQUADS,
-        semantic_id='squads',
-        action_binding='D_SQUADS',
-        bounds_finder=function() return nil end,
+        menu_id=UiHotkeyMenuId.OBJECTS,
+        semantic_id='objects',
+        action_binding='D_ARTLIST',
+        button_order=7,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
     },
     {
         menu_id=UiHotkeyMenuId.JUSTICE,
         semantic_id='justice',
         action_binding='D_JUSTICE',
-        bounds_finder=function() return nil end,
+        button_order=8,
+        bounds_finder=function(context, entry)
+            return context.bottom_button_bounds[entry.button_order]
+        end,
     },
 }
+
+---Returns whether a tile belongs to a native UI surface.
+---@param tile table|nil
+---@return boolean
+local function is_native_ui_tile(tile)
+    if not tile then return false end
+    if tile.write_to_lower then return true end
+    return type(tile.tile) == 'number' and tile.tile ~= 0
+end
+
+---Discovers the rendered bounds of the native bottom-bar button group.
+---@param width integer|nil
+---@param height integer|nil
+---@param read_tile fun(x: integer, y: integer): table|nil
+---@param button_count integer
+---@return table[]
+local function detect_bottom_button_bounds(width, height, read_tile, button_count)
+    if type(width) ~= 'number' or type(height) ~= 'number' or
+            type(button_count) ~= 'number' or button_count < 1 or
+            width < button_count or height < 8 then
+        return {}
+    end
+
+    local band_top = math.max(0, height - 8)
+    local band_bottom = height - 1
+    local visited = {}
+
+    ---Returns whether a bottom-band cell has already been scanned.
+    ---@param x integer
+    ---@param y integer
+    ---@return boolean
+    local function was_visited(x, y)
+        local row = visited[y]
+        return row and row[x] or false
+    end
+
+    ---Marks a bottom-band cell as scanned.
+    ---@param x integer
+    ---@param y integer
+    local function mark_visited(x, y)
+        visited[y] = visited[y] or {}
+        visited[y][x] = true
+    end
+
+    local components = {}
+    local directions = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+    }
+
+    for y = band_top, band_bottom do
+        for x = 0, width - 1 do
+            if not was_visited(x, y) and is_native_ui_tile(read_tile(x, y)) then
+                local queue = {{x=x, y=y}}
+                mark_visited(x, y)
+                local head = 1
+                local x1, y1, x2, y2 = x, y, x, y
+                local count = 0
+
+                while head <= #queue do
+                    local cell = queue[head]
+                    head = head + 1
+                    count = count + 1
+                    if cell.x < x1 then x1 = cell.x end
+                    if cell.y < y1 then y1 = cell.y end
+                    if cell.x > x2 then x2 = cell.x end
+                    if cell.y > y2 then y2 = cell.y end
+
+                    for _, direction in ipairs(directions) do
+                        local nx = cell.x + direction[1]
+                        local ny = cell.y + direction[2]
+                        if nx >= 0 and nx < width and
+                                ny >= band_top and ny <= band_bottom and
+                                not was_visited(nx, ny) and
+                                is_native_ui_tile(read_tile(nx, ny)) then
+                            mark_visited(nx, ny)
+                            queue[#queue + 1] = {x=nx, y=ny}
+                        end
+                    end
+                end
+
+                local component_width = x2 - x1 + 1
+                local component_height = y2 - y1 + 1
+                local touches_bottom = y2 >= height - 2
+                local not_huge = component_width <= math.floor(width * 0.45)
+                if count >= 6 and component_width >= 3 and
+                        component_height >= 2 and touches_bottom and not_huge then
+                    components[#components + 1] = {
+                        x1=x1, y1=y1, x2=x2, y2=y2,
+                    }
+                end
+            end
+        end
+    end
+
+    table.sort(components, function(left, right)
+        local left_width = left.x2 - left.x1 + 1
+        local right_width = right.x2 - right.x1 + 1
+        local left_height = left.y2 - left.y1 + 1
+        local right_height = right.y2 - right.y1 + 1
+        local left_cell_width = left_width / button_count
+        local right_cell_width = right_width / button_count
+        local left_valid = left_width % button_count == 0 and
+            left_cell_width >= left_height
+        local right_valid = right_width % button_count == 0 and
+            right_cell_width >= right_height
+        if left_valid ~= right_valid then return left_valid end
+        if left.x1 ~= right.x1 then return left.x1 < right.x1 end
+        return left.y1 < right.y1
+    end)
+
+    local group = components[1]
+    if not group then return {} end
+    local group_width = group.x2 - group.x1 + 1
+    local group_height = group.y2 - group.y1 + 1
+    if group_width % button_count ~= 0 then return {} end
+    local button_width = group_width / button_count
+    if button_width < group_height then return {} end
+
+    local bounds_list = {}
+    for index=0,button_count - 1 do
+        local x1 = group.x1 + index * button_width
+        bounds_list[#bounds_list + 1] = {
+            x1=x1,
+            y1=group.y1,
+            x2=x1 + button_width - 1,
+            y2=group.y2,
+        }
+    end
+    return bounds_list
+end
 
 ---Returns the screen dimensions from DF's global GPS state.
 ---@return integer|nil width
@@ -110,28 +267,34 @@ end
 ---@param y integer
 ---@return table|nil
 local function default_read_tile(x, y)
-    return dfhack.screen.readTile(x, y)
+    local screen = dfhack and dfhack.screen
+    if not screen or type(screen.readTile) ~= 'function' then return nil end
+    return screen.readTile(x, y)
 end
 
 ---Attempts to resolve a human-readable key display token from DF/DFHack.
 ---@param action_binding string
 ---@return string|nil
 local function default_binding_lookup(action_binding)
+    local interface_key = df and df.interface_key and
+        df.interface_key[action_binding] or nil
+    if type(interface_key) ~= 'number' then return nil end
+
     local resolvers = {
         function()
             local screen = dfhack and dfhack.screen
             return screen and screen.getKeyDisplay and
-                screen.getKeyDisplay(action_binding) or nil
+                screen.getKeyDisplay(interface_key) or nil
         end,
         function()
             local gui = dfhack and dfhack.gui
             return gui and gui.getKeyDisplay and
-                gui.getKeyDisplay(action_binding) or nil
+                gui.getKeyDisplay(interface_key) or nil
         end,
         function()
             local internal = dfhack and dfhack.internal
             return internal and internal.getHotkeyDisplay and
-                internal.getHotkeyDisplay(action_binding) or nil
+                internal.getHotkeyDisplay(interface_key) or nil
         end,
     }
     for _, resolver in ipairs(resolvers) do
@@ -232,15 +395,23 @@ end
 ---Returns a layout signature used to invalidate cached bounds.
 ---@param width integer|nil
 ---@param height integer|nil
+---@param context dwarfui.UiHotkeySamplingContext|nil
 ---@return string
-function UiHotkeyModel:get_layout_signature(width, height)
+function UiHotkeyModel:get_layout_signature(width, height, context)
     local dimensions = ('%sx%s'):format(tostring(width), tostring(height))
+    local native_parts = {}
+    for _, bounds in ipairs(context and context.bottom_button_bounds or {}) do
+        native_parts[#native_parts + 1] = ('%d,%d,%d,%d'):format(
+            bounds.x1, bounds.y1, bounds.x2, bounds.y2)
+    end
+    local native_signature = #native_parts > 0 and
+        '|native:' .. table.concat(native_parts, ';') or ''
     if self.layout_signature_provider == nil or
             self.layout_signature_provider == DEFAULT_NIL then
-        return dimensions
+        return dimensions .. native_signature
     end
     local extra = self.layout_signature_provider(width, height)
-    return dimensions .. '|' .. tostring(extra)
+    return dimensions .. '|' .. tostring(extra) .. native_signature
 end
 
 ---Builds a shared sampling context for all catalog bounds finders.
@@ -248,19 +419,23 @@ end
 ---@param height integer|nil
 ---@return dwarfui.UiHotkeySamplingContext
 function UiHotkeyModel:make_sampling_context(width, height)
+    local button_count = #(self.button_catalog or {})
     return {
         width=width,
         height=height,
         read_tile=self.read_tile,
+        bottom_button_bounds=detect_bottom_button_bounds(
+            width, height, self.read_tile, button_count),
     }
 end
 
 ---Re-samples every configured button bounds finder for this layout.
 ---@param width integer|nil
 ---@param height integer|nil
-function UiHotkeyModel:refresh_bounds(width, height)
+---@param context dwarfui.UiHotkeySamplingContext|nil
+function UiHotkeyModel:refresh_bounds(width, height, context)
     self.cached_bounds = {}
-    local context = self:make_sampling_context(width, height)
+    context = context or self:make_sampling_context(width, height)
     for _, entry in ipairs(self.button_catalog or {}) do
         if type(entry.semantic_id) == 'string' and
                 type(entry.bounds_finder) == 'function' then
@@ -276,17 +451,19 @@ end
 function UiHotkeyModel:build_snapshot()
     if not self.active_provider() then
         self:clear_cache()
-        return {active=false, layout_signature='inactive', buttons={}}
+        return {active=false, layout_signature='inactive', buttons={}, bounds=nil}
     end
 
     local width, height = self.dimensions_provider()
-    local layout_signature = self:get_layout_signature(width, height)
+    local context = self:make_sampling_context(width, height)
+    local layout_signature = self:get_layout_signature(width, height, context)
     if self.cached_signature ~= layout_signature then
         self.cached_signature = layout_signature
-        self:refresh_bounds(width, height)
+        self:refresh_bounds(width, height, context)
     end
 
     local buttons = {}
+    local snapshot_bounds
     for _, entry in ipairs(self.button_catalog or {}) do
         local bounds = entry.semantic_id and self.cached_bounds[entry.semantic_id] or nil
         local raw_label = type(entry.action_binding) == 'string' and
@@ -300,11 +477,23 @@ function UiHotkeyModel:build_snapshot()
                 bounds=bounds,
                 label=label,
             })
+            if snapshot_bounds == nil then
+                snapshot_bounds = {
+                    x1=bounds.x1, y1=bounds.y1,
+                    x2=bounds.x2, y2=bounds.y2,
+                }
+            else
+                snapshot_bounds.x1 = math.min(snapshot_bounds.x1, bounds.x1)
+                snapshot_bounds.y1 = math.min(snapshot_bounds.y1, bounds.y1)
+                snapshot_bounds.x2 = math.max(snapshot_bounds.x2, bounds.x2)
+                snapshot_bounds.y2 = math.max(snapshot_bounds.y2, bounds.y2)
+            end
         end
     end
     return {
         active=true,
         layout_signature=layout_signature,
         buttons=buttons,
+        bounds=snapshot_bounds,
     }
 end
