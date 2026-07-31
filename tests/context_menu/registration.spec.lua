@@ -383,14 +383,22 @@ describe('context-menu registration', function()
             pos={x=1, y=2, z=3},
             definition=definition('Map'),
         }
+        local identity = manager:resolve_map_tile(handle).identity
 
         assert.equals(owner, manager:resolve_map_tile(handle).root)
-        owner.visible = false
+        owner._native = harness.state.native
+        harness.state.current_viewscreen = {parent=harness.state.native}
         assert.is_nil(manager:resolve_map_tile(handle))
+        assert.equals(owner,
+            manager:resolve_open_map_identity(identity, owner).root)
+        owner.visible = false
+        assert.is_nil(manager:resolve_open_map_identity(identity, owner))
         owner.visible = true
         owner.active = false
-        assert.is_nil(manager:resolve_map_tile(handle))
+        assert.is_nil(manager:resolve_open_map_identity(identity, owner))
         owner.active = true
+        harness.state.current_viewscreen = harness.state.native
+        owner._native = nil
         harness.state.native_root = harness.widgets.Panel{}
         assert.is_nil(manager:resolve_map_tile(handle))
         harness.present_native(owner)

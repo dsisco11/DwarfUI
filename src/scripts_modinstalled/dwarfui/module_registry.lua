@@ -13,6 +13,7 @@ MODULES = {
     {name='dwarfui/utils/numbers', contract='is_integer'},
     {name='dwarfui/utils/immutable_enum', contract='define'},
     {name='dwarfui/utils/function_chain', contract='wraps'},
+    {name='dwarfui/map_projection', contract='project_visible'},
     {
         name='dwarfui/context_menu/definition',
         contract='ContextMenuDefinitionSlot',

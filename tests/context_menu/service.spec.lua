@@ -76,6 +76,12 @@ local function registration_double()
         return 0
     end
 
+    ---Resolves the controlled open map registration.
+    ---@return table|nil
+    function manager:resolve_open_map_identity()
+        return self.open_map_candidate
+    end
+
     return manager
 end
 
@@ -159,6 +165,24 @@ local function load_harness(state)
     ---@return table
     function Session:get_definition_snapshot()
         return self.definition
+    end
+
+    ---Returns the controlled target descriptor.
+    ---@return table
+    function Session:get_target_descriptor()
+        return self.options.target
+    end
+
+    ---Returns the controlled anchor descriptor.
+    ---@return table
+    function Session:get_anchor_descriptor()
+        return self.options.anchor
+    end
+
+    ---Returns the controlled source root.
+    ---@return table
+    function Session:get_source_root()
+        return self.options.source_root
     end
 
     ---Returns one live controlled callback context.
@@ -305,6 +329,36 @@ describe('context-menu service', function()
         assert.is_false(service:is_open())
         assert.equals(1, presentation.closed)
         assert.is_false(service:close())
+    end)
+
+    it('validates an open map session against identity and copied position',
+            function()
+        local harness = load_harness()
+        local registrations = registration_double()
+        registrations.open_map_candidate={pos={x=10, y=20, z=3}}
+        local captured_actions
+        local service = create_service(harness, {
+            registrations=registrations,
+            presentation_factory=function(_, actions)
+                captured_actions = actions
+                return {show=function() end, close=function() end}
+            end,
+        })
+        local target = detection()
+        target.target.kind = 2
+        target.anchor = {
+            kind=2,
+            screen_position={x=4, y=5},
+            map_position={x=10, y=20, z=3},
+        }
+        target.candidate.owner = {}
+
+        assert.is_true(service:open(target))
+        assert.is_true(captured_actions.map_session_is_valid())
+        registrations.open_map_candidate.pos.x = 11
+        assert.is_false(captured_actions.map_session_is_valid())
+        registrations.open_map_candidate = nil
+        assert.is_false(captured_actions.map_session_is_valid())
     end)
 
     it('opens only actionable right-click targets from one synchronous sample',

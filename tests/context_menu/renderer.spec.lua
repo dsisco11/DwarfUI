@@ -105,6 +105,24 @@ describe('DwarfUI context-menu renderer', function()
         assert.equals(10 - bottom_right.frame.h, bottom_right.frame.t)
     end)
 
+    it('chooses horizontal and vertical fallback independently', function()
+        local renderer = load_renderer()
+        local definition = {
+            fg=15,
+            bg=0,
+            entries={{label='123456', fg=15, bg=0}},
+        }
+        assert.same({l=2, t=1, w=8, h=3},
+            renderer.calculate_layout(
+                definition, {x=10, y=1}, 16, 10).frame)
+        assert.same({l=10, t=3, w=8, h=3},
+            renderer.calculate_layout(
+                definition, {x=10, y=6}, 20, 8).frame)
+        assert.same({l=2, t=3, w=8, h=3},
+            renderer.calculate_layout(
+                definition, {x=10, y=6}, 12, 8).frame)
+    end)
+
     it('creates isolated frame styles and preserves native glyphs', function()
         local renderer, context = load_renderer()
         local first = renderer.create_frame_style(2, 4)

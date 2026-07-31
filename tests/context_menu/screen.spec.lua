@@ -110,6 +110,7 @@ local function screen_fixture()
             self.start_count = self.start_count + 1
         end,
     }
+    local projection = {position=nil}
     local dfhack = {
         pen=pen,
         screen={
@@ -122,13 +123,21 @@ local function screen_fixture()
             dfhack=dfhack,
         },
         reqscript={
+            ['dwarfui/map_projection']={
+                project_visible=function() return projection.position end,
+            },
             ['dwarfui/context_menu/renderer']=renderer,
             ['dwarfui/context_menu/service']={service=service},
+            ['dwarfui/context_menu/target']={
+                ContextMenuAnchorKind={SCREEN_POSITION=1, MAP_TILE=2},
+            },
         },
         require_modules={gui=gui},
     })
     local session = {
         valid=true,
+        root={},
+        anchor={kind=1, screen_position={x=2, y=2}},
         get_definition_snapshot=function()
             return {
                 fg=15,
@@ -136,15 +145,17 @@ local function screen_fixture()
                 entries={{label='Entry', fg=15, bg=0}},
             }
         end,
-        get_anchor_descriptor=function()
-            return {screen_position={x=2, y=2}}
+        get_anchor_descriptor=function(self)
+            return self.anchor
         end,
+        get_source_root=function(self) return self.root end,
         is_valid=function(self) return self.valid end,
     }
-    local calls = {close=0, select=0, fail=0}
+    local calls = {close=0, select=0, fail=0, map_valid=true}
     local actions = {
         close=function() calls.close = calls.close + 1 end,
         select=function() calls.select = calls.select + 1 end,
+        map_session_is_valid=function() return calls.map_valid end,
         fail=function() calls.fail = calls.fail + 1 end,
     }
     local controller = service.factory(session, actions)
@@ -161,6 +172,7 @@ local function screen_fixture()
         calls=calls,
         mouse=mouse,
         parent_inputs=parent_inputs,
+        projection=projection,
     }
 end
 
@@ -329,5 +341,71 @@ describe('DwarfUI context-menu screen', function()
         fixture.screen:render({})
 
         assert.equals(1, fixture.calls.close)
+    end)
+
+    it('keeps screen anchors fixed and reprojects map anchors each render',
+            function()
+        local fixture = screen_fixture()
+        fixture.session.anchor = {
+            kind=1,
+            screen_position={x=17, y=2},
+        }
+        fixture.screen:render({})
+        assert.equals(2, fixture.screen.menu_window.anchor.x)
+
+        fixture.screen.anchor = {
+            kind=2,
+            screen_position={x=2, y=2},
+            map_position={x=10, y=20, z=3},
+        }
+        fixture.projection.position = {x=7, y=4, z=0}
+        fixture.screen:render({})
+        assert.same({x=7, y=4}, fixture.screen.menu_window.anchor)
+        fixture.projection.position = {x=5, y=3, z=0}
+        fixture.screen:render({})
+        assert.same({x=5, y=3}, fixture.screen.menu_window.anchor)
+    end)
+
+    it('closes a map menu when projection becomes invalid', function()
+        local fixture = screen_fixture()
+        fixture.screen.anchor = {
+            kind=2,
+            screen_position={x=2, y=2},
+            map_position={x=10, y=20, z=3},
+        }
+        fixture.projection.position = nil
+
+        fixture.screen:render({})
+
+        assert.equals(1, fixture.calls.close)
+    end)
+
+    it('closes a map menu when its registration becomes invalid', function()
+        local fixture = screen_fixture()
+        fixture.screen.anchor = {
+            kind=2,
+            screen_position={x=2, y=2},
+            map_position={x=10, y=20, z=3},
+        }
+        fixture.projection.position = {x=4, y=5, z=0}
+        fixture.calls.map_valid = false
+
+        fixture.screen:render({})
+
+        assert.equals(1, fixture.calls.close)
+    end)
+
+    it('recognizes only roots in its native parent chain', function()
+        local fixture = screen_fixture()
+        local root = {_native={}}
+        local parent = root._native
+        fixture.screen._native={parent=parent}
+
+        assert.is_true(fixture.screen:source_root_is_presented(root))
+        fixture.screen._native.parent = {}
+        assert.is_false(fixture.screen:source_root_is_presented(root))
+        fixture.screen._native.parent = {widgets=root}
+        root._native = nil
+        assert.is_true(fixture.screen:source_root_is_presented(root))
     end)
 end)

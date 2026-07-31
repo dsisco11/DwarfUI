@@ -9,6 +9,7 @@ local shipped_modules = {
     'dwarfui/utils/numbers.lua',
     'dwarfui/utils/immutable_enum.lua',
     'dwarfui/utils/function_chain.lua',
+    'dwarfui/map_projection.lua',
     'dwarfui/context_menu/definition.lua',
     'dwarfui/context_menu/target.lua',
     'dwarfui/context_menu/root_discovery.lua',
@@ -106,7 +107,23 @@ end
 
 local function load_public_module(package_path)
     local options
-    if package_path ==
+    if package_path == 'scripts_modinstalled/dwarfui/map_projection.lua' then
+        options = {
+            globals={
+                df={global={}},
+                dfhack={
+                    isWorldLoaded=function() return false end,
+                    screen={inGraphicsMode=function() return false end},
+                },
+            },
+            require_modules={
+                ['gui.dwarfmode']={
+                    getPanelLayout=function() return {map={}} end,
+                    Viewport={get=function() end},
+                },
+            },
+        }
+    elseif package_path ==
             'scripts_modinstalled/dwarfui/context_menu/definition.lua' then
         local _, numbers = module_loader.load(repo_root,
             'src/scripts_modinstalled/dwarfui/utils/numbers.lua')
@@ -456,6 +473,9 @@ local function load_public_module(package_path)
                     nil, widget_harness.widgets().Panel)},
             },
             reqscript={
+                ['dwarfui/map_projection']={
+                    project_visible=function() return nil end,
+                },
                 ['dwarfui/context_menu/renderer']={
                     ContextMenuWindow=setmetatable({}, {
                         __call=function() return {} end,
@@ -466,6 +486,9 @@ local function load_public_module(package_path)
                         set_presentation_factory=function() end,
                         start=function() end,
                     },
+                },
+                ['dwarfui/context_menu/target']={
+                    ContextMenuAnchorKind={SCREEN_POSITION=1, MAP_TILE=2},
                 },
             },
         }
@@ -649,6 +672,13 @@ local function load_public_module(package_path)
                         return instance
                     end})
                 end,
+            },
+            reqscript={
+                ['dwarfui/map_projection']={
+                    world_to_interface=function(_, viewport)
+                        return viewport
+                    end,
+                },
             },
         }
     elseif package_path ==

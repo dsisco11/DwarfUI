@@ -60,6 +60,9 @@ local function load_harness()
         resolve=function(_, owner)
             return state.eligible[owner] and state.roots[owner] or nil
         end,
+        find_root=function(_, owner)
+            return state.attachments[owner]
+        end,
     }
     local _, module = module_loader.load(repo_root, MAP_TARGET_PATH, {
         reqscript={
@@ -124,6 +127,28 @@ describe('context-menu exact map targets', function()
         assert.equals('Before',
             candidate:get_definition_snapshot().entries[1].label)
         assert.is_true(harness.registry:contains(handle))
+    end)
+
+    it('resolves an open identity only while attached to its opening root',
+            function()
+        local harness = load_harness()
+        local owner, root = {}, {}
+        harness.present(owner, root)
+        local handle = harness.registry:register{
+            owner=owner,
+            pos={x=1, y=2, z=3},
+            definition=definition(),
+        }
+        local identity = assert(harness.registry:resolve(handle)).identity
+
+        assert.equals(root,
+            harness.registry:resolve_identity_attached(identity, root).root)
+        harness.state.attachments[owner] = {}
+        assert.is_nil(
+            harness.registry:resolve_identity_attached(identity, root))
+        harness.state.attachments[owner] = nil
+        assert.is_nil(
+            harness.registry:resolve_identity_attached(identity, root))
     end)
 
     it('packs every signed-16 component into distinct exact integer keys',

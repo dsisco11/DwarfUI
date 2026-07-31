@@ -24,6 +24,13 @@ local route_environment = module_loader.load(repo_root,
                 inGraphicsMode=function() return false end,
             }},
         },
+        reqscript={
+            ['dwarfui/map_projection']={
+                world_to_interface=function(pos, viewport)
+                    return viewport:tileToScreen(pos)
+                end,
+            },
+        },
     })
 
 local MinecartRouteMenuLayout = route_environment.MinecartRouteMenuLayout

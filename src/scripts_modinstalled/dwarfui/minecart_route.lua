@@ -1,5 +1,7 @@
 --@ module=true
 
+local map_projection = reqscript('dwarfui/map_projection')
+
 -- Selection support for the native Premium DF minecart route menu.
 
 local DEFAULT_LIST_X1 = 0
@@ -316,38 +318,10 @@ local function make_label(name, z_delta)
     return label
 end
 
----Translates a world map position into interface-layer coordinates. DFHack's
----Viewport translation is correct in text mode, but Premium graphics applies
----an independent map zoom before the interface text layer is composited.
----@param pos {x: integer, y: integer, z: integer}
----@param viewport gui.dwarfmode.Viewport
----@return {x: integer, y: integer, z: integer}
-local function world_to_ui(pos, viewport)
-    if not dfhack.screen.inGraphicsMode() then
-        return viewport:tileToScreen(pos)
-    end
-
-    local gps = df.global.gps
-    local native_viewport = df.global.world.viewport
-    if not native_viewport or not native_viewport.corner or
-            not gps.viewport_zoom_factor then
-        return viewport:tileToScreen(pos)
-    end
-
-    local corner = native_viewport.corner
-    local map_tile_pixels = gps.viewport_zoom_factor // 4
-    return {
-        x=math.ceil(map_tile_pixels * (pos.x - corner.x) /
-            gps.tile_pixel_x),
-        y=math.ceil(map_tile_pixels * (pos.y - corner.y) /
-            gps.tile_pixel_y),
-        z=pos.z - corner.z,
-    }
-end
-
 ---Initializes the production world-to-interface coordinate translator.
 function MinecartRouteMarkerProjection:init()
-    self.ui_position_provider = self.ui_position_provider or world_to_ui
+    self.ui_position_provider = self.ui_position_provider or
+        map_projection.world_to_interface
 end
 
 ---Anchors a label at the marker's translated UI column and two rows below it.
