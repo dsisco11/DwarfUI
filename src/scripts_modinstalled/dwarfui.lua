@@ -23,6 +23,7 @@ local CONTEXT_MENU_SERVICE_SCRIPT =
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfui/context_menu/registration'
 local OVERLAY_SCRIPTS = {
+    'dwarfui-ui-hotkeys',
     'dwarfui-mood-popover',
     'dwarfui-minecart-route-markers',
     'dwarfui-unit-card-task-details',

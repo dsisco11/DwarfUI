@@ -144,6 +144,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/ui_hotkeys',
+        contract='UiHotkeyModel',
+        contract_type='table',
+    },
+    {
         name='dwarfui/mood_popover',
         contract='MoodPopoverModel',
         contract_type='table',

@@ -50,6 +50,7 @@ describe('dwarfui command', function()
             'dwarfui/context_menu/service',
             'dwarfui/consumer',
             'dwarfui/dependency',
+            'dwarfui-ui-hotkeys',
             'dwarfui-mood-popover',
             'dwarfui-minecart-route-markers',
             'dwarfui-unit-card-task-details',
@@ -59,6 +60,7 @@ describe('dwarfui command', function()
         end
         local overlay_db = {}
         for _, script in ipairs({
+            'dwarfui-ui-hotkeys',
                 'dwarfui-mood-popover',
                 'dwarfui-minecart-route-markers',
                 'dwarfui-unit-card-task-details'}) do
@@ -124,33 +126,35 @@ describe('dwarfui command', function()
 
         environment.reload()
 
-        assert.same({'retire', 'dwarfui-mood-popover'}, events[1])
+        assert.same({'retire', 'dwarfui-ui-hotkeys'}, events[1])
+        assert.same({'retire', 'dwarfui-mood-popover'}, events[2])
         assert.same(
-            {'retire', 'dwarfui-minecart-route-markers'}, events[2])
+            {'retire', 'dwarfui-minecart-route-markers'}, events[3])
         assert.same(
-            {'retire', 'dwarfui-unit-card-task-details'}, events[3])
-        assert.same({'retire', 'context_menu'}, events[4])
+            {'retire', 'dwarfui-unit-card-task-details'}, events[4])
+        assert.same({'retire', 'context_menu'}, events[5])
         assert.same({'clear', 'devel/clear-script-env',
             'dwarfui/context_menu/registration',
             'dwarfui/context_menu/service',
-            'dwarfui/consumer', 'dwarfui/dependency'}, events[5])
+            'dwarfui/consumer', 'dwarfui/dependency'}, events[6])
         assert.same({'clear', 'devel/clear-script-env',
-            'dwarfui/module_registry'}, events[6])
-        assert.same({'run', 'dwarfui/module_registry'}, events[7])
+            'dwarfui/module_registry'}, events[7])
+        assert.same({'run', 'dwarfui/module_registry'}, events[8])
         assert.same({'clear', 'devel/clear-script-env',
             'dwarfui/dependency',
             'dwarfui/context_menu/registration',
             'dwarfui/context_menu/service',
-            'dwarfui/consumer'}, events[8])
-        assert.same({'run', 'dwarfui/dependency'}, events[9])
+            'dwarfui/consumer'}, events[9])
+        assert.same({'run', 'dwarfui/dependency'}, events[10])
         assert.same(
-            {'run', 'dwarfui/context_menu/registration'}, events[10])
+            {'run', 'dwarfui/context_menu/registration'}, events[11])
         assert.same(
-            {'run', 'dwarfui/context_menu/service'}, events[11])
-        assert.same({'run', 'dwarfui/consumer'}, events[12])
-        assert.same({'overlay_rescan'}, events[13])
-        assert.same({'validate', 'fresh'}, events[14])
-        assert.is_nil(events[15])
+            {'run', 'dwarfui/context_menu/service'}, events[12])
+        assert.same({'run', 'dwarfui/consumer'}, events[13])
+        assert.same({'overlay_rescan'}, events[14])
+        assert.same({'validate', 'fresh'}, events[15])
+        assert.is_nil(events[16])
+        assert.is_nil(scripts['/scripts/dwarfui-ui-hotkeys.lua'])
         assert.is_nil(scripts['/scripts/dwarfui-mood-popover.lua'])
         assert.is_nil(scripts[
             '/scripts/dwarfui-minecart-route-markers.lua'])
