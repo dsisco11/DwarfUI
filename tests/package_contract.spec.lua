@@ -18,7 +18,7 @@ local shipped_modules = {
     'dwarfui/widgets/hover_action_rail.lua',
     'dwarfui/pointer.lua',
     'dwarfui/pointer_poller.lua',
-    'dwarfui/tooltip_root_resolver.lua',
+    'dwarfui/view_root_resolver.lua',
     'dwarfui/context_menu/map_target.lua',
     'dwarfui/context_menu/registration.lua',
     'dwarfui/context_menu/input_sample.lua',
@@ -28,16 +28,19 @@ local shipped_modules = {
     'dwarfui/context_menu/renderer.lua',
     'dwarfui/context_menu/screen.lua',
     'dwarfui/context_menu/api.lua',
-    'dwarfui/tooltip_target.lua',
-    'dwarfui/tooltip_target_detector.lua',
-    'dwarfui/tooltip_map_target.lua',
-    'dwarfui/tooltip_service.lua',
-    'dwarfui/tooltip_render_hook.lua',
+    'dwarfui/tooltip/target.lua',
+    'dwarfui/tooltip/target_detector.lua',
+    'dwarfui/tooltip/map_target.lua',
+    'dwarfui/tooltip/service.lua',
+    'dwarfui/tooltip/registration.lua',
+    'dwarfui/tooltip/render_hook.lua',
+    'dwarfui/tooltip/renderer.lua',
+    'dwarfui/tooltip/presenter.lua',
+    'dwarfui/tooltip/runtime.lua',
+    'dwarfui/tooltip/api.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
     'dwarfui/popover.lua',
-    'dwarfui/tooltip.lua',
-    'dwarfui/tooltip_registration.lua',
     'dwarfui/unit_card_task.lua',
 }
 
@@ -218,7 +221,7 @@ local function load_public_module(package_path)
                 },
             })
         local root_resolver = {
-            TooltipRootResolver={
+            ViewRootResolver={
                 new=function()
                     return {resolve=function() return nil end}
                 end,
@@ -228,7 +231,7 @@ local function load_public_module(package_path)
             ['dwarfui/context_menu/definition']=definitions,
             ['dwarfui/context_menu/target']=targets,
             ['dwarfui/utils/numbers']=numbers,
-            ['dwarfui/tooltip_root_resolver']=root_resolver,
+            ['dwarfui/view_root_resolver']=root_resolver,
         }
         if package_path ==
                 'scripts_modinstalled/dwarfui/context_menu/map_target.lua' then
@@ -255,7 +258,7 @@ local function load_public_module(package_path)
                     ['dwarfui/context_menu/map_target']=map_target,
                     ['dwarfui/context_menu/root_discovery']=root_discovery,
                     ['dwarfui/context_menu/target']=targets,
-                    ['dwarfui/tooltip_root_resolver']=root_resolver,
+                    ['dwarfui/view_root_resolver']=root_resolver,
                 },
             }
         end
@@ -348,7 +351,7 @@ local function load_public_module(package_path)
             },
         }
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_root_resolver.lua' then
+            'scripts_modinstalled/dwarfui/view_root_resolver.lua' then
         local widget_harness = require('support.widget_harness')
         local widgets = widget_harness.widgets()
         ---@class tests.PackageContractRootResolverOverlay
@@ -519,48 +522,48 @@ local function load_public_module(package_path)
             },
         }
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_target.lua' then
+            'scripts_modinstalled/dwarfui/tooltip/target.lua' then
         options = {}
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_target_detector.lua' then
+            'scripts_modinstalled/dwarfui/tooltip/target_detector.lua' then
         options = {
             reqscript={
                 ['dwarfui/pointer']=pointer_stub(),
-                ['dwarfui/tooltip_root_resolver']={
-                    TooltipRootResolver={
+                ['dwarfui/view_root_resolver']={
+                    ViewRootResolver={
                         new=function()
                             return {resolve=function() return nil end}
                         end,
                     },
                 },
-                ['dwarfui/tooltip_target']=tooltip_target_stub(),
+                ['dwarfui/tooltip/target']=tooltip_target_stub(),
             },
         }
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_map_target.lua' then
+            'scripts_modinstalled/dwarfui/tooltip/map_target.lua' then
         options = {
             globals={dfhack={dwarfui={}}},
             reqscript={
-                ['dwarfui/tooltip_root_resolver']={
-                    TooltipRootResolver={
+                ['dwarfui/view_root_resolver']={
+                    ViewRootResolver={
                         new=function()
                             return {resolve=function() return nil end}
                         end,
                     },
                 },
-                ['dwarfui/tooltip_target']=tooltip_target_stub(),
+                ['dwarfui/tooltip/target']=tooltip_target_stub(),
             },
         }
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_service.lua' then
+            'scripts_modinstalled/dwarfui/tooltip/service.lua' then
         options = {
             globals={dfhack={dwarfui={}}},
             reqscript={
-                ['dwarfui/tooltip_target']=tooltip_target_stub(),
+                ['dwarfui/tooltip/target']=tooltip_target_stub(),
             },
         }
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_render_hook.lua' then
+            'scripts_modinstalled/dwarfui/tooltip/render_hook.lua' then
         local _, function_chain = module_loader.load(repo_root,
             'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')
         options = {
@@ -574,7 +577,8 @@ local function load_public_module(package_path)
                 ['dwarfui/utils/function_chain']=function_chain,
             },
         }
-    elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/tooltip/renderer.lua' then
         local widget_harness = require('support.widget_harness')
         local default_nil = widget_harness.default_nil()
         local widgets = widget_harness.widgets(nil, default_nil)
@@ -586,13 +590,8 @@ local function load_public_module(package_path)
                 defclass=widget_harness.defclass,
                 dfhack={
                     pen={parse=function(value) return value end},
-                    gui={
-                        getDFViewscreen=function() return nil end,
-                        getCurViewscreen=function() return nil end,
-                    },
                     screen={
                         getWindowSize=function() return 80, 25 end,
-                        invalidate=function() end,
                     },
                 },
             },
@@ -606,37 +605,75 @@ local function load_public_module(package_path)
                     paint_frame=function() end,
                 },
                 ['gui.widgets']=widgets,
-                ['plugins.overlay']={OverlayWidget={}},
             },
+            reqscript={
+                ['dwarfui/pointer']=pointer_stub(),
+                ['dwarfui/widget_extensions']={},
+                ['dwarfui/text']={wrap_text=function() return {''} end},
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/tooltip/presenter.lua' then
+        options = {
+            globals={dfhack={}},
+            require_modules={gui={}},
             reqscript={
                 ['dwarfui/class']={
                     is_instance_of=function() return false end,
                 },
-                ['dwarfui/pointer']=pointer_stub(),
-                ['dwarfui/widget_extensions']={},
-                ['dwarfui/text']={wrap_text=function() return {''} end},
-                ['dwarfui/tooltip_service']={
-                    service={
-                        get_intent=function() return nil end,
-                        get_diagnostics=function() return {revision=0} end,
-                        set_intent_observer=function() end,
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/tooltip/runtime.lua' then
+        local presenter = {
+            start=function() return true end,
+            present=function() end,
+            get_diagnostics=function() return {} end,
+        }
+        options = {
+            globals={
+                dfhack={
+                    gui={
+                        getDFViewscreen=function() return nil end,
+                        getCurViewscreen=function() return nil end,
+                    },
+                    screen={
+                        getWindowSize=function() return 80, 25 end,
+                        invalidate=function() end,
                     },
                 },
-                ['dwarfui/tooltip_render_hook']={
+            },
+            require_modules={
+                gui={Screen={}, Painter={new=function() return {} end}},
+                ['plugins.overlay']={},
+            },
+            reqscript={
+                ['dwarfui/tooltip/presenter']={
+                    TooltipPresenter={new=function() return presenter end},
+                },
+                ['dwarfui/tooltip/renderer']={
+                    TooltipRenderer=function() return {} end,
+                },
+                ['dwarfui/tooltip/service']={service={}},
+                ['dwarfui/tooltip/render_hook']={
+                    manager={},
                     TooltipRenderTransport={OVERLAY=1, SCREEN=2},
-                    manager={
-                        get_diagnostics=function()
-                            return {generation=1}
-                        end,
-                        set_presenter=function() end,
-                        set_current_intent_revision=function() end,
-                        ensure_overlay=function() end,
-                        clear_selection=function() end,
-                    },
                 },
-                ['dwarfui/tooltip_registration']={
+            },
+        }
+    elseif package_path == 'scripts_modinstalled/dwarfui/tooltip/api.lua' then
+        options = {
+            reqscript={
+                ['dwarfui/tooltip/registration']={
                     register=function() return true end,
                     unregister=function() return true end,
+                    register_map_tile=function() return {} end,
+                    update_map_tile=function() return true end,
+                    unregister_map_tile=function() return true end,
+                    get_diagnostics=function() return {} end,
+                },
+                ['dwarfui/tooltip/runtime']={
+                    presenter={get_diagnostics=function() return {} end},
                 },
             },
         }
@@ -690,7 +727,7 @@ local function load_public_module(package_path)
             },
         }
     elseif package_path ==
-            'scripts_modinstalled/dwarfui/tooltip_registration.lua' then
+            'scripts_modinstalled/dwarfui/tooltip/registration.lua' then
         options = {
             globals={
                 dfhack={
@@ -720,7 +757,7 @@ local function load_public_module(package_path)
                         end,
                     },
                 },
-                ['dwarfui/tooltip_service']={
+                ['dwarfui/tooltip/service']={
                     service={
                         get_registrations=function()
                             return setmetatable({}, {__mode='k'})
@@ -743,7 +780,7 @@ local function load_public_module(package_path)
                         end,
                     },
                 },
-                ['dwarfui/tooltip_target_detector']={
+                ['dwarfui/tooltip/target_detector']={
                     TooltipTargetDetector={
                         new=function()
                             return {detect=function()
@@ -755,7 +792,7 @@ local function load_public_module(package_path)
                         end,
                     },
                 },
-                ['dwarfui/tooltip_map_target']={
+                ['dwarfui/tooltip/map_target']={
                     registry={
                         registration_count=function() return 0 end,
                         get_owner_roots=function() return {} end,
@@ -770,7 +807,7 @@ local function load_public_module(package_path)
                         end,
                     },
                 },
-                ['dwarfui/tooltip_target']=tooltip_target_stub(),
+                ['dwarfui/tooltip/target']=tooltip_target_stub(),
             },
         }
     elseif package_path ==
@@ -849,7 +886,7 @@ describe('DwarfUI package contract', function()
 
     it('ships the process-wide tooltip service object', function()
         local _, module = load_public_module(
-            'scripts_modinstalled/dwarfui/tooltip_service.lua')
+            'scripts_modinstalled/dwarfui/tooltip/service.lua')
 
         assert.equals('table', type(module.TooltipService))
         assert.equals('table', type(module.service))
@@ -860,7 +897,7 @@ describe('DwarfUI package contract', function()
 
     it('ships numeric tooltip target and observation enums', function()
         local _, module = load_public_module(
-            'scripts_modinstalled/dwarfui/tooltip_target.lua')
+            'scripts_modinstalled/dwarfui/tooltip/target.lua')
 
         assert.equals('number',
             type(module.TooltipTargetKind.WIDGET))
@@ -919,7 +956,7 @@ describe('DwarfUI package contract', function()
 
     it('ships the process-wide tooltip render-hook manager', function()
         local _, module = load_public_module(
-            'scripts_modinstalled/dwarfui/tooltip_render_hook.lua')
+            'scripts_modinstalled/dwarfui/tooltip/render_hook.lua')
 
         assert.equals('table', type(module.TooltipRenderHookManager))
         assert.equals('table', type(module.TooltipRenderTransport))
@@ -935,41 +972,44 @@ describe('DwarfUI package contract', function()
     end)
 
     it('ships the process-wide intent-driven tooltip presenter', function()
-        local _, module = load_public_module(
-            'scripts_modinstalled/dwarfui/tooltip.lua')
+        local _, presenter_module = load_public_module(
+            'scripts_modinstalled/dwarfui/tooltip/presenter.lua')
+        local _, runtime = load_public_module(
+            'scripts_modinstalled/dwarfui/tooltip/runtime.lua')
 
-        assert.equals('table', type(module.TooltipPresenter))
-        assert.equals('table', type(module.presenter))
-        assert.is_equal(module.TooltipPresenter,
-            getmetatable(module.presenter))
-        assert.equals('function', type(module.presenter.present))
-        assert.equals('function', type(module.presenter.get_diagnostics))
-        assert.is_nil(module.TooltipAgent)
+        assert.equals('table', type(presenter_module.TooltipPresenter))
+        assert.equals('function',
+            type(presenter_module.TooltipPresenter.new))
+        assert.equals('table', type(runtime.presenter))
+        assert.equals('function', type(runtime.presenter.present))
+        assert.equals('function', type(runtime.presenter.get_diagnostics))
+        assert.is_nil(presenter_module.TooltipAgent)
     end)
 
     it('ships the exact map-tile public registration contract ' ..
             '#map_tile_contract', function()
         local _, module = load_public_module(
-            'scripts_modinstalled/dwarfui/tooltip.lua')
+            'scripts_modinstalled/dwarfui/tooltip/api.lua')
 
         assert.equals('function', type(module.register_map_tile))
         assert.equals('function', type(module.update_map_tile))
         assert.equals('function', type(module.unregister_map_tile))
+        assert.equals('function', type(module.get_diagnostics))
     end)
 
     it('keeps tooltip input and registration free of UI hosts', function()
         local registration = read_source(
-            'scripts_modinstalled/dwarfui/tooltip_registration.lua')
+            'scripts_modinstalled/dwarfui/tooltip/registration.lua')
         local service = read_source(
-            'scripts_modinstalled/dwarfui/tooltip_service.lua')
+            'scripts_modinstalled/dwarfui/tooltip/service.lua')
         local map_target = read_source(
-            'scripts_modinstalled/dwarfui/tooltip_map_target.lua')
+            'scripts_modinstalled/dwarfui/tooltip/map_target.lua')
         local root_resolver = read_source(
-            'scripts_modinstalled/dwarfui/tooltip_root_resolver.lua')
+            'scripts_modinstalled/dwarfui/view_root_resolver.lua')
         for _, source in ipairs({
                 registration, service, map_target, root_resolver,
                 read_source(
-                    'scripts_modinstalled/dwarfui/tooltip_target.lua')}) do
+                    'scripts_modinstalled/dwarfui/tooltip/target.lua')}) do
             for _, forbidden in ipairs({
                     "require('gui')",
                     "require('gui.widgets')",
@@ -995,14 +1035,14 @@ describe('DwarfUI package contract', function()
 
     it('does not construct a tooltip screen or overlay widget', function()
         for _, relative_path in ipairs({
-                'scripts_modinstalled/dwarfui/tooltip.lua',
-                'scripts_modinstalled/dwarfui/tooltip_registration.lua',
-                'scripts_modinstalled/dwarfui/tooltip_service.lua',
-                'scripts_modinstalled/dwarfui/tooltip_root_resolver.lua',
-                'scripts_modinstalled/dwarfui/tooltip_target.lua',
-                'scripts_modinstalled/dwarfui/tooltip_target_detector.lua',
-                'scripts_modinstalled/dwarfui/tooltip_map_target.lua',
-                'scripts_modinstalled/dwarfui/tooltip_render_hook.lua',
+                'scripts_modinstalled/dwarfui/tooltip/api.lua',
+                'scripts_modinstalled/dwarfui/tooltip/registration.lua',
+                'scripts_modinstalled/dwarfui/tooltip/service.lua',
+                'scripts_modinstalled/dwarfui/view_root_resolver.lua',
+                'scripts_modinstalled/dwarfui/tooltip/target.lua',
+                'scripts_modinstalled/dwarfui/tooltip/target_detector.lua',
+                'scripts_modinstalled/dwarfui/tooltip/map_target.lua',
+                'scripts_modinstalled/dwarfui/tooltip/render_hook.lua',
             }) do
             local source = read_source(relative_path)
             assert.is_nil(source:find('gui.ZScreen{', 1, true), relative_path)
@@ -1018,18 +1058,18 @@ describe('DwarfUI package contract', function()
         for _, relative_path in ipairs({
                 'scripts_modinstalled/dwarfui/pointer.lua',
                 'scripts_modinstalled/dwarfui/pointer_poller.lua',
-                'scripts_modinstalled/dwarfui/tooltip_root_resolver.lua',
-                'scripts_modinstalled/dwarfui/tooltip_target.lua',
-                'scripts_modinstalled/dwarfui/tooltip_target_detector.lua',
-                'scripts_modinstalled/dwarfui/tooltip_map_target.lua',
-                'scripts_modinstalled/dwarfui/tooltip_service.lua',
-                'scripts_modinstalled/dwarfui/tooltip_registration.lua',
+                'scripts_modinstalled/dwarfui/view_root_resolver.lua',
+                'scripts_modinstalled/dwarfui/tooltip/target.lua',
+                'scripts_modinstalled/dwarfui/tooltip/target_detector.lua',
+                'scripts_modinstalled/dwarfui/tooltip/map_target.lua',
+                'scripts_modinstalled/dwarfui/tooltip/service.lua',
+                'scripts_modinstalled/dwarfui/tooltip/registration.lua',
             }) do
             local source = read_source(relative_path)
             assert.is_nil(source:find(
-                "reqscript('dwarfui/tooltip')", 1, true), relative_path)
+                "reqscript('dwarfui/tooltip/api')", 1, true), relative_path)
             assert.is_nil(source:find(
-                "reqscript('dwarfui/tooltip_render_hook')", 1, true),
+                "reqscript('dwarfui/tooltip/render_hook')", 1, true),
                 relative_path)
             assert.is_nil(source:find(
                 'TooltipPresenter', 1, true), relative_path)
@@ -1039,7 +1079,7 @@ describe('DwarfUI package contract', function()
     it('keeps exact map-target detection generic and host-independent',
             function()
         local source = read_source(
-            'scripts_modinstalled/dwarfui/tooltip_map_target.lua')
+            'scripts_modinstalled/dwarfui/tooltip/map_target.lua')
         for _, forbidden in ipairs({
                 'minecart',
                 'Minecart',
@@ -1057,8 +1097,8 @@ describe('DwarfUI package contract', function()
     it('does not compensate for wrapper-shaped class test doubles',
             function()
         for _, relative_path in ipairs({
-                'scripts_modinstalled/dwarfui/tooltip.lua',
-                'scripts_modinstalled/dwarfui/tooltip_root_resolver.lua',
+                'scripts_modinstalled/dwarfui/tooltip/api.lua',
+                'scripts_modinstalled/dwarfui/view_root_resolver.lua',
                 'scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua',
             }) do
             local source = read_source(relative_path)

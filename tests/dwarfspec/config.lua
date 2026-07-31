@@ -96,12 +96,12 @@ end
 ---Returns current input, presenter, and sanitized render-hook diagnostics.
 ---@return table
 local function tooltip_diagnostics()
-    local registration = reqscript('dwarfui/tooltip_registration')
-    local tooltip = reqscript('dwarfui/tooltip')
-    local render_hook = reqscript('dwarfui/tooltip_render_hook')
-    local result = registration.get_diagnostics()
+    local tooltip = reqscript('dwarfui/tooltip/api')
+    local render_hook = reqscript('dwarfui/tooltip/render_hook')
+    local result = tooltip.get_diagnostics()
     result.presenter =
-        snapshot_presenter(tooltip.presenter:get_diagnostics())
+        snapshot_presenter(result.presentation)
+    result.presentation = nil
     result.render_hook =
         snapshot_render_hook(render_hook.manager:get_diagnostics())
     return result

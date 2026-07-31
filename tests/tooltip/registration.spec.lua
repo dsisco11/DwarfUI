@@ -5,17 +5,17 @@ local widget_harness = require('support.widget_harness')
 local POINTER_POLLER_PATH =
     'src/scripts_modinstalled/dwarfui/pointer_poller.lua'
 local TARGET_DETECTOR_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/target_detector.lua'
 local ROOT_RESOLVER_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
+    'src/scripts_modinstalled/dwarfui/view_root_resolver.lua'
 local MAP_TARGET_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_map_target.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/map_target.lua'
 local SERVICE_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_service.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/service.lua'
 local TARGET_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/target.lua'
 local REGISTRATION_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_registration.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/registration.lua'
 local ENUM_PATH =
     'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua'
 
@@ -103,22 +103,22 @@ local function load_environment(state)
                 globals={dfhack=dfhack},
                 reqscript={
                     ['dwarfui/pointer']=pointer,
-                    ['dwarfui/tooltip_root_resolver']=root_resolver,
-                    ['dwarfui/tooltip_target']=target_adapter,
+                    ['dwarfui/view_root_resolver']=root_resolver,
+                    ['dwarfui/tooltip/target']=target_adapter,
                 },
             })
         local _, map_target = module_loader.load(
             repo_root, MAP_TARGET_PATH, {
                 globals={dfhack=dfhack},
                 reqscript={
-                    ['dwarfui/tooltip_root_resolver']=root_resolver,
-                    ['dwarfui/tooltip_target']=target_adapter,
+                    ['dwarfui/view_root_resolver']=root_resolver,
+                    ['dwarfui/tooltip/target']=target_adapter,
                 },
             })
         local _, service = module_loader.load(repo_root, SERVICE_PATH, {
             globals={dfhack=dfhack},
             reqscript={
-                ['dwarfui/tooltip_target']=target_adapter,
+                ['dwarfui/tooltip/target']=target_adapter,
             },
         })
         local _, registration = module_loader.load(
@@ -127,10 +127,10 @@ local function load_environment(state)
                 require_modules={},
                 reqscript={
                     ['dwarfui/pointer_poller']=pointer_poller,
-                    ['dwarfui/tooltip_target_detector']=target_detector,
-                    ['dwarfui/tooltip_map_target']=map_target,
-                    ['dwarfui/tooltip_service']=service,
-                    ['dwarfui/tooltip_target']=target_adapter,
+                    ['dwarfui/tooltip/target_detector']=target_detector,
+                    ['dwarfui/tooltip/map_target']=map_target,
+                    ['dwarfui/tooltip/service']=service,
+                    ['dwarfui/tooltip/target']=target_adapter,
                 },
             })
         return registration

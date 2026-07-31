@@ -51,8 +51,8 @@ MODULES = {
         contract_type='table',
     },
     {
-        name='dwarfui/tooltip_root_resolver',
-        contract='TooltipRootResolver',
+        name='dwarfui/view_root_resolver',
+        contract='ViewRootResolver',
         contract_type='table',
     },
     {
@@ -97,30 +97,47 @@ MODULES = {
     },
     {name='dwarfui/context_menu/api', contract='register'},
     {
-        name='dwarfui/tooltip_target',
+        name='dwarfui/tooltip/target',
         contract='TooltipTargetAdapter',
         contract_type='table',
     },
     {
-        name='dwarfui/tooltip_target_detector',
+        name='dwarfui/tooltip/target_detector',
         contract='TooltipTargetDetector',
         contract_type='table',
     },
     {
-        name='dwarfui/tooltip_map_target',
+        name='dwarfui/tooltip/map_target',
         contract='TooltipMapTargetRegistry',
         contract_type='table',
     },
     {
-        name='dwarfui/tooltip_service',
+        name='dwarfui/tooltip/service',
         contract='service',
         contract_type='table',
     },
+    {name='dwarfui/tooltip/registration', contract='register'},
     {
-        name='dwarfui/tooltip_render_hook',
+        name='dwarfui/tooltip/render_hook',
         contract='manager',
         contract_type='table',
     },
+    {
+        name='dwarfui/tooltip/renderer',
+        contract='TooltipRenderer',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/tooltip/presenter',
+        contract='TooltipPresenter',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/tooltip/runtime',
+        contract='presenter',
+        contract_type='table',
+    },
+    {name='dwarfui/tooltip/api', contract='register'},
     {
         name='dwarfui/popover',
         contract='Popover',
@@ -137,12 +154,6 @@ MODULES = {
         contract_type='table',
     },
     {name='dwarfui/unit_card_task', contract='is_haul_job'},
-    {
-        name='dwarfui/tooltip',
-        contract='TooltipRenderer',
-        contract_type='table',
-    },
-    {name='dwarfui/tooltip_registration', contract='register'},
 }
 
 local REGISTRY_SCRIPT = 'dwarfui/module_registry'

@@ -5,7 +5,7 @@ local widget_harness = require('support.widget_harness')
 local extension_path =
     'src/scripts_modinstalled/dwarfui/widget_extensions.lua'
 local text_path = 'src/scripts_modinstalled/dwarfui/text.lua'
-local tooltip_path = 'src/scripts_modinstalled/dwarfui/tooltip.lua'
+local tooltip_path = 'src/scripts_modinstalled/dwarfui/tooltip/renderer.lua'
 local Policy
 
 local function load_tooltip(state)
@@ -136,9 +136,9 @@ local function load_tooltip(state)
             ['dwarfui/class']=class_helpers,
             ['dwarfui/pointer']=pointer,
             ['dwarfui/widget_extensions']=extensions,
-            ['dwarfui/tooltip_registration']=registration,
-            ['dwarfui/tooltip_service']={service=service},
-            ['dwarfui/tooltip_render_hook']={
+            ['dwarfui/tooltip/registration']=registration,
+            ['dwarfui/tooltip/service']={service=service},
+            ['dwarfui/tooltip/render_hook']={
                 manager=hook_manager,
                 TooltipRenderTransport=transport,
             },
@@ -149,65 +149,6 @@ local function load_tooltip(state)
 end
 
 describe('DwarfUI tooltip renderer', function()
-    it('delegates stable registration through the tooltip facade', function()
-        local state = {registration_service={}}
-        state.registration_service.register = function(widget)
-            state.registered = widget
-            return true
-        end
-        state.registration_service.unregister = function(widget)
-            state.unregistered = widget
-            return true
-        end
-        local tooltip = load_tooltip(state)
-        local widget = {}
-
-        assert.is_true(tooltip.register(widget))
-        assert.is.equal(widget, state.registered)
-        assert.is_true(tooltip.unregister(widget))
-        assert.is.equal(widget, state.unregistered)
-    end)
-
-    it('delegates the exact map-tile registration lifecycle ' ..
-            '#map_tile_contract', function()
-        local state = {registration_service={}}
-        local handle = {}
-        state.registration_service.register_map_tile = function(options)
-            state.map_registration = options
-            return handle
-        end
-        state.registration_service.update_map_tile = function(target, update)
-            state.map_update_target = target
-            state.map_update = update
-            return true
-        end
-        state.registration_service.unregister_map_tile = function(target)
-            state.map_unregistration = target
-            return true
-        end
-        local tooltip = load_tooltip(state)
-        local options = {
-            owner={},
-            pos={x=11, y=22, z=3},
-            tooltip='Exact tile',
-        }
-        local update = {
-            pos={x=12, y=23, z=4},
-            tooltip=nil,
-        }
-
-        assert.equals('function', type(tooltip.register_map_tile))
-        assert.equals('function', type(tooltip.update_map_tile))
-        assert.equals('function', type(tooltip.unregister_map_tile))
-        assert.is_equal(handle, tooltip.register_map_tile(options))
-        assert.is_equal(options, state.map_registration)
-        assert.is_true(tooltip.update_map_tile(handle, update))
-        assert.is_equal(handle, state.map_update_target)
-        assert.is_equal(update, state.map_update)
-        assert.is_true(tooltip.unregister_map_tile(handle))
-        assert.is_equal(handle, state.map_unregistration)
-    end)
-
     it('is a hidden plain Widget with the required pens and exclusion policy', function()
         local state = {}
         local tooltip, widgets = load_tooltip(state)
@@ -345,7 +286,7 @@ describe('DwarfUI tooltip renderer', function()
 
     it('contains no SoulSearch diagnostics or logging surface', function()
         local file = assert(io.open(repo_root ..
-            '/src/scripts_modinstalled/dwarfui/tooltip.lua', 'rb'))
+            '/src/scripts_modinstalled/dwarfui/tooltip/renderer.lua', 'rb'))
         local source = file:read('*a')
         file:close()
         local lower = source:lower()

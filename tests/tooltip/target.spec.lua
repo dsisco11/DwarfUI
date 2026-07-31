@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local _, adapters = module_loader.load(repo_root,
-    'src/scripts_modinstalled/dwarfui/tooltip_target.lua')
+    'src/scripts_modinstalled/dwarfui/tooltip/target.lua')
 
 describe('DwarfUI normalized tooltip targets', function()
     it('exports distinct numeric target and observation enums', function()

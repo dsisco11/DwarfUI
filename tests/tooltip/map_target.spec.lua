@@ -3,11 +3,11 @@ local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
 local ROOT_RESOLVER_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
+    'src/scripts_modinstalled/dwarfui/view_root_resolver.lua'
 local MAP_TARGET_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_map_target.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/map_target.lua'
 local TARGET_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/target.lua'
 local _, target_types = module_loader.load(repo_root, TARGET_PATH)
 local ObservationKind = target_types.TooltipPointerObservationKind
 local TargetKind = target_types.TooltipTargetKind
@@ -68,8 +68,8 @@ local function load_environment()
             repo_root, MAP_TARGET_PATH, {
                 globals={dfhack=dfhack},
                 reqscript={
-                    ['dwarfui/tooltip_root_resolver']=root_resolver,
-                    ['dwarfui/tooltip_target']=target_types,
+                    ['dwarfui/view_root_resolver']=root_resolver,
+                    ['dwarfui/tooltip/target']=target_types,
                 },
             })
         return map_target

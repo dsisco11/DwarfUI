@@ -220,7 +220,7 @@ local function load_overlay(state)
                 },
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
-                ['dwarfui/tooltip']=tooltip,
+                ['dwarfui/tooltip/api']=tooltip,
                 ['dwarfui/pointer']={PointerPolicy=PointerPolicy},
             },
         })

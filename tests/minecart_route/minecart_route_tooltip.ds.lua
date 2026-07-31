@@ -226,7 +226,7 @@ end
 local function assert_native_render_diagnostics(
         state, minimum_rendered_revision, expected_outermost)
     local transport =
-        reqscript('dwarfui/tooltip_render_hook').TooltipRenderTransport
+        reqscript('dwarfui/tooltip/render_hook').TooltipRenderTransport
     assert.is_true(state.presenter.active)
     assert.is_true(state.presenter.supported_surface)
     assert.equals(transport.OVERLAY,
@@ -257,7 +257,7 @@ end
 ---Installs a reversible foreign wrapper outside the active tooltip hook.
 ---@return table record
 local function install_foreign_overlay_wrapper()
-    local hook = reqscript('dwarfui/tooltip_render_hook')
+    local hook = reqscript('dwarfui/tooltip/render_hook')
     local active_record = assert(hook.manager._state.overlay_hook,
         'active tooltip overlay hook is unavailable')
     local current_export = overlay.render_viewscreen_widgets
@@ -335,7 +335,7 @@ describe('native minecart zoom tooltip polling', function()
             controls = resolve_controls()
             local stop = reveal_action(hauling, controls)
             local action = controls.action
-            local tooltip = reqscript('dwarfui/tooltip')
+            local tooltip = reqscript('dwarfui/tooltip/api')
             local environment = capture_environment(native_subject)
 
             -- The production overlay already registered this button. Cycle
@@ -513,7 +513,7 @@ describe('native minecart zoom tooltip polling', function()
             state = ds.tooltip_state()
             assert.is_equal(controls.action, state.target,
                 'recreated Hauling action did not become the tooltip target')
-            assert.is_table(reqscript('dwarfui/tooltip_service').service:
+            assert.is_table(reqscript('dwarfui/tooltip/service').service:
                 get_registrations()[controls.action],
                 'recreated Hauling action was not automatically registered')
             assert_input_only_diagnostics(state)
@@ -536,7 +536,7 @@ describe('native minecart zoom tooltip polling', function()
         cleanup_step('restore action overrides', restore_action)
         cleanup_step('restore interrupted registration', function()
             if registration_to_restore then
-                reqscript('dwarfui/tooltip').register(
+                reqscript('dwarfui/tooltip/api').register(
                     registration_to_restore)
                 registration_to_restore = nil
             end
@@ -801,7 +801,7 @@ describe('native minecart zoom tooltip final rendering', function()
             if probe then probe.enabled = false end
         end)
         cleanup_step('retire tooltip render hooks', function()
-            reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
+            reqscript('dwarfui/tooltip/render_hook').manager:shutdown()
         end)
         cleanup_step('restore foreign and displaced overlay wrappers',
             function()

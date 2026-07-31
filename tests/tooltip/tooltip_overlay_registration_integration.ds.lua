@@ -1,6 +1,6 @@
 -- Real overlay-discovery integration contracts for tooltip input intent.
 
-local tooltip = reqscript('dwarfui/tooltip')
+local tooltip = reqscript('dwarfui/tooltip/api')
 local overlay = require('plugins.overlay')
 
 ---Returns the product diagnostics registered in tests/dwarfspec/config.lua.

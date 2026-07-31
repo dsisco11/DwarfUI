@@ -93,23 +93,17 @@ describe('DwarfSpec tooltip diagnostics adapter', function()
         }
         local _, config = module_loader.load(repo_root, CONFIG_PATH, {
             reqscript={
-                ['dwarfui/tooltip_registration']={
+                ['dwarfui/tooltip/api']={
                     get_diagnostics=function()
                         local copy = {}
                         for key, value in pairs(registration_diagnostics) do
                             copy[key] = value
                         end
+                        copy.presentation = presenter_diagnostics
                         return copy
                     end,
                 },
-                ['dwarfui/tooltip']={
-                    presenter={
-                        get_diagnostics=function()
-                            return presenter_diagnostics
-                        end,
-                    },
-                },
-                ['dwarfui/tooltip_render_hook']={
+                ['dwarfui/tooltip/render_hook']={
                     manager={
                         get_diagnostics=function()
                             return hook_diagnostics

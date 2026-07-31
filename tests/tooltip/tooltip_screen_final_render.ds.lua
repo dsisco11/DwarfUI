@@ -43,7 +43,7 @@ function TooltipFinalRenderScreen:init()
         tooltip=self.tooltip_text,
     }
     self:addviews{self.tooltip_target}
-    assert(reqscript('dwarfui/tooltip').register(
+    assert(reqscript('dwarfui/tooltip/api').register(
         self.tooltip_target))
 end
 
@@ -187,7 +187,7 @@ end
 local function assert_screen_render_diagnostics(
         state, minimum_rendered_revision, expected_hook_count)
     local transport =
-        reqscript('dwarfui/tooltip_render_hook').TooltipRenderTransport
+        reqscript('dwarfui/tooltip/render_hook').TooltipRenderTransport
     assert.is_true(state.presenter.active)
     assert.is_true(state.presenter.supported_surface)
     assert.equals(transport.SCREEN,
@@ -434,9 +434,9 @@ describe('foreground Lua-screen tooltip final rendering', function()
                 local current = ds.tooltip_state()
                 return current.target == nil and current.intent == nil
             end)
-            assert.is_true(reqscript('dwarfui/tooltip').unregister(
+            assert.is_true(reqscript('dwarfui/tooltip/api').unregister(
                 upper_target))
-            assert.is_true(reqscript('dwarfui/tooltip').unregister(
+            assert.is_true(reqscript('dwarfui/tooltip/api').unregister(
                 lower_target))
 
             local lower_native = lower._native
@@ -454,7 +454,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
             end)
             assert.equals(1, lower.dismiss_count)
 
-            reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
+            reqscript('dwarfui/tooltip/render_hook').manager:shutdown()
             assert.is_equal(upper_original_raw,
                 rawget(upper, 'onRender'))
             assert.is_equal(lower_original_raw,
@@ -487,12 +487,12 @@ describe('foreground Lua-screen tooltip final rendering', function()
         end
 
         cleanup_step('clear tooltip registrations', function()
-            local tooltip = reqscript('dwarfui/tooltip')
+            local tooltip = reqscript('dwarfui/tooltip/api')
             if upper_target then tooltip.unregister(upper_target) end
             if lower_target then tooltip.unregister(lower_target) end
         end)
         cleanup_step('retire screen render hooks', function()
-            reqscript('dwarfui/tooltip_render_hook').manager:shutdown()
+            reqscript('dwarfui/tooltip/render_hook').manager:shutdown()
         end)
         cleanup_step('dismiss upper screen', function()
             if upper and upper._native then upper:dismiss() end

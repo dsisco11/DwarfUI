@@ -3,11 +3,11 @@ local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
 local DETECTOR_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/target_detector.lua'
 local ROOT_RESOLVER_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
+    'src/scripts_modinstalled/dwarfui/view_root_resolver.lua'
 local TARGET_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/target.lua'
 local ENUM_PATH =
     'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua'
 
@@ -70,8 +70,8 @@ local function load_environment(state)
             globals={dfhack=dfhack},
             reqscript={
                 ['dwarfui/pointer']=pointer,
-                ['dwarfui/tooltip_root_resolver']=root_resolver,
-                ['dwarfui/tooltip_target']=target_types,
+                ['dwarfui/view_root_resolver']=root_resolver,
+                ['dwarfui/tooltip/target']=target_types,
             },
         })
 

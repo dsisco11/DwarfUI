@@ -4,27 +4,15 @@ DwarfUI is a DFHack mod that provides reusable UI infrastructure and its own
 user-facing interface enhancements.
 
 The shared public Lua namespace is installed under `scripts_modinstalled/dwarfui/`.
-The tooltip port reserves these downstream module paths:
+The supported tooltip entry point is:
 
-- `dwarfui/text`
-- `dwarfui/widget_extensions`
-- `dwarfui/pointer`
-- `dwarfui/pointer_poller`
-- `dwarfui/tooltip_target_detector`
-- `dwarfui/tooltip_service`
-- `dwarfui/tooltip_render_hook`
-- `dwarfui/tooltip`
-- `dwarfui/tooltip_registration`
+- `dwarfui/tooltip/api`
 
 All modules use DFHack's `--@ module=true` script-environment contract and are
-loaded with `reqscript()`. `dwarfui/text` provides
-standalone text wrapping, and importing `dwarfui/widget_extensions` installs
-the declarative tooltip and pointer attributes on DFHack's native widget
-classes. `dwarfui/pointer` provides isolated per-root pointer contexts and
-generic target/pass/block/none dispatch. The remaining tooltip modules provide
-process-wide weak registration, pointer polling, immutable tooltip intent, and
-final rendering through reload-safe native-overlay and Lua-screen hooks.
-`dwarfui/tooltip` is the stable public registration facade.
+loaded with `reqscript()`. The modules beneath `dwarfui/tooltip/` other than
+`api` implement registration, pointer polling, immutable intent, and final
+rendering through reload-safe native-overlay and Lua-screen hooks. Those module
+paths are internal implementation details, not downstream API contracts.
 
 ## Mood icon unit popover
 
@@ -52,10 +40,10 @@ are not downstream API contracts.
 
 ## Automatic tooltip registration
 
-The stable high-level API is exposed by `dwarfui/tooltip`:
+The stable high-level API is exposed by `dwarfui/tooltip/api`:
 
 ```lua
-local tooltip = reqscript('dwarfui/tooltip')
+local tooltip = reqscript('dwarfui/tooltip/api')
 
 local label = widgets.Label{
     text='Hover me',
@@ -67,6 +55,25 @@ tooltip.register(label)
 Registration may happen before or after attachment. It is idempotent and uses
 weak keys, so ordinary widget lifetime does not require explicit cleanup.
 `tooltip.unregister(label)` is available when immediate removal is useful.
+
+Exact map tiles use opaque registration handles:
+
+```lua
+local handle = tooltip.register_map_tile{
+    owner=overlay_widget,
+    pos={x=10, y=20, z=3},
+    tooltip='Route stop',
+}
+tooltip.update_map_tile(handle, {
+    pos={x=11, y=20, z=3},
+    tooltip='Updated route stop',
+})
+tooltip.unregister_map_tile(handle)
+```
+
+`tooltip.get_diagnostics()` returns a copied registration snapshot with a
+`presentation` snapshot for support and test integrations. Consumers should
+not load the internal service, presenter, or render-hook modules directly.
 
 Registration creates no screen, overlay widget, focus owner, input handler, or
 renderer. A presentation-neutral poller publishes one immutable process-wide

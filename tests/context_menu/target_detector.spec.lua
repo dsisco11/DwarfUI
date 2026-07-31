@@ -61,7 +61,7 @@ local function load_environment()
     end
 
     local root_resolver = {
-        TooltipRootResolver={new=function() return resolver end},
+        ViewRootResolver={new=function() return resolver end},
     }
     local _, root_discovery = module_loader.load(
         repo_root, BASE .. 'context_menu/root_discovery.lua', {
@@ -71,7 +71,7 @@ local function load_environment()
         ['dwarfui/context_menu/definition']=definitions,
         ['dwarfui/context_menu/target']=targets,
         ['dwarfui/utils/numbers']=numbers,
-        ['dwarfui/tooltip_root_resolver']=root_resolver,
+        ['dwarfui/view_root_resolver']=root_resolver,
     }
     local _, map_target = module_loader.load(
         repo_root, BASE .. 'context_menu/map_target.lua', {
@@ -85,7 +85,7 @@ local function load_environment()
                 ['dwarfui/context_menu/map_target']=map_target,
                 ['dwarfui/context_menu/root_discovery']=root_discovery,
                 ['dwarfui/context_menu/target']=targets,
-                ['dwarfui/tooltip_root_resolver']=root_resolver,
+                ['dwarfui/view_root_resolver']=root_resolver,
             },
         })
     local manager = registration.ContextMenuRegistrationManager.new{

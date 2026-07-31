@@ -4,7 +4,7 @@
 
 local overlay = require('plugins.overlay')
 local widgets = require('gui.widgets')
-local tooltip = reqscript('dwarfui/tooltip')
+local tooltip = reqscript('dwarfui/tooltip/api')
 
 ---@class tests.TooltipRegistrationOverlay: plugins.overlay.OverlayWidget
 local TooltipRegistrationOverlay = defclass(nil, overlay.OverlayWidget)

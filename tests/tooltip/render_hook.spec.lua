@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local MODULE_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/render_hook.lua'
 
 local _, function_chain = module_loader.load(
     repo_root, 'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')

@@ -2,9 +2,9 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local SERVICE_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_service.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/service.lua'
 local TARGET_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip/target.lua'
 local _, target_types = module_loader.load(repo_root, TARGET_PATH)
 local ObservationKind = target_types.TooltipPointerObservationKind
 
@@ -17,7 +17,7 @@ local function load_service(process)
     local _, service_module = module_loader.load(repo_root, SERVICE_PATH, {
         globals={dfhack=dfhack},
         require_modules={},
-        reqscript={['dwarfui/tooltip_target']=target_types},
+        reqscript={['dwarfui/tooltip/target']=target_types},
     })
     return {
         dfhack=dfhack,

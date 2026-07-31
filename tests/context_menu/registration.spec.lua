@@ -16,7 +16,7 @@ local REGISTRATION_PATH =
 local ROOT_DISCOVERY_PATH =
     'src/scripts_modinstalled/dwarfui/context_menu/root_discovery.lua'
 local ROOT_RESOLVER_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
+    'src/scripts_modinstalled/dwarfui/view_root_resolver.lua'
 local TARGET_PATH =
     'src/scripts_modinstalled/dwarfui/context_menu/target.lua'
 
@@ -117,7 +117,7 @@ local function load_harness()
                     ['dwarfui/context_menu/definition']=definitions,
                     ['dwarfui/context_menu/target']=targets,
                     ['dwarfui/utils/numbers']=numbers,
-                    ['dwarfui/tooltip_root_resolver']=resolver_module,
+                    ['dwarfui/view_root_resolver']=resolver_module,
                 },
             })
         local _, registration_module = module_loader.load(
@@ -128,13 +128,13 @@ local function load_harness()
                     ['dwarfui/context_menu/map_target']=map_module,
                     ['dwarfui/context_menu/root_discovery']=discovery_module,
                     ['dwarfui/context_menu/target']=targets,
-                    ['dwarfui/tooltip_root_resolver']=resolver_module,
+                    ['dwarfui/view_root_resolver']=resolver_module,
                 },
             })
         return {
             definitions=definitions,
             module=registration_module,
-            resolver=resolver_module.TooltipRootResolver.new(),
+            resolver=resolver_module.ViewRootResolver.new(),
             targets=targets,
         }
     end

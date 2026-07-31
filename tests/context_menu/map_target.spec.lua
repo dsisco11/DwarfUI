@@ -69,8 +69,8 @@ local function load_harness()
             ['dwarfui/context_menu/definition']=definitions,
             ['dwarfui/context_menu/target']=targets,
             ['dwarfui/utils/numbers']=numbers,
-            ['dwarfui/tooltip_root_resolver']={
-                TooltipRootResolver={new=function() return resolver end},
+            ['dwarfui/view_root_resolver']={
+                ViewRootResolver={new=function() return resolver end},
             },
         },
     })

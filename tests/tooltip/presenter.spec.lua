@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 local _, target_types = module_loader.load(repo_root,
-    'src/scripts_modinstalled/dwarfui/tooltip_target.lua')
+    'src/scripts_modinstalled/dwarfui/tooltip/target.lua')
 local ObservationKind = target_types.TooltipPointerObservationKind
 
 local function load_environment()
@@ -98,15 +98,15 @@ local function load_environment()
             reqscript={['dwarfui/pointer']=pointer},
         })
     local _, service_module = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/tooltip_service.lua', {
+        'src/scripts_modinstalled/dwarfui/tooltip/service.lua', {
             globals={dfhack=process},
             reqscript={
-                ['dwarfui/tooltip_target']=target_types,
+                ['dwarfui/tooltip/target']=target_types,
             },
         })
     local function load_hook_generation()
         local _, result = module_loader.load(repo_root,
-            'src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua', {
+            'src/scripts_modinstalled/dwarfui/tooltip/render_hook.lua', {
                 globals={dfhack=process},
                 require_modules={['plugins.overlay']=overlay},
                 reqscript={
@@ -116,8 +116,8 @@ local function load_environment()
         return result
     end
     local function load_tooltip_generation(hook)
-        local _, result = module_loader.load(repo_root,
-            'src/scripts_modinstalled/dwarfui/tooltip.lua', {
+        local _, renderer_module = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/tooltip/renderer.lua', {
                 globals={
                     COLOR_BLACK='black',
                     COLOR_WHITE='white',
@@ -131,16 +131,29 @@ local function load_environment()
                     ['plugins.overlay']=overlay,
                 },
                 reqscript={
-                    ['dwarfui/class']=class_helpers,
                     ['dwarfui/widget_extensions']=extensions,
                     ['dwarfui/pointer']=pointer,
                     ['dwarfui/text']=text,
-                    ['dwarfui/tooltip_service']=service_module,
-                    ['dwarfui/tooltip_render_hook']=hook,
-                    ['dwarfui/tooltip_registration']={
-                        register=function() end,
-                        unregister=function() end,
-                    },
+                },
+            })
+        local _, presenter_module = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/tooltip/presenter.lua', {
+                globals={dfhack=process},
+                require_modules={gui=gui},
+                reqscript={['dwarfui/class']=class_helpers},
+            })
+        local _, result = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/tooltip/runtime.lua', {
+                globals={dfhack=process},
+                require_modules={
+                    gui=gui,
+                    ['plugins.overlay']=overlay,
+                },
+                reqscript={
+                    ['dwarfui/tooltip/presenter']=presenter_module,
+                    ['dwarfui/tooltip/renderer']=renderer_module,
+                    ['dwarfui/tooltip/service']=service_module,
+                    ['dwarfui/tooltip/render_hook']=hook,
                 },
             })
         return result
