@@ -40,6 +40,7 @@ local shipped_modules = {
     'dwarfui/tooltip/api.lua',
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
+    'dwarfui/ui_hotkeys.lua',
     'dwarfui/popover.lua',
     'dwarfui/unit_card_task.lua',
 }
@@ -53,6 +54,11 @@ local mood_popover_payload = {
 local minecart_route_payload = {
     registration='scripts_modinstalled/dwarfui-minecart-route-markers.lua',
     model='scripts_modinstalled/dwarfui/minecart_route.lua',
+}
+
+local ui_hotkeys_payload = {
+    registration='scripts_modinstalled/dwarfui-ui-hotkeys.lua',
+    model='scripts_modinstalled/dwarfui/ui_hotkeys.lua',
 }
 
 local function source_path(relative_path)
@@ -177,6 +183,38 @@ local function load_public_module(package_path)
                 },
             },
             reqscript={['dwarfui/utils/numbers']=numbers},
+        }
+    elseif package_path == 'scripts_modinstalled/dwarfui/ui_hotkeys.lua' then
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        options = {
+            globals={
+                defclass=function(_, parent)
+                    local class = {}
+                    class.__index = class
+                    class.super = parent
+                    class.ATTRS = setmetatable({}, {
+                        __call=function(_, values)
+                            for key, value in pairs(values) do
+                                class.ATTRS[key] = value
+                            end
+                        end,
+                    })
+                    return setmetatable(class, {
+                        __index=parent,
+                        __call=function(class_table, values)
+                            local instance = values or {}
+                            setmetatable(instance, class_table)
+                            if class_table.init then class_table.init(instance) end
+                            return instance
+                        end,
+                    })
+                end,
+                DEFAULT_NIL={},
+            },
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+            },
         }
     elseif package_path ==
             'scripts_modinstalled/dwarfui/context_menu/target_detector.lua' then
@@ -1168,6 +1206,18 @@ describe('DwarfUI package contract', function()
 
         local model = read_source(minecart_route_payload.model)
         contains(model, 'MinecartRouteMarkerProjection = defclass')
+    end)
+
+    it('includes the complete UI hotkeys payload and registration', function()
+        local registration = read_source(ui_hotkeys_payload.registration)
+        contains(registration, '--@ module=true')
+        contains(registration, 'OVERLAY_WIDGETS')
+        contains(registration, 'ui_hotkeys=UiMenuHotkeysOverlay')
+
+        local model = read_source(ui_hotkeys_payload.model)
+        contains(model, '--@ module=true')
+        contains(model, 'UiHotkeyModel = defclass')
+        contains(model, 'UiHotkeyMenuId =')
     end)
 
     it('ships the dwarfui reload command', function()

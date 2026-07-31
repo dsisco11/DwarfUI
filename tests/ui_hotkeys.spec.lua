@@ -19,6 +19,40 @@ local function load_module()
 end
 
 describe('DwarfUI UI hotkeys model', function()
+    it('recomputes bounds across window-size layout drift', function()
+        local hotkeys = load_module()
+        local width, height = 80, 25
+        local sample_calls = 0
+        local model = hotkeys.UiHotkeyModel{
+            active_provider=function() return true end,
+            dimensions_provider=function() return width, height end,
+            binding_lookup=function() return 'u' end,
+            button_catalog={{
+                menu_id=hotkeys.UiHotkeyMenuId.CITIZENS,
+                semantic_id='citizens',
+                action_binding='D_CITIZEN',
+                bounds_finder=function(context)
+                    sample_calls = sample_calls + 1
+                    return {
+                        x1=context.width - 8,
+                        y1=context.height - 4,
+                        x2=context.width - 3,
+                        y2=context.height - 2,
+                    }
+                end,
+            }},
+        }
+
+        local first = model:build_snapshot()
+        assert.same({x1=72, y1=21, x2=77, y2=23}, first.buttons[1].bounds)
+        assert.equals(1, sample_calls)
+
+        width, height = 96, 30
+        local second = model:build_snapshot()
+        assert.same({x1=88, y1=26, x2=93, y2=28}, second.buttons[1].bounds)
+        assert.equals(2, sample_calls)
+    end)
+
     it('caches sampled bounds until the layout signature changes', function()
         local hotkeys = load_module()
         local sample_calls = 0
