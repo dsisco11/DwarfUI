@@ -1,22 +1,30 @@
-☐ [Phase 1 - Existing-System Audit and Reusable Contracts] Define the boundary between generic hotkey-group infrastructure and feature-specific group definitions.
-    ☐ Inventory the responsibilities currently combined in `dwarfui/ui_hotkeys.lua` and `dwarfui-ui-hotkeys.lua`:
+✔ [Phase 1 - Existing-System Audit and Reusable Contracts] Define the boundary between generic hotkey-group infrastructure and feature-specific group definitions. @done(26-07-31 16:55)
+    ✔ Inventory the responsibilities currently combined in `dwarfui/ui_hotkeys.lua` and `dwarfui-ui-hotkeys.lua`: @done(26-07-31 16:55)
         - native element discovery,
         - rectangle validation and layout signatures,
         - semantic button ordering,
         - DF binding lookup and label normalization,
         - snapshot caching,
         - bounded overlay layout and rendering.
-    ☐ Document the current public exports and preserve compatible entry points for `UiHotkeyModel` and `UiMenuHotkeysOverlay` during migration.
-    ☐ Define a generic `HotkeyGroupDefinition` contract containing a stable group ID, activity provider, layout provider, button definitions, and label-placement configuration.
-    ☐ Define a canonical `HotkeyGroupLayout` result containing the group bounds, semantic element bounds, and a provider-owned layout signature.
-    ☐ Define a generic `HotkeyButtonDefinition` contract containing a stable semantic ID, DF action binding, and element selector.
-    ☐ Define immutable public enums for closed configuration concepts such as geometry source kind and label anchor.
-    ☐ Define failure behavior for inactive, missing, incomplete, and ambiguous groups without allowing one failed group or button to suppress unrelated labels.
-    ☐ Confirm that discovery providers are read-only and never manipulate the OS pointer or synthesize mouse clicks.
+    ✔ Document the current public exports and preserve compatible entry points for `UiHotkeyModel` and `UiMenuHotkeysOverlay` during migration. @done(26-07-31 16:55)
+    ✔ Define a generic `HotkeyGroupDefinition` contract containing a stable group ID, activity provider, layout provider, button definitions, and label-placement configuration. @done(26-07-31 16:55)
+    ✔ Define a canonical `HotkeyGroupLayout` result containing the group bounds, semantic element bounds, and a provider-owned layout signature. @done(26-07-31 16:55)
+    ✔ Define a generic `HotkeyButtonDefinition` contract containing a stable semantic ID, DF action binding, and element selector. @done(26-07-31 16:55)
+    ✔ Define immutable public enums for closed configuration concepts such as geometry source kind and label anchor. @done(26-07-31 16:55)
+    ✔ Define failure behavior for inactive, missing, incomplete, and ambiguous groups without allowing one failed group or button to suppress unrelated labels. @done(26-07-31 16:55)
+    ✔ Confirm that discovery providers are read-only and never manipulate the OS pointer or synthesize mouse clicks. @done(26-07-31 16:55)
     Deliverables:
     - Approved LuaDoc contracts for group definitions, layouts, elements, buttons, and snapshots.
     - Compatibility inventory for the existing UI-hotkey model and overlay exports.
     - Explicit ownership rules for generic infrastructure versus concrete group definitions.
+    Decisions:
+    - Generic semantics are joined to discovered geometry by stable `element_id`, never inferred from coordinates.
+    - Layout providers own source-specific signatures and return typed inactive, unavailable, or ambiguous outcomes.
+    - Native structures, widget containers, rendered signatures, and custom adapters share one validated layout boundary.
+    - Provider discovery is strictly read-only; input simulation is not a geometry-discovery mechanism.
+    - `UiHotkeyModel`, `UiMenuHotkeysOverlay`, their current snapshot fields, and `dwarfui-ui-hotkeys.ui_hotkeys` remain compatibility surfaces.
+    Docs:
+    - `Docs/reusable-hotkey-groups-contract.md`
 
 ☐ [Phase 2 - Generic Geometry Primitives] Extract reusable rectangle and rendered-element discovery utilities.
     ☐ Add `dwarfui/hotkeys/geometry.lua` as a reload-managed production module.
