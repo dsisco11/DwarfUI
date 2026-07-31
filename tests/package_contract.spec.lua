@@ -24,6 +24,9 @@ local shipped_modules = {
     'dwarfui/context_menu/target_detector.lua',
     'dwarfui/context_menu/input_hook.lua',
     'dwarfui/context_menu/service.lua',
+    'dwarfui/context_menu/renderer.lua',
+    'dwarfui/context_menu/screen.lua',
+    'dwarfui/context_menu/api.lua',
     'dwarfui/tooltip_target.lua',
     'dwarfui/tooltip_target_detector.lua',
     'dwarfui/tooltip_map_target.lua',
@@ -424,6 +427,63 @@ local function load_public_module(package_path)
                     is_integer=function(value)
                         return type(value) == 'number' and value % 1 == 0
                     end,
+                },
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/renderer.lua' then
+        local widget_harness = require('support.widget_harness')
+        options = {
+            globals={
+                defclass=widget_harness.defclass,
+                dfhack={pen={parse=function(value) return value end}},
+            },
+            require_modules={
+                gui={FRAME_INTERIOR=function() return {} end},
+                ['gui.widgets']=widget_harness.widgets(),
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/screen.lua' then
+        local widget_harness = require('support.widget_harness')
+        options = {
+            globals={
+                defclass=widget_harness.defclass,
+                dfhack={screen={getMousePos=function() return nil, nil end}},
+            },
+            require_modules={
+                gui={ZScreen=widget_harness.defclass(
+                    nil, widget_harness.widgets().Panel)},
+            },
+            reqscript={
+                ['dwarfui/context_menu/renderer']={
+                    ContextMenuWindow=setmetatable({}, {
+                        __call=function() return {} end,
+                    }),
+                },
+                ['dwarfui/context_menu/service']={
+                    service={
+                        set_presentation_factory=function() end,
+                        start=function() end,
+                    },
+                },
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/api.lua' then
+        options = {
+            reqscript={
+                ['dwarfui/context_menu/registration']={
+                    register=function() end,
+                    update=function() end,
+                    unregister=function() end,
+                    register_map_tile=function() end,
+                    update_map_tile=function() end,
+                    unregister_map_tile=function() end,
+                },
+                ['dwarfui/context_menu/screen']={},
+                ['dwarfui/context_menu/service']={
+                    service={get_diagnostics=function() return {} end},
                 },
             },
         }

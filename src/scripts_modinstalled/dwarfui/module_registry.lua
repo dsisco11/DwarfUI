@@ -85,6 +85,17 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/context_menu/renderer',
+        contract='ContextMenuWindow',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/screen',
+        contract='ContextMenuScreen',
+        contract_type='table',
+    },
+    {name='dwarfui/context_menu/api', contract='register'},
+    {
         name='dwarfui/tooltip_target',
         contract='TooltipTargetAdapter',
         contract_type='table',

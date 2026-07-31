@@ -125,7 +125,7 @@ end
 ---@return table
 local function load_harness(state)
     state = state or {}
-    state.process = state.process or {dwarfui={}}
+    state.process = state.process or {dwarfui={}, onStateChange={}}
     state.errors = state.errors or {}
     state.process.printerr = function(message)
         table.insert(state.errors, message)
@@ -189,7 +189,7 @@ local function load_harness(state)
         },
     }
     local _, module = module_loader.load(repo_root, SERVICE_PATH, {
-        globals={dfhack=state.process},
+        globals={dfhack=state.process, SC_WORLD_UNLOADED=42},
         reqscript={
             ['dwarfui/context_menu/input_hook']={manager=state.hook},
             ['dwarfui/context_menu/input_sample']=input_samples,
@@ -465,6 +465,28 @@ describe('context-menu service', function()
         assert.equals(1, hook.shutdown_count)
         assert.equals('root discovery',
             service:get_diagnostics().last_failure.stage)
+    end)
+
+    it('closes on world unload and releases only its owned callback',
+            function()
+        local harness = load_harness()
+        local factory = presenter_factory()
+        local service = create_service(harness, {
+            presentation_factory=factory,
+        })
+        service:start()
+        assert.is_true(service:open(detection()))
+        local callback =
+            harness.process.onStateChange.dwarfui_context_menu
+
+        callback(42)
+
+        assert.is_false(service:is_open())
+        assert.is_function(
+            harness.process.onStateChange.dwarfui_context_menu)
+        service:shutdown()
+        assert.is_nil(
+            harness.process.onStateChange.dwarfui_context_menu)
     end)
 
     it('destructively resets singleton state on module reload', function()

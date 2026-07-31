@@ -39,9 +39,12 @@ describe('DwarfUI module registry', function()
         assert.equals('dwarfui/context_menu/target_detector', calls[18])
         assert.equals('dwarfui/context_menu/input_hook', calls[19])
         assert.equals('dwarfui/context_menu/service', calls[20])
-        assert.equals('dwarfui/tooltip_target', calls[21])
-        assert.equals('dwarfui/tooltip_target_detector', calls[22])
-        assert.equals('dwarfui/tooltip_map_target', calls[23])
+        assert.equals('dwarfui/context_menu/renderer', calls[21])
+        assert.equals('dwarfui/context_menu/screen', calls[22])
+        assert.equals('dwarfui/context_menu/api', calls[23])
+        assert.equals('dwarfui/tooltip_target', calls[24])
+        assert.equals('dwarfui/tooltip_target_detector', calls[25])
+        assert.equals('dwarfui/tooltip_map_target', calls[26])
         assert.equals('dwarfui/tooltip', calls[#calls - 1])
         assert.equals('dwarfui/tooltip_registration', calls[#calls])
         assert.equals('table',
@@ -62,6 +65,12 @@ describe('DwarfUI module registry', function()
             type(loaded['dwarfui/context_menu/input_hook']))
         assert.equals('table',
             type(loaded['dwarfui/context_menu/service']))
+        assert.equals('table',
+            type(loaded['dwarfui/context_menu/renderer']))
+        assert.equals('table',
+            type(loaded['dwarfui/context_menu/screen']))
+        assert.equals('table',
+            type(loaded['dwarfui/context_menu/api']))
         assert.equals('table',
             type(loaded['dwarfui/context_menu/map_target']))
         assert.equals('table',
@@ -112,6 +121,9 @@ describe('DwarfUI module registry', function()
             'dwarfui/tooltip_map_target',
             'dwarfui/tooltip_target_detector',
             'dwarfui/tooltip_target',
+            'dwarfui/context_menu/api',
+            'dwarfui/context_menu/screen',
+            'dwarfui/context_menu/renderer',
             'dwarfui/context_menu/service',
             'dwarfui/context_menu/input_hook',
             'dwarfui/context_menu/target_detector',
