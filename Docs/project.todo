@@ -1,6 +1,4 @@
-✔ Port over the Tooltip widget from `SoulSearch`. @done(26-07-21 23:00)
 ☐ [Tooltip System] Refactor map-target coordinate indexing to use the packed 48-bit integer approach used by the context-menu system instead of `"x:y:z"` string keys.
-☐ Port over the ContextMenu widget from `DwarfDirect`. See `Docs/context-menu-system.todo`.
 ☐ [Minecart Routes] After the generic ContextMenu system is implemented, add context-menu support to route-stop map indicators. Right-clicking an indicator should open the generic context menu for that stop and expose its available actions, including the entry point for updating its position.
 ☐ [UI Hotkeys]: Add hotkey labels to the various ui-menu-buttons in the bottom panel to display which hotkey will open the menu. E.g. the "citizen" menu button should have a small "u" label in the corner to indicate that pressing "u" will open the citizen menu.
 ✔ [Mood Popover] Implement ability to hover mouse over dwarf mood icons in the top panel to show a popout panel which shows the list of all units at that mood level. See `Docs/mood-popover.todo`. @done(26-07-22 08:05)
