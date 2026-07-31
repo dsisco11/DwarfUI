@@ -176,6 +176,37 @@ describe('DwarfUI exact map-tile tooltip targets', function()
         assert.equals(4, z_miss.map_z)
     end)
 
+    it('packs signed-16 coordinates into distinct exact lookup keys',
+            function()
+        local env = load_environment()
+        local registry = env.load_generation().registry
+        local owner = env.widgets.Panel{}
+        present_native(env, owner)
+        local positions = {
+            {x=-32768, y=-32768, z=-32768},
+            {x=32767, y=32767, z=32767},
+            {x=-1, y=0, z=0},
+            {x=0, y=-1, z=0},
+            {x=0, y=0, z=-1},
+        }
+        for index, position in ipairs(positions) do
+            registry:register{
+                owner=owner,
+                pos=position,
+                tooltip=('Position %d'):format(index),
+            }
+        end
+
+        for index, position in ipairs(positions) do
+            local hit = registry:detect(sample(index, 1, 1,
+                position.x, position.y, position.z))
+            assert.equals(ObservationKind.TARGET, hit.kind)
+            assert.equals(('Position %d'):format(index), hit.tooltip)
+        end
+        assert.equals(#positions,
+            registry:get_diagnostics().coordinate_bucket_count)
+    end)
+
     it('resolves duplicate coordinates by latest eligible registration',
             function()
         local env = load_environment()
