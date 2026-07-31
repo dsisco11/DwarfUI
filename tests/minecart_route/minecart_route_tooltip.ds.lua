@@ -2,6 +2,7 @@
 
 local gui = require('gui')
 local overlay = require('plugins.overlay')
+local MinecartRouteFixture = require('tests.minecart_route.support.route_fixture')
 
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
@@ -300,6 +301,7 @@ describe('native minecart zoom tooltip polling', function()
         local initial_scroll
         local saved_action_fields
         local registration_to_restore
+        local route_fixture
 
         ---Restores test-owned method and tooltip overrides on the live action.
         local function restore_action()
@@ -323,6 +325,7 @@ describe('native minecart zoom tooltip polling', function()
                     return ds.hasFocus('dwarfmode/Default')
                 end)
             end
+            route_fixture = MinecartRouteFixture.create()
 
             ds.input('D_HAULING')
             ds.await('native Hauling menu opens', function()
@@ -561,6 +564,10 @@ describe('native minecart zoom tooltip polling', function()
                 end)
             end
         end)
+        cleanup_step('remove disposable routes', function()
+            MinecartRouteFixture.destroy(route_fixture)
+            route_fixture = nil
+        end)
         cleanup_step('restore Hauling scroll position', function()
             if initial_scroll ~= nil and df.global.plotinfo.hauling then
                 df.global.plotinfo.hauling.scroll_position = initial_scroll
@@ -597,6 +604,7 @@ describe('native minecart zoom tooltip final rendering', function()
         local initially_open
         local initial_scroll
         local environment
+        local route_fixture
 
         local ok, failure = xpcall(function()
             native_subject = ds.mountNativeScreen()
@@ -607,6 +615,7 @@ describe('native minecart zoom tooltip final rendering', function()
                     return ds.hasFocus('dwarfmode/Default')
                 end)
             end
+            route_fixture = MinecartRouteFixture.create()
             ds.input('D_HAULING')
             ds.await('native Hauling menu opens for final rendering',
                 function()
@@ -832,6 +841,10 @@ describe('native minecart zoom tooltip final rendering', function()
                     return ds.hasFocus('dwarfmode/Default')
                 end)
             end
+        end)
+        cleanup_step('remove disposable routes', function()
+            MinecartRouteFixture.destroy(route_fixture)
+            route_fixture = nil
         end)
         cleanup_step('restore Hauling scroll position', function()
             if initial_scroll ~= nil and df.global.plotinfo.hauling then

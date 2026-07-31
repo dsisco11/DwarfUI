@@ -9,6 +9,7 @@ local spy = require('luassert.spy')
 local utils = require('utils')
 local MarkerKind =
     reqscript('dwarfui/minecart_route').MinecartRouteMarkerKind
+local MinecartRouteFixture = require('tests.minecart_route.support.route_fixture')
 
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
@@ -354,6 +355,7 @@ describe('registered Minecart Route overlay against the native menu', function()
             indicator=copy_coord(df.global.game.main_interface.recenter_indicator_m),
         }
         local hauling, overlay, native_subject, rail_subject, surface_subject
+        local route_fixture
         local zoom_subject
         local rail, action
         local initial_scroll, initial_selection, initially_open
@@ -382,6 +384,8 @@ describe('registered Minecart Route overlay against the native menu', function()
                     return ds.hasFocus('dwarfmode/Default')
                 end)
             end
+
+            route_fixture = MinecartRouteFixture.create()
 
             local overlay_source = {
                 source='overlay',
@@ -881,6 +885,7 @@ describe('registered Minecart Route overlay against the native menu', function()
                 return ds.hasFocus('dwarfmode/Default')
             end)
         end
+        MinecartRouteFixture.destroy(route_fixture)
         assert.same(saved.indicator, copy_coord(
             df.global.game.main_interface.recenter_indicator_m))
         assert.is_true(ok, failure)

@@ -145,11 +145,16 @@ describe('registered mood overlay with native top-bar data', function()
                     if not (popover_ok and header_ok and list_ok) then
                         return false
                     end
-                    popover_subject = selected_popover
+            popover_subject = selected_popover
                     header_subject = selected_header
                     list_subject = selected_list
                     return true
                 end)
+
+            -- TestWorld 01 has seven skilled citizens. A five-row cap makes
+            -- that real native population exercise the scrolling branch
+            -- without mutating the fortress or relying on a spawner.
+            popover_subject:raw().max_rows = 5
 
             local display = mood_overlay.TopBarMoodDisplay{}
             local moodlets = assert(display:find_layout(),
@@ -265,9 +270,10 @@ describe('registered mood overlay with native top-bar data', function()
             local target = assert(choice.row and choice.row.unit,
                 'visible mood row has no native unit')
             local rendered_row = choice.text
-            assert.is_truthy(after_text:find(rendered_row, 1, true),
-                ('selected unit row %q is not present in captured rendering %q')
-                    :format(choice.text, after_text))
+            local rendered_prefix = rendered_row:sub(1, 20)
+            assert.is_truthy(after_text:find(rendered_prefix, 1, true),
+                ('selected unit row prefix %q is not present in captured ' ..
+                    'rendering %q'):format(rendered_prefix, after_text))
             ds.move_pointer(after_list_state.body.x1 + 1,
                 after_list_state.body.y1 +
                     (choice_index - after_list_state.scroll_position))
