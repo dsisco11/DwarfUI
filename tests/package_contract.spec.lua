@@ -10,12 +10,15 @@ local shipped_modules = {
     'dwarfui/utils/immutable_enum.lua',
     'dwarfui/context_menu/definition.lua',
     'dwarfui/context_menu/target.lua',
+    'dwarfui/context_menu/root_discovery.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/widgets/asset_button.lua',
     'dwarfui/widgets/hover_action_rail.lua',
     'dwarfui/pointer.lua',
     'dwarfui/pointer_poller.lua',
     'dwarfui/tooltip_root_resolver.lua',
+    'dwarfui/context_menu/map_target.lua',
+    'dwarfui/context_menu/registration.lua',
     'dwarfui/tooltip_target.lua',
     'dwarfui/tooltip_target_detector.lua',
     'dwarfui/tooltip_map_target.lua',
@@ -110,6 +113,82 @@ local function load_public_module(package_path)
                 ['dwarfui/utils/numbers']=numbers,
             },
         }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/root_discovery.lua' then
+        options = {
+            globals={
+                dfhack={
+                    dwarfui={},
+                    timeout=function() end,
+                },
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/map_target.lua' or
+            package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/registration.lua' then
+        local _, numbers = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/numbers.lua')
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        local _, definitions = module_loader.load(
+            repo_root,
+            'src/scripts_modinstalled/dwarfui/context_menu/definition.lua', {
+                reqscript={
+                    ['dwarfui/utils/numbers']=numbers,
+                },
+            })
+        local _, targets = module_loader.load(
+            repo_root,
+            'src/scripts_modinstalled/dwarfui/context_menu/target.lua', {
+                reqscript={
+                    ['dwarfui/context_menu/definition']=definitions,
+                    ['dwarfui/utils/immutable_enum']=immutable_enum,
+                    ['dwarfui/utils/numbers']=numbers,
+                },
+            })
+        local root_resolver = {
+            TooltipRootResolver={
+                new=function()
+                    return {resolve=function() return nil end}
+                end,
+            },
+        }
+        local map_reqscript = {
+            ['dwarfui/context_menu/definition']=definitions,
+            ['dwarfui/context_menu/target']=targets,
+            ['dwarfui/utils/numbers']=numbers,
+            ['dwarfui/tooltip_root_resolver']=root_resolver,
+        }
+        if package_path ==
+                'scripts_modinstalled/dwarfui/context_menu/map_target.lua' then
+            options = {reqscript=map_reqscript}
+        else
+            local dfhack = {
+                dwarfui={},
+                timeout=function() end,
+            }
+            local _, root_discovery = module_loader.load(
+                repo_root,
+                'src/scripts_modinstalled/dwarfui/context_menu/root_discovery.lua', {
+                    globals={dfhack=dfhack},
+                })
+            local _, map_target = module_loader.load(
+                repo_root,
+                'src/scripts_modinstalled/dwarfui/context_menu/map_target.lua', {
+                    reqscript=map_reqscript,
+                })
+            options = {
+                globals={dfhack=dfhack},
+                reqscript={
+                    ['dwarfui/context_menu/definition']=definitions,
+                    ['dwarfui/context_menu/map_target']=map_target,
+                    ['dwarfui/context_menu/root_discovery']=root_discovery,
+                    ['dwarfui/context_menu/target']=targets,
+                    ['dwarfui/tooltip_root_resolver']=root_resolver,
+                },
+            }
+        end
     elseif package_path ==
             'scripts_modinstalled/dwarfui/widget_extensions.lua' then
         local widget_harness = require('support.widget_harness')

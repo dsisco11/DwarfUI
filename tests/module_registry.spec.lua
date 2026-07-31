@@ -25,17 +25,20 @@ describe('DwarfUI module registry', function()
         assert.equals('dwarfui/utils/immutable_enum', calls[4])
         assert.equals('dwarfui/context_menu/definition', calls[5])
         assert.equals('dwarfui/context_menu/target', calls[6])
-        assert.equals('dwarfui/widget_extensions', calls[7])
-        assert.equals('dwarfui/widgets/asset_button', calls[8])
-        assert.equals('dwarfui/widgets/hover_action_rail', calls[9])
-        assert.equals('dwarfui/pointer', calls[10])
-        assert.equals('dwarfui/pointer_poller', calls[11])
-        assert.equals('dwarfui/tooltip_root_resolver', calls[12])
-        assert.equals('dwarfui/tooltip_target', calls[13])
-        assert.equals('dwarfui/tooltip_target_detector', calls[14])
-        assert.equals('dwarfui/tooltip_map_target', calls[15])
-        assert.equals('dwarfui/tooltip_service', calls[16])
-        assert.equals('dwarfui/tooltip_render_hook', calls[17])
+        assert.equals('dwarfui/context_menu/root_discovery', calls[7])
+        assert.equals('dwarfui/widget_extensions', calls[8])
+        assert.equals('dwarfui/widgets/asset_button', calls[9])
+        assert.equals('dwarfui/widgets/hover_action_rail', calls[10])
+        assert.equals('dwarfui/pointer', calls[11])
+        assert.equals('dwarfui/pointer_poller', calls[12])
+        assert.equals('dwarfui/tooltip_root_resolver', calls[13])
+        assert.equals('dwarfui/context_menu/map_target', calls[14])
+        assert.equals('dwarfui/context_menu/registration', calls[15])
+        assert.equals('dwarfui/tooltip_target', calls[16])
+        assert.equals('dwarfui/tooltip_target_detector', calls[17])
+        assert.equals('dwarfui/tooltip_map_target', calls[18])
+        assert.equals('dwarfui/tooltip_service', calls[19])
+        assert.equals('dwarfui/tooltip_render_hook', calls[20])
         assert.equals('dwarfui/tooltip', calls[#calls - 1])
         assert.equals('dwarfui/tooltip_registration', calls[#calls])
         assert.equals('table',
@@ -46,6 +49,12 @@ describe('DwarfUI module registry', function()
             type(loaded['dwarfui/context_menu/definition']))
         assert.equals('table',
             type(loaded['dwarfui/context_menu/target']))
+        assert.equals('table',
+            type(loaded['dwarfui/context_menu/root_discovery']))
+        assert.equals('table',
+            type(loaded['dwarfui/context_menu/map_target']))
+        assert.equals('table',
+            type(loaded['dwarfui/context_menu/registration'].manager))
         assert.equals('table', type(loaded['dwarfui/utils/numbers']))
         assert.equals('table',
             type(loaded['dwarfui/utils/immutable_enum']))
@@ -77,28 +86,37 @@ describe('DwarfUI module registry', function()
 
     it('clears consumers before their dependencies', function()
         local names = registry.get_script_names()
+        local expected = {
+            'dwarfui/module_registry',
+            'dwarfui/tooltip_registration',
+            'dwarfui/tooltip',
+            'dwarfui/unit_card_task',
+            'dwarfui/minecart_route',
+            'dwarfui/mood_popover',
+            'dwarfui/popover',
+            'dwarfui/tooltip_render_hook',
+            'dwarfui/tooltip_service',
+            'dwarfui/tooltip_map_target',
+            'dwarfui/tooltip_target_detector',
+            'dwarfui/tooltip_target',
+            'dwarfui/context_menu/registration',
+            'dwarfui/context_menu/map_target',
+            'dwarfui/tooltip_root_resolver',
+            'dwarfui/pointer_poller',
+            'dwarfui/pointer',
+            'dwarfui/widgets/hover_action_rail',
+            'dwarfui/widgets/asset_button',
+            'dwarfui/widget_extensions',
+            'dwarfui/context_menu/root_discovery',
+            'dwarfui/context_menu/target',
+            'dwarfui/context_menu/definition',
+            'dwarfui/utils/immutable_enum',
+            'dwarfui/utils/numbers',
+            'dwarfui/text',
+            'dwarfui/class',
+        }
 
         assert.equals(#registry.MODULES + 1, #names)
-        assert.equals('dwarfui/module_registry', names[1])
-        assert.equals('dwarfui/tooltip_registration', names[2])
-        assert.equals('dwarfui/tooltip', names[3])
-        assert.equals('dwarfui/tooltip_render_hook', names[#names - 16])
-        assert.equals('dwarfui/tooltip_service', names[#names - 15])
-        assert.equals('dwarfui/tooltip_map_target', names[#names - 14])
-        assert.equals('dwarfui/tooltip_target_detector', names[#names - 13])
-        assert.equals('dwarfui/tooltip_target', names[#names - 12])
-        assert.equals('dwarfui/tooltip_root_resolver', names[#names - 11])
-        assert.equals('dwarfui/pointer_poller', names[#names - 10])
-        assert.equals('dwarfui/pointer', names[#names - 9])
-        assert.equals('dwarfui/widgets/hover_action_rail',
-            names[#names - 8])
-        assert.equals('dwarfui/widgets/asset_button', names[#names - 7])
-        assert.equals('dwarfui/widget_extensions', names[#names - 6])
-        assert.equals('dwarfui/context_menu/target', names[#names - 5])
-        assert.equals('dwarfui/context_menu/definition', names[#names - 4])
-        assert.equals('dwarfui/utils/immutable_enum', names[#names - 3])
-        assert.equals('dwarfui/utils/numbers', names[#names - 2])
-        assert.equals('dwarfui/text', names[#names - 1])
-        assert.equals('dwarfui/class', names[#names])
+        assert.same(expected, names)
     end)
 end)

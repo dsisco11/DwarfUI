@@ -18,6 +18,8 @@ Usage
 ]====]
 
 local MODULE_REGISTRY_SCRIPT = 'dwarfui/module_registry'
+local CONTEXT_MENU_REGISTRATION_SCRIPT =
+    'dwarfui/context_menu/registration'
 local OVERLAY_SCRIPTS = {
     'dwarfui-mood-popover',
     'dwarfui-minecart-route-markers',
@@ -35,6 +37,17 @@ local function retire_overlays()
                 entry.widget.overlay_ondisable()
             end
         end
+    end
+end
+
+---Destructively retires loaded context-menu registrations before environment clearing.
+local function retire_context_menu()
+    local path = dfhack.findScript(CONTEXT_MENU_REGISTRATION_SCRIPT)
+    if not path or not dfhack.internal.scripts[path] then return end
+    local registration = reqscript(CONTEXT_MENU_REGISTRATION_SCRIPT)
+    if registration.manager and
+            type(registration.manager.shutdown) == 'function' then
+        registration.manager:shutdown()
     end
 end
 
@@ -105,6 +118,7 @@ function reload()
         end
     end
     retire_overlays()
+    retire_context_menu()
     clear_script_environments(old_modules)
 
     dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)

@@ -22,6 +22,11 @@ MODULES = {
         contract='ContextMenuOpenSession',
         contract_type='table',
     },
+    {
+        name='dwarfui/context_menu/root_discovery',
+        contract='ContextMenuRootDiscovery',
+        contract_type='table',
+    },
     {name='dwarfui/widget_extensions', contract='install_pointer_attributes'},
     {
         name='dwarfui/widgets/asset_button',
@@ -46,6 +51,16 @@ MODULES = {
     {
         name='dwarfui/tooltip_root_resolver',
         contract='TooltipRootResolver',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/map_target',
+        contract='ContextMenuMapTargetRegistry',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/registration',
+        contract='manager',
         contract_type='table',
     },
     {
