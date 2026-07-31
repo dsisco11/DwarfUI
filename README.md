@@ -38,6 +38,25 @@ The mood model and popover widget that support this feature are
 project-internal implementation details in this release; their module paths
 are not downstream API contracts.
 
+## Bottom panel menu hotkey labels
+
+DwarfUI includes a default-enabled `dwarfui-ui-hotkeys` overlay for fortress
+mode. It paints a compact key token in the corner of each visible native
+bottom-panel menu button to indicate which active keybinding opens that menu
+(for example, `u` on the citizen menu under default bindings).
+
+The overlay dynamically samples native button bounds each refresh cycle and
+derives label anchors from those live bounds, so slight window-size or layout
+shifts keep labels aligned with their owning buttons.
+
+Label text is resolved from active DF/DFHack keybinding display state. DwarfUI
+does not use hardcoded key-label fallbacks. If a specific button's bounds or
+binding display token is unavailable in a frame, only that button's label is
+suppressed while other labels continue rendering.
+
+The overlay is presentation-only and always passes mouse and keyboard input
+through to native Dwarf Fortress UI handlers.
+
 ## Automatic tooltip registration
 
 The stable high-level API is exposed by `dwarfui/tooltip/api`:
