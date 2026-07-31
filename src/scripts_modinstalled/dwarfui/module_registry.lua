@@ -27,6 +27,11 @@ MODULES = {
         contract='ContextMenuRootDiscovery',
         contract_type='table',
     },
+    {
+        name='dwarfui/pointer',
+        contract='PointerDispatcher',
+        contract_type='table',
+    },
     {name='dwarfui/widget_extensions', contract='install_pointer_attributes'},
     {
         name='dwarfui/widgets/asset_button',
@@ -36,11 +41,6 @@ MODULES = {
     {
         name='dwarfui/widgets/hover_action_rail',
         contract='HoverActionRail',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/pointer',
-        contract='PointerDispatcher',
         contract_type='table',
     },
     {
@@ -61,6 +61,16 @@ MODULES = {
     {
         name='dwarfui/context_menu/registration',
         contract='manager',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/input_sample',
+        contract='ContextMenuInputSampler',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/target_detector',
+        contract='ContextMenuTargetDetector',
         contract_type='table',
     },
     {

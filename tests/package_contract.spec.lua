@@ -19,6 +19,8 @@ local shipped_modules = {
     'dwarfui/tooltip_root_resolver.lua',
     'dwarfui/context_menu/map_target.lua',
     'dwarfui/context_menu/registration.lua',
+    'dwarfui/context_menu/input_sample.lua',
+    'dwarfui/context_menu/target_detector.lua',
     'dwarfui/tooltip_target.lua',
     'dwarfui/tooltip_target_detector.lua',
     'dwarfui/tooltip_map_target.lua',
@@ -82,6 +84,20 @@ local function tooltip_target_stub()
     }
 end
 
+---Returns the named numeric pointer contract needed by package fixtures.
+---@return table
+local function pointer_stub()
+    local policy = {TARGET=1, PASS=2, BLOCK=3, NONE=4}
+    local result_kind = {TARGET=1, BLOCKED=2, MISS=3}
+    return {
+        PointerPolicy=policy,
+        PointerResultKind=result_kind,
+        PointerDispatcher={
+            resolve=function() return {kind=result_kind.MISS} end,
+        },
+    }
+end
+
 local function load_public_module(package_path)
     local options
     if package_path ==
@@ -120,6 +136,37 @@ local function load_public_module(package_path)
                 dfhack={
                     dwarfui={},
                     timeout=function() end,
+                },
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/input_sample.lua' then
+        local _, numbers = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/numbers.lua')
+        options = {
+            globals={
+                dfhack={
+                    gui={getMousePos=function() return nil end},
+                    screen={getMousePos=function() return nil, nil end},
+                },
+            },
+            reqscript={['dwarfui/utils/numbers']=numbers},
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/target_detector.lua' then
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        options = {
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfui/pointer']=pointer_stub(),
+                ['dwarfui/context_menu/target']={
+                    ContextMenuTargetKind={WIDGET=1, MAP_TILE=2},
+                    ContextMenuTargetDescriptor={new=function() return {} end},
+                    ContextMenuAnchorDescriptor={
+                        screen_position=function() return {} end,
+                        map_tile=function() return {} end,
+                    },
                 },
             },
         }
@@ -198,6 +245,7 @@ local function load_public_module(package_path)
             require_modules={
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },
+            reqscript={['dwarfui/pointer']=pointer_stub()},
         }
     elseif package_path ==
             'scripts_modinstalled/dwarfui/widgets/asset_button.lua' then
@@ -249,6 +297,15 @@ local function load_public_module(package_path)
             },
         }
     elseif package_path ==
+            'scripts_modinstalled/dwarfui/pointer.lua' then
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        options = {
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+            },
+        }
+    elseif package_path ==
             'scripts_modinstalled/dwarfui/pointer_poller.lua' then
         options = {
             globals={
@@ -297,11 +354,7 @@ local function load_public_module(package_path)
             'scripts_modinstalled/dwarfui/tooltip_target_detector.lua' then
         options = {
             reqscript={
-                ['dwarfui/pointer']={
-                    PointerDispatcher={resolve=function()
-                        return {kind='miss'}
-                    end},
-                },
+                ['dwarfui/pointer']=pointer_stub(),
                 ['dwarfui/tooltip_root_resolver']={
                     TooltipRootResolver={
                         new=function()
@@ -383,6 +436,7 @@ local function load_public_module(package_path)
                 ['dwarfui/class']={
                     is_instance_of=function() return false end,
                 },
+                ['dwarfui/pointer']=pointer_stub(),
                 ['dwarfui/widget_extensions']={},
                 ['dwarfui/text']={wrap_text=function() return {''} end},
                 ['dwarfui/tooltip_service']={
@@ -510,7 +564,10 @@ local function load_public_module(package_path)
                     TooltipTargetDetector={
                         new=function()
                             return {detect=function()
-                                return {kind='miss'}
+                                return {
+                                    kind=tooltip_target_stub().
+                                        TooltipPointerObservationKind.MISS,
+                                }
                             end}
                         end,
                     },
@@ -616,6 +673,19 @@ describe('DwarfUI package contract', function()
             type(module.TooltipPointerObservationKind.BLOCKED))
         assert.equals('number',
             type(module.TooltipPointerObservationKind.MISS))
+    end)
+
+    it('ships numeric pointer policy and result enums', function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/pointer.lua')
+
+        assert.equals('number', type(module.PointerPolicy.TARGET))
+        assert.equals('number', type(module.PointerPolicy.PASS))
+        assert.equals('number', type(module.PointerPolicy.BLOCK))
+        assert.equals('number', type(module.PointerPolicy.NONE))
+        assert.equals('number', type(module.PointerResultKind.TARGET))
+        assert.equals('number', type(module.PointerResultKind.BLOCKED))
+        assert.equals('number', type(module.PointerResultKind.MISS))
     end)
 
     it('ships the process-wide tooltip render-hook manager', function()

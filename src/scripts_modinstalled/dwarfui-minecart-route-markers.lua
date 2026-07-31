@@ -9,6 +9,7 @@ local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
 local tooltip = reqscript('dwarfui/tooltip')
 local MarkerKind = route_model.MinecartRouteMarkerKind
+local PointerPolicy = reqscript('dwarfui/pointer').PointerPolicy
 
 local HAULING_FOCUS = 'dwarfmode/Hauling'
 local ZOOM_ACTION_ID = 'recenter'
@@ -166,7 +167,7 @@ function MinecartRouteMarkersOverlay:init()
     self.stop_rail = rail_model.HoverActionRail{
         view_id='stop_action_rail',
         actions={zoom}, placement_order={'left'},
-        pointer_policy='pass',
+        pointer_policy=PointerPolicy.PASS,
         background_pen=RAIL_BACKGROUND, border_style=RAIL_BORDER,
         content_inset=RAIL_CONTENT_INSET, consume_scroll=true,
         target_at=function(x,y) return self:target_at_stop(x,y) end,

@@ -5,8 +5,13 @@ local widget_harness = require('support.widget_harness')
 local pointer_path = 'src/scripts_modinstalled/dwarfui/pointer.lua'
 local extensions_path =
     'src/scripts_modinstalled/dwarfui/widget_extensions.lua'
+local enum_path =
+    'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua'
+local Policy
+local Kind
 
 local function load_pointer(mouse_pos)
+    local _, immutable_enum = module_loader.load(repo_root, enum_path)
     local _, pointer = module_loader.load(repo_root, pointer_path, {
         globals={
             dfhack={
@@ -15,14 +20,18 @@ local function load_pointer(mouse_pos)
                 },
             },
         },
+        reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
     })
+    Policy = pointer.PointerPolicy
+    Kind = pointer.PointerResultKind
     return pointer
 end
 
-local function load_extensions(widgets, default_nil)
+local function load_extensions(widgets, default_nil, pointer)
     local _, extensions = module_loader.load(repo_root, extensions_path, {
         globals={DEFAULT_NIL=default_nil},
         require_modules={['gui.widgets']=widgets},
+        reqscript={['dwarfui/pointer']=pointer},
     })
     return extensions
 end
@@ -44,64 +53,85 @@ local function sample_target(pointer, root, x, y)
 end
 
 describe('DwarfUI pointer dispatcher', function()
+    it('publishes immutable numeric policy and result enums', function()
+        local pointer = load_pointer()
+
+        assert.equals('number', type(pointer.PointerPolicy.TARGET))
+        assert.equals('number', type(pointer.PointerPolicy.PASS))
+        assert.equals('number', type(pointer.PointerPolicy.BLOCK))
+        assert.equals('number', type(pointer.PointerPolicy.NONE))
+        assert.equals('number', type(pointer.PointerResultKind.TARGET))
+        assert.equals('number', type(pointer.PointerResultKind.BLOCKED))
+        assert.equals('number', type(pointer.PointerResultKind.MISS))
+        assert.has_error(function()
+            pointer.PointerPolicy.TARGET = pointer.PointerPolicy.PASS
+        end)
+        assert.has_error(function()
+            pointer.PointerResultKind.MISS =
+                pointer.PointerResultKind.TARGET
+        end)
+    end)
+
     it('owns state per supplied root and starts with a miss', function()
         local pointer = load_pointer()
-        local root = view('target', 0, 0, 10, 10)
+        local root = view(Policy.TARGET, 0, 0, 10, 10)
         local context = pointer.PointerContext.new(root)
 
         assert.is.equal(root, context.root)
         assert.is_nil(context.target)
-        assert.equals('miss', context.result.kind)
+        assert.equals(Kind.MISS, context.result.kind)
     end)
 
     it('returns explicit results and resolves overlaps in reverse render order', function()
         local pointer = load_pointer()
-        local lower = view('target', 2, 2, 5, 5)
-        local upper = view('target', 3, 3, 5, 5)
-        local panel = view('pass', 0, 0, 12, 12, {lower, upper})
-        local root = view('target', 0, 0, 20, 20, {panel})
+        local lower = view(Policy.TARGET, 2, 2, 5, 5)
+        local upper = view(Policy.TARGET, 3, 3, 5, 5)
+        local panel = view(Policy.PASS, 0, 0, 12, 12, {lower, upper})
+        local root = view(Policy.TARGET, 0, 0, 20, 20, {panel})
 
         local result = pointer.PointerDispatcher.resolve(root, 4, 4)
-        assert.equals('target', result.kind)
+        assert.equals(Kind.TARGET, result.kind)
         assert.is.equal(upper, result.target)
         assert.same({1, 1}, {result.x, result.y})
 
         result = pointer.PointerDispatcher.resolve(root, 1, 1)
-        assert.same({kind='miss'}, result)
-        panel.pointer_policy = 'block'
+        assert.same({kind=Kind.MISS}, result)
+        panel.pointer_policy = Policy.BLOCK
         result = pointer.PointerDispatcher.resolve(root, 1, 1)
-        assert.equals('blocked', result.kind)
+        assert.equals(Kind.BLOCKED, result.kind)
         assert.is.equal(panel, result.blocker)
     end)
 
     it('treats the root as a boundary instead of selecting it', function()
         local pointer = load_pointer()
-        local root = view('target', 0, 0, 10, 10)
+        local root = view(Policy.TARGET, 0, 0, 10, 10)
 
-        assert.equals('miss',
+        assert.equals(Kind.MISS,
             pointer.PointerDispatcher.resolve(root, 2, 2).kind)
     end)
 
     it('keeps terminal composites above implementation children', function()
         local pointer = load_pointer()
-        local implementation = view('target', 2, 2, 6, 2)
-        local control = view('target', 1, 1, 8, 4, {implementation})
-        local root = view('target', 0, 0, 12, 8, {control})
+        local implementation = view(Policy.TARGET, 2, 2, 6, 2)
+        local control = view(Policy.TARGET, 1, 1, 8, 4, {implementation})
+        local root = view(Policy.TARGET, 0, 0, 12, 8, {control})
         local _, result = sample_target(pointer, root, 3, 3)
 
-        assert.equals('target', result.kind)
+        assert.equals(Kind.TARGET, result.kind)
         assert.is.equal(control, result.target)
         assert.same({2, 2}, {result.x, result.y})
     end)
 
     it('keeps pass containers transparent and none subtrees excluded', function()
         local pointer = load_pointer()
-        local behind = view('target', 0, 0, 20, 20)
-        local empty_panel = view('pass', 1, 1, 8, 8)
-        local excluded_child = view('target', 10, 1, 5, 5)
-        local excluded = view('none', 10, 1, 5, 5, {excluded_child})
+        local behind = view(Policy.TARGET, 0, 0, 20, 20)
+        local empty_panel = view(Policy.PASS, 1, 1, 8, 8)
+        local excluded_child = view(Policy.TARGET, 10, 1, 5, 5)
+        local excluded = view(
+            Policy.NONE, 10, 1, 5, 5, {excluded_child})
         local root = view(
-            'target', 0, 0, 20, 20, {behind, empty_panel, excluded})
+            Policy.TARGET, 0, 0, 20, 20,
+            {behind, empty_panel, excluded})
 
         local result = pointer.PointerDispatcher.resolve(root, 2, 2)
         assert.is.equal(behind, result.target)
@@ -111,11 +141,12 @@ describe('DwarfUI pointer dispatcher', function()
 
     it('respects clipped bodies for targets and the root', function()
         local pointer = load_pointer()
-        local behind = view('target', 0, 0, 20, 20)
-        local clipped = view('target', 1, 1, 8, 8)
+        local behind = view(Policy.TARGET, 0, 0, 20, 20)
+        local clipped = view(Policy.TARGET, 1, 1, 8, 8)
         clipped.frame_body = widget_harness.rect(1, 1, 8, 8,
             {x1=1, y1=1, x2=4, y2=8})
-        local root = view('target', 0, 0, 20, 20, {behind, clipped})
+        local root = view(
+            Policy.TARGET, 0, 0, 20, 20, {behind, clipped})
 
         assert.is.equal(clipped,
             pointer.PointerDispatcher.resolve(root, 3, 2).target)
@@ -124,22 +155,23 @@ describe('DwarfUI pointer dispatcher', function()
 
         root.frame_body = widget_harness.rect(0, 0, 20, 20,
             {x1=0, y1=0, x2=5, y2=19})
-        assert.equals('miss',
+        assert.equals(Kind.MISS,
             pointer.PointerDispatcher.resolve(root, 6, 2).kind)
     end)
 
     it('uses full window frames for blocking while retaining child targets', function()
         local pointer = load_pointer()
-        local behind = view('target', 0, 0, 20, 20)
-        local child = view('target', 4, 4, 3, 3)
-        local window = view('block', 2, 2, 10, 10, {child})
+        local behind = view(Policy.TARGET, 0, 0, 20, 20)
+        local child = view(Policy.TARGET, 4, 4, 3, 3)
+        local window = view(Policy.BLOCK, 2, 2, 10, 10, {child})
         window.frame_body = widget_harness.rect(3, 3, 8, 8)
-        local root = view('target', 0, 0, 20, 20, {behind, window})
+        local root = view(
+            Policy.TARGET, 0, 0, 20, 20, {behind, window})
 
         local result = pointer.PointerDispatcher.resolve(root, 4, 4)
         assert.is.equal(child, result.target)
         result = pointer.PointerDispatcher.resolve(root, 2, 2)
-        assert.equals('blocked', result.kind)
+        assert.equals(Kind.BLOCKED, result.kind)
         assert.is.equal(window, result.blocker)
         result = pointer.PointerDispatcher.resolve(root, 15, 15)
         assert.is.equal(behind, result.target)
@@ -147,26 +179,26 @@ describe('DwarfUI pointer dispatcher', function()
 
     it('lets nested modal windows block only their own frames', function()
         local pointer = load_pointer()
-        local outer = view('block', 1, 1, 16, 16)
-        local inner = view('block', 5, 5, 6, 6)
+        local outer = view(Policy.BLOCK, 1, 1, 16, 16)
+        local inner = view(Policy.BLOCK, 5, 5, 6, 6)
         outer.subviews = {inner}
-        local root = view('target', 0, 0, 20, 20, {outer})
+        local root = view(Policy.TARGET, 0, 0, 20, 20, {outer})
 
         local result = pointer.PointerDispatcher.resolve(root, 6, 6)
-        assert.equals('blocked', result.kind)
+        assert.equals(Kind.BLOCKED, result.kind)
         assert.is.equal(inner, result.blocker)
         result = pointer.PointerDispatcher.resolve(root, 3, 3)
-        assert.equals('blocked', result.kind)
+        assert.equals(Kind.BLOCKED, result.kind)
         assert.is.equal(outer, result.blocker)
         result = pointer.PointerDispatcher.resolve(root, 18, 18)
-        assert.equals('miss', result.kind)
+        assert.equals(Kind.MISS, result.kind)
     end)
 
     it('evaluates visible and active state through the ancestor chain', function()
         local pointer = load_pointer()
-        local target = view('target', 2, 2, 4, 4)
-        local parent = view('pass', 1, 1, 8, 8, {target})
-        local root = view('target', 0, 0, 12, 12, {parent})
+        local target = view(Policy.TARGET, 2, 2, 4, 4)
+        local parent = view(Policy.PASS, 1, 1, 8, 8, {target})
+        local root = view(Policy.TARGET, 0, 0, 12, 12, {parent})
         local visible = true
         local active = true
         local evaluations = 0
@@ -183,19 +215,19 @@ describe('DwarfUI pointer dispatcher', function()
             pointer.PointerDispatcher.resolve(root, 3, 3).target)
         assert.equals(2, evaluations)
         visible = false
-        assert.equals('miss',
+        assert.equals(Kind.MISS,
             pointer.PointerDispatcher.resolve(root, 3, 3).kind)
         visible = true
         active = false
-        assert.equals('miss',
+        assert.equals(Kind.MISS,
             pointer.PointerDispatcher.resolve(root, 3, 3).kind)
     end)
 
     it('emits ordered transitions and terminal-local callback coordinates', function()
         local pointer = load_pointer()
         local events = {}
-        local first = view('target', 1, 1, 4, 4)
-        local second = view('target', 6, 1, 3, 3)
+        local first = view(Policy.TARGET, 1, 1, 4, 4)
+        local second = view(Policy.TARGET, 6, 1, 3, 3)
         first.on_pointer_enter = function(target, x, y)
             table.insert(events, {'enter', target, x, y})
         end
@@ -208,7 +240,7 @@ describe('DwarfUI pointer dispatcher', function()
         second.on_pointer_enter = first.on_pointer_enter
         second.on_pointer_update = first.on_pointer_update
         second.on_pointer_leave = first.on_pointer_leave
-        local root = view('target', 0, 0, 12, 8, {first, second})
+        local root = view(Policy.TARGET, 0, 0, 12, 8, {first, second})
         local context = pointer.PointerContext.new(root)
 
         pointer.PointerDispatcher.sample(context, 2, 3)
@@ -226,7 +258,7 @@ describe('DwarfUI pointer dispatcher', function()
             {'leave', second},
         }, events)
         assert.is_nil(context.target)
-        assert.equals('miss', context.result.kind)
+        assert.equals(Kind.MISS, context.result.kind)
     end)
 
     it('samples the mouse once and clears on missing coordinates', function()
@@ -236,8 +268,8 @@ describe('DwarfUI pointer dispatcher', function()
             samples = samples + 1
             return mouse_x, mouse_y
         end)
-        local target = view('target', 1, 1, 4, 4)
-        local root = view('target', 0, 0, 8, 8, {target})
+        local target = view(Policy.TARGET, 1, 1, 4, 4)
+        local root = view(Policy.TARGET, 0, 0, 8, 8, {target})
         local context = pointer.PointerContext.new(root)
 
         pointer.PointerDispatcher.sample(context, 2, 2)
@@ -249,12 +281,12 @@ describe('DwarfUI pointer dispatcher', function()
         mouse_x, mouse_y = nil, nil
         local result = pointer.PointerDispatcher.sample(context)
         assert.equals(2, samples)
-        assert.equals('miss', result.kind)
+        assert.equals(Kind.MISS, result.kind)
         assert.is_nil(context.target)
 
         result = pointer.PointerDispatcher.sample(context, nil, nil)
         assert.equals(2, samples)
-        assert.equals('miss', result.kind)
+        assert.equals(Kind.MISS, result.kind)
     end)
 
     it('clears stale targets after every eligibility and reachability change', function()
@@ -289,8 +321,9 @@ describe('DwarfUI pointer dispatcher', function()
             {
                 name='unreachable',
                 mutate=function(target, root)
-                    local detached = view('pass', 0, 0, 8, 8, {target})
-                    root.subviews = {view('pass', 0, 0, 8, 8)}
+                    local detached = view(
+                        Policy.PASS, 0, 0, 8, 8, {target})
+                    root.subviews = {view(Policy.PASS, 0, 0, 8, 8)}
                     assert.is.equal(target, detached.subviews[1])
                 end,
             },
@@ -298,16 +331,16 @@ describe('DwarfUI pointer dispatcher', function()
 
         for _, case in ipairs(cases) do
             local leaves = 0
-            local target = view('target', 1, 1, 4, 4)
+            local target = view(Policy.TARGET, 1, 1, 4, 4)
             target.on_pointer_leave = function() leaves = leaves + 1 end
-            local root = view('target', 0, 0, 8, 8, {target})
+            local root = view(Policy.TARGET, 0, 0, 8, 8, {target})
             local context = pointer.PointerContext.new(root)
             pointer.PointerDispatcher.sample(context, 2, 2)
             assert.is.equal(target, context.target, case.name)
 
             case.mutate(target, root)
             local result = pointer.PointerDispatcher.sample(context, 2, 2)
-            assert.equals('miss', result.kind, case.name)
+            assert.equals(Kind.MISS, result.kind, case.name)
             assert.is_nil(context.target, case.name)
             assert.equals(1, leaves, case.name)
         end
@@ -315,10 +348,12 @@ describe('DwarfUI pointer dispatcher', function()
 
     it('keeps contexts isolated between independently rendered roots', function()
         local pointer = load_pointer()
-        local first_target = view('target', 0, 0, 8, 8)
-        local second_target = view('target', 0, 0, 8, 8)
-        local first_root = view('target', 0, 0, 8, 8, {first_target})
-        local second_root = view('target', 0, 0, 8, 8, {second_target})
+        local first_target = view(Policy.TARGET, 0, 0, 8, 8)
+        local second_target = view(Policy.TARGET, 0, 0, 8, 8)
+        local first_root = view(
+            Policy.TARGET, 0, 0, 8, 8, {first_target})
+        local second_root = view(
+            Policy.TARGET, 0, 0, 8, 8, {second_target})
         local first = pointer.PointerContext.new(first_root)
         local second = pointer.PointerContext.new(second_root)
 
@@ -336,7 +371,8 @@ describe('DwarfUI pointer dispatcher', function()
         local default_nil = widget_harness.default_nil()
         local widgets = widget_harness.widgets(nil, default_nil)
         widgets.Widget.ATTRS{visible=true, active=true}
-        load_extensions(widgets, default_nil)
+        local pointer = load_pointer()
+        load_extensions(widgets, default_nil, pointer)
         local Handler = widget_harness.defclass(nil, widgets.Label)
         function Handler:on_pointer_update(x, y)
             self.callback_self = self
@@ -348,7 +384,6 @@ describe('DwarfUI pointer dispatcher', function()
         local root = widgets.Widget{}
         widget_harness.set_frame(root, 0, 0, 10, 10)
         root:addviews{target}
-        local pointer = load_pointer()
         local context = pointer.PointerContext.new(root)
 
         pointer.PointerDispatcher.sample(context, 3, 5)
@@ -358,8 +393,8 @@ describe('DwarfUI pointer dispatcher', function()
 
     it('targets controls independently of tooltip content', function()
         local pointer = load_pointer()
-        local target = view('target', 1, 1, 4, 4)
-        local root = view('target', 0, 0, 8, 8, {target})
+        local target = view(Policy.TARGET, 1, 1, 4, 4)
+        local root = view(Policy.TARGET, 0, 0, 8, 8, {target})
 
         assert.is.equal(target,
             pointer.PointerDispatcher.resolve(root, 2, 2).target)

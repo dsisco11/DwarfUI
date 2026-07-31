@@ -7,6 +7,7 @@ local MarkerKind = {
     ABOVE=2,
     BELOW=3,
 }
+local PointerPolicy = {PASS=2}
 
 ---Loads the route-marker overlay with isolated DFHack collaborators.
 ---@param state table
@@ -220,6 +221,7 @@ local function load_overlay(state)
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
                 ['dwarfui/tooltip']=tooltip,
+                ['dwarfui/pointer']={PointerPolicy=PointerPolicy},
             },
         })
     local instance = module.MinecartRouteMarkersOverlay{}
@@ -572,7 +574,7 @@ describe('DwarfUI minecart route markers overlay', function()
         state.mouse_x, state.mouse_y = 2, 11
         overlay:render(painter())
         assert.same({action}, state.tooltip_registrations)
-        assert.equals('pass', overlay.stop_rail.pointer_policy)
+        assert.equals(PointerPolicy.PASS, overlay.stop_rail.pointer_policy)
         assert.is_true(overlay.stop_rail.surface.visible)
         assert.equals('left', overlay.stop_rail.placement)
         assert.same({fg=0, bg=0, keep_lower=true},
