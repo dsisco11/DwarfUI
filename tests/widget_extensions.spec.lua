@@ -8,13 +8,53 @@ local pointer_path = 'src/scripts_modinstalled/dwarfui/pointer.lua'
 local enum_path =
     'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua'
 
-local function load_extension(widgets, default_nil)
+---Creates a DFHack reporting and process-state test double.
+---@param options? table
+---@return table dfhack
+local function make_dfhack(options)
+    options = options or {}
+    local announcements = {}
+    local console_errors = {}
+    return {
+        dwarfui=options.dwarfui,
+        gui={
+            showAnnouncement=options.show_announcement or function(...)
+                table.insert(announcements, {...})
+            end,
+        },
+        printerr=options.printerr or function(message)
+            table.insert(console_errors, message)
+        end,
+        announcements=announcements,
+        console_errors=console_errors,
+    }
+end
+
+---Loads the production pointer module and its immutable enum dependency.
+---@return table pointer
+local function load_pointer()
     local _, immutable_enum = module_loader.load(repo_root, enum_path)
     local _, pointer = module_loader.load(repo_root, pointer_path, {
         reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
     })
+    return pointer
+end
+
+---Loads the production widget extension with controlled shared classes.
+---@param widgets table
+---@param default_nil any
+---@param dfhack? table
+---@param pointer? table
+---@return table extension
+---@return table pointer
+local function load_extension(widgets, default_nil, dfhack, pointer)
+    pointer = pointer or load_pointer()
     local _, extension = module_loader.load(repo_root, module_path, {
-        globals={DEFAULT_NIL=default_nil},
+        globals={
+            DEFAULT_NIL=default_nil,
+            COLOR_RED=4,
+            dfhack=dfhack or make_dfhack(),
+        },
         require_modules={['gui.widgets']=widgets},
         reqscript={['dwarfui/pointer']=pointer},
     })
@@ -84,9 +124,24 @@ describe('DwarfUI widget extensions', function()
     it('preserves compatible attributes and reloads without replacing classes', function()
         local default_nil = widget_harness.default_nil()
         local widgets = widget_harness.widgets(nil, default_nil)
-        widgets.Widget.ATTRS{tooltip=default_nil}
-        local _, first_pointer = load_extension(widgets, default_nil)
-        widgets.Panel.ATTRS.pointer_policy = first_pointer.PointerPolicy.PASS
+        local dfhack = make_dfhack()
+        local first_pointer = load_pointer()
+        widgets.Widget.ATTRS{
+            tooltip=default_nil,
+            pointer_policy=first_pointer.PointerPolicy.TARGET,
+            on_pointer_enter=default_nil,
+            on_pointer_update=default_nil,
+            on_pointer_leave=default_nil,
+        }
+        widgets.Panel.ATTRS{
+            pointer_policy=first_pointer.PointerPolicy.PASS,
+        }
+        widgets.Window.ATTRS{
+            pointer_policy=first_pointer.PointerPolicy.BLOCK,
+        }
+        widgets.TextButton.ATTRS{
+            pointer_policy=first_pointer.PointerPolicy.TARGET,
+        }
 
         local classes = {
             Widget=widgets.Widget,
@@ -94,8 +149,10 @@ describe('DwarfUI widget extensions', function()
             Window=widgets.Window,
             TextButton=widgets.TextButton,
         }
-        local first = load_extension(widgets, default_nil)
-        local second = load_extension(widgets, default_nil)
+        local first = load_extension(
+            widgets, default_nil, dfhack, first_pointer)
+        local second = load_extension(
+            widgets, default_nil, dfhack, first_pointer)
 
         assert.is_false(first.install_tooltip_attribute())
         assert.is_false(first.install_pointer_attributes())
@@ -108,33 +165,132 @@ describe('DwarfUI widget extensions', function()
         assert.equals(
             first_pointer.PointerPolicy.PASS,
             widgets.Panel.ATTRS.pointer_policy)
+        assert.equals(0, second.get_diagnostics().replacement_count)
+        assert.equals(0, #dfhack.announcements)
+        assert.equals(0, #dfhack.console_errors)
     end)
 
-    it('rejects an incompatible tooltip default without overwriting it', function()
+    it('authoritatively replaces legacy and arbitrary conflicting defaults', function()
         local default_nil = widget_harness.default_nil()
         local widgets = widget_harness.widgets(nil, default_nil)
+        local pointer = load_pointer()
+        local dfhack = make_dfhack()
         widgets.Widget.ATTRS{tooltip=false}
+        widgets.Widget.ATTRS.pointer_policy = 'target'
+        widgets.Panel.ATTRS.pointer_policy = 'pass'
+        widgets.Window.ATTRS.pointer_policy = {}
+        widgets.TextButton.ATTRS.pointer_policy = 999
 
-        local ok, err = pcall(load_extension, widgets, default_nil)
-        assert.is_false(ok)
-        contains(tostring(err), 'incompatible contract')
-        contains(tostring(err), 'DwarfUI requires tooltip=')
-        assert.is_false(widgets.Widget.ATTRS.tooltip)
-    end)
+        local extension = load_extension(
+            widgets, default_nil, dfhack, pointer)
 
-    it('rejects an incompatible pointer default without overwriting it', function()
-        local default_nil = widget_harness.default_nil()
-        local widgets = widget_harness.widgets(nil, default_nil)
-        local _, pointer = load_extension(widgets, default_nil)
-        widgets.Panel.ATTRS.pointer_policy = pointer.PointerPolicy.TARGET
-
-        local ok, err = pcall(load_extension, widgets, default_nil)
-        assert.is_false(ok)
-        contains(tostring(err), 'incompatible contract')
-        contains(tostring(err), 'DwarfUI requires pointer_policy=' ..
-            tostring(pointer.PointerPolicy.PASS))
+        assert.is.equal(default_nil, widgets.Widget.ATTRS.tooltip)
         assert.equals(
             pointer.PointerPolicy.TARGET,
+            widgets.Widget.ATTRS.pointer_policy)
+        assert.equals(
+            pointer.PointerPolicy.PASS,
             widgets.Panel.ATTRS.pointer_policy)
+        assert.equals(
+            pointer.PointerPolicy.BLOCK,
+            widgets.Window.ATTRS.pointer_policy)
+        assert.equals(
+            pointer.PointerPolicy.TARGET,
+            widgets.TextButton.ATTRS.pointer_policy)
+
+        local diagnostics = extension.get_diagnostics()
+        assert.equals(5, diagnostics.replacement_count)
+        assert.equals(5, #diagnostics.replacements)
+        assert.equals(1, #dfhack.announcements)
+        assert.equals(1, #dfhack.console_errors)
+        contains(dfhack.console_errors[1],
+            'gui.widgets.Widget.ATTRS.pointer_policy: target ->')
+        contains(dfhack.console_errors[1],
+            'gui.widgets.Panel.ATTRS.pointer_policy: pass ->')
+        contains(dfhack.console_errors[1],
+            'gui.widgets.TextButton.ATTRS.pointer_policy: 999 ->')
+
+        local second = load_extension(
+            widgets, default_nil, dfhack, pointer)
+        assert.equals(2, second.get_diagnostics().generation)
+        assert.equals(5, second.get_diagnostics().replacement_count)
+        assert.equals(1, #dfhack.announcements)
+        assert.equals(1, #dfhack.console_errors)
+    end)
+
+    it('installs absent defaults quietly and remains stable across reload', function()
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        local pointer = load_pointer()
+        local dfhack = make_dfhack()
+
+        local first = load_extension(
+            widgets, default_nil, dfhack, pointer)
+        local second = load_extension(
+            widgets, default_nil, dfhack, pointer)
+
+        assert.equals(0, first.get_diagnostics().replacement_count)
+        assert.equals(0, second.get_diagnostics().replacement_count)
+        assert.equals(2, second.get_diagnostics().generation)
+        assert.equals(0, #dfhack.announcements)
+        assert.equals(0, #dfhack.console_errors)
+        assert.equals(0, second.install_all())
+        assert.equals(0, #dfhack.announcements)
+        assert.equals(0, #dfhack.console_errors)
+    end)
+
+    it('does not let reporting failures block authoritative installation', function()
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        widgets.Panel.ATTRS.pointer_policy = 'foreign'
+        local dfhack = make_dfhack{
+            show_announcement=function() error('announcement failed') end,
+            printerr=function() error('console failed') end,
+        }
+
+        local extension, pointer = load_extension(
+            widgets, default_nil, dfhack)
+
+        assert.equals(
+            pointer.PointerPolicy.PASS,
+            widgets.Panel.ATTRS.pointer_policy)
+        local diagnostics = extension.get_diagnostics()
+        assert.is_true(diagnostics.report_attempted)
+        contains(diagnostics.announcement_error, 'announcement failed')
+        contains(diagnostics.console_error, 'console failed')
+
+        local reloaded = load_extension(
+            widgets, default_nil, dfhack, pointer)
+        assert.equals(2, reloaded.get_diagnostics().generation)
+        assert.equals(1, reloaded.get_diagnostics().replacement_count)
+    end)
+
+    it('repairs malformed partial process state before installation', function()
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        widgets.Window.ATTRS.pointer_policy = 'foreign'
+        local dfhack = make_dfhack{
+            dwarfui={
+                widget_extensions={
+                    generation='partial',
+                    replacement_count='partial',
+                    replacements='partial',
+                    report_attempted='partial',
+                },
+            },
+        }
+
+        local extension, pointer = load_extension(
+            widgets, default_nil, dfhack)
+
+        assert.equals(
+            pointer.PointerPolicy.BLOCK,
+            widgets.Window.ATTRS.pointer_policy)
+        local diagnostics = extension.get_diagnostics()
+        assert.equals(1, diagnostics.generation)
+        assert.equals(1, diagnostics.replacement_count)
+        assert.equals(1, #diagnostics.replacements)
+        assert.equals(1, #dfhack.announcements)
+        assert.equals(1, #dfhack.console_errors)
     end)
 end)

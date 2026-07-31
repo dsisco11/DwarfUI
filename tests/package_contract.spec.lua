@@ -264,7 +264,15 @@ local function load_public_module(package_path)
         local widget_harness = require('support.widget_harness')
         local default_nil = widget_harness.default_nil()
         options = {
-            globals={DEFAULT_NIL=default_nil},
+            globals={
+                DEFAULT_NIL=default_nil,
+                COLOR_RED=4,
+                dfhack={
+                    dwarfui={},
+                    gui={showAnnouncement=function() end},
+                    printerr=function() end,
+                },
+            },
             require_modules={
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },

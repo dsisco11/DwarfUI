@@ -29,7 +29,15 @@ end
 
 local function load_extensions(widgets, default_nil, pointer)
     local _, extensions = module_loader.load(repo_root, extensions_path, {
-        globals={DEFAULT_NIL=default_nil},
+        globals={
+            DEFAULT_NIL=default_nil,
+            COLOR_RED=4,
+            dfhack={
+                dwarfui={},
+                gui={showAnnouncement=function() end},
+                printerr=function() end,
+            },
+        },
         require_modules={['gui.widgets']=widgets},
         reqscript={['dwarfui/pointer']=pointer},
     })
