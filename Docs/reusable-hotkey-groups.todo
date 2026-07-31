@@ -1,0 +1,130 @@
+☐ [Phase 1 - Existing-System Audit and Reusable Contracts] Define the boundary between generic hotkey-group infrastructure and feature-specific group definitions.
+    ☐ Inventory the responsibilities currently combined in `dwarfui/ui_hotkeys.lua` and `dwarfui-ui-hotkeys.lua`:
+        - native element discovery,
+        - rectangle validation and layout signatures,
+        - semantic button ordering,
+        - DF binding lookup and label normalization,
+        - snapshot caching,
+        - bounded overlay layout and rendering.
+    ☐ Document the current public exports and preserve compatible entry points for `UiHotkeyModel` and `UiMenuHotkeysOverlay` during migration.
+    ☐ Define a generic `HotkeyGroupDefinition` contract containing a stable group ID, activity provider, layout provider, button definitions, and label-placement configuration.
+    ☐ Define a canonical `HotkeyGroupLayout` result containing the group bounds, semantic element bounds, and a provider-owned layout signature.
+    ☐ Define a generic `HotkeyButtonDefinition` contract containing a stable semantic ID, DF action binding, and element selector.
+    ☐ Define immutable public enums for closed configuration concepts such as geometry source kind and label anchor.
+    ☐ Define failure behavior for inactive, missing, incomplete, and ambiguous groups without allowing one failed group or button to suppress unrelated labels.
+    ☐ Confirm that discovery providers are read-only and never manipulate the OS pointer or synthesize mouse clicks.
+    Deliverables:
+    - Approved LuaDoc contracts for group definitions, layouts, elements, buttons, and snapshots.
+    - Compatibility inventory for the existing UI-hotkey model and overlay exports.
+    - Explicit ownership rules for generic infrastructure versus concrete group definitions.
+
+☐ [Phase 2 - Generic Geometry Primitives] Extract reusable rectangle and rendered-element discovery utilities.
+    ☐ Add `dwarfui/hotkeys/geometry.lua` as a reload-managed production module.
+    ☐ Implement validated rectangle construction, copying, union, containment, equality, and screen-to-local translation helpers.
+    ☐ Implement configurable connected-component sampling over a caller-provided screen region.
+    ☐ Implement repeated-strip extraction that derives group position, element width, element height, and element rectangles from sampled native geometry.
+    ☐ Make search regions, expected element counts, candidate validation, and element ordering caller-provided instead of bottom-toolbar constants.
+    ☐ Generate stable geometry signatures from actual group and element bounds so same-resolution movement invalidates caches.
+    ☐ Reject ambiguous candidate sets instead of silently selecting an arbitrary component.
+    ☐ Ensure rendered overlay labels cannot permanently corrupt subsequent native-layout detection.
+    Deliverables:
+    - Generic geometry module with no fortress-mode, bottom-bar, or Citizens-specific behavior.
+    - Deterministic geometry fixtures covering adjacent elements and competing native components.
+
+☐ [Phase 3 - Reusable Layout Providers] Support native-structure, widget-tree, and rendered-signature sources through one layout contract.
+    ☐ Add `dwarfui/hotkeys/layout_provider.lua` with the common provider interface and result validation.
+    ☐ Implement a rendered-strip provider backed by the generic geometry primitives.
+    ☐ Allow rendered providers to supply a search-region provider, component validator, semantic element ordering, and layout-signature data.
+    ☐ Implement a native-control provider that accepts a feature-specific callback for locating native structures or widget roots and extracting their rectangles.
+    ☐ Support native widget traversal only when the located object is a `df.widget_container`; do not assume all native controls are widgets.
+    ☐ Allow custom providers to adapt other exposed native screen structures without changing the generic model.
+    ☐ Validate all provider results at the module boundary and suppress invalid layouts safely.
+    Deliverables:
+    - Interchangeable rendered-strip and native-control provider implementations.
+    - A provider test double suitable for deterministic model and overlay tests.
+
+☐ [Phase 4 - Generic Hotkey Group Model] Move binding resolution, caching, and snapshot construction into a reusable model.
+    ☐ Add `dwarfui/hotkeys/model.lua` containing `HotkeyGroupModel`.
+    ☐ Accept a `HotkeyGroupDefinition` and injectable dimensions, tile-reading, binding, and activity collaborators.
+    ☐ Resolve active key displays by converting named actions through `df.interface_key` before calling DFHack key-display APIs.
+    ☐ Move compact label normalization into the generic hotkey subsystem.
+    ☐ Cache geometry by the provider-owned layout signature while resolving active bindings independently of geometry-cache changes.
+    ☐ Map semantic button definitions to provider elements without coupling the model to visual position.
+    ☐ Return a canonical snapshot containing group bounds, resolved buttons, active state, and layout signature.
+    ☐ Clear all cached geometry immediately when the group becomes inactive.
+    ☐ Preserve per-button suppression when either geometry or a binding is unavailable.
+    Deliverables:
+    - Reusable `HotkeyGroupModel` with injectable providers and no concrete toolbar catalog.
+    - Compatibility adapter or specialization retaining the existing `UiHotkeyModel` entry point.
+
+☐ [Phase 5 - Generic Bounded Overlay] Implement reusable rendering for independently positioned hotkey groups.
+    ☐ Add `dwarfui/hotkeys/overlay.lua` containing a reusable `HotkeyGroupOverlay` base class.
+    ☐ Accept a model builder and configurable label anchor, inset, and pen.
+    ☐ Fit each overlay frame to the current resolved group bounds instead of allocating a fullscreen host.
+    ☐ Render through the overlay body painter using overlay-local coordinates derived from screen-space element bounds.
+    ☐ Re-layout when the group moves or changes size, including changes that preserve the screen resolution.
+    ☐ Collapse safely to an inert minimal frame when the group is unavailable.
+    ☐ Keep keyboard and pointer input fully pass-through.
+    ☐ Support multiple independently registered group overlays without shared mutable geometry or lifecycle state.
+    Deliverables:
+    - Reusable bounded overlay base class.
+    - Test fixture demonstrating two independent hotkey groups with different positions and layouts.
+
+☐ [Phase 6 - Fortress Main Toolbar Migration] Reimplement the current eight-button toolbar as a concrete reusable-group definition.
+    ☐ Add `dwarfui/hotkeys/groups/fortress_main.lua`.
+    ☐ Move `dwarfmode/Default` activity detection into the concrete group definition.
+    ☐ Configure the rendered search region and candidate validation for the native main-toolbar strip.
+    ☐ Define the semantic element order as Citizens, Tasks, Places, Labor, Work Orders, Nobles, Objects, and Justice.
+    ☐ Map those elements to `D_UNITLIST`, `D_JOBLIST`, `D_LOCATIONS`, `D_LABOR`, `D_ORDERS`, `D_NOBLES`, `D_ARTLIST`, and `D_JUSTICE`.
+    ☐ Convert `dwarfui-ui-hotkeys.lua` into a thin registration wrapper around the generic overlay and fortress-main definition.
+    ☐ Retain the existing overlay registration key and default-enabled behavior.
+    ☐ Remove bottom-band scanning, concrete catalog data, and generic rendering mechanics from the compatibility module once callers are migrated.
+    Deliverables:
+    - Concrete fortress-main group definition using only public reusable contracts.
+    - Existing live toolbar behavior preserved with eight correctly positioned labels.
+
+☐ [Phase 7 - Focused Regression Coverage] Prove generic geometry, provider, model, overlay, and migration behavior independently.
+    ☐ Add geometry tests for variable element width, height, spacing, origin, and screen dimensions.
+    ☐ Cover adjacent controls with no blank separator and distractor components near the target group.
+    ☐ Cover ambiguous, incomplete, off-screen, and malformed layouts.
+    ☐ Cover same-resolution movement and provider-signature invalidation.
+    ☐ Add rendered-strip provider tests using synthetic native-tile fixtures.
+    ☐ Add native-control provider tests using fake native structures and widget trees with changing rectangles.
+    ☐ Add model tests for binding changes, label normalization, inactive-cache reset, and per-button suppression.
+    ☐ Add overlay tests for bounded frames, screen-to-local conversion, movement, disappearance, multiple groups, and input pass-through.
+    ☐ Add concrete fortress-main tests for semantic ordering and exact DF action mappings.
+    ☐ Retain regression coverage for the default Citizens `u` label.
+    Deliverables:
+    - Focused specs for each new module and the migrated concrete group.
+    - No tests that depend on OS-level mouse movement.
+
+☐ [Phase 8 - Reload, Registry, Packaging, and Documentation] Integrate the reusable subsystem into the project lifecycle.
+    ☐ Register new modules in `dwarfui/module_registry.lua` in dependency order before their consumers.
+    ☐ Update module-order and reload-retirement tests for all new scripts.
+    ☐ Update package contracts and isolated-load fixtures for every new production module.
+    ☐ Confirm the rockspec and published archive include the complete reusable subsystem and concrete fortress group.
+    ☐ Document how to define and register a new hotkey group.
+    ☐ Document when to use native structures, widget traversal, rendered signatures, or a custom provider.
+    ☐ Document coordinate-space, ambiguity, caching, and failure-isolation requirements.
+    ☐ Include a minimal second-group example that demonstrates reuse without copying the fortress toolbar implementation.
+    Deliverables:
+    - Reload-managed and packaged reusable hotkey subsystem.
+    - Extension guide for future native hotkey button groups.
+
+☐ [Phase 9 - Verification and Live Evidence] Validate the reusable system without overstating focused or live results.
+    ☐ Run focused geometry, provider, model, overlay, and fortress-main specs.
+    ☐ Run the full unit-test task through `tools/Run-UnitTests.ps1`.
+    ☐ Run the syntax/build task through `tools/Build.ps1`.
+    ☐ Run package construction and package-content verification through the scripts in `tools/`.
+    ☐ Reload DwarfUI in a running fortress and confirm the reusable modules are loaded from the intended checkout.
+    ☐ Confirm all eight fortress-main labels render on their corresponding native controls.
+    ☐ Confirm the overlay frame exactly matches the resolved native group bounds and remains non-fullscreen.
+    ☐ Confirm geometry follows native movement and resizing, including at least one same-resolution layout change.
+    ☐ Confirm missing or ambiguous geometry suppresses only the affected group and produces no misplaced labels.
+    ☐ Confirm native keyboard and pointer behavior remains unchanged.
+    ☐ Inspect the final archive independently of build or publish success.
+    ☐ Report focused, full-suite, syntax/build, package, and live evidence as separate results.
+    Completion criteria:
+    - A new hotkey group can be added by defining a provider, semantic button catalog, and thin overlay registration without modifying generic infrastructure.
+    - The migrated fortress toolbar passes all automated gates and live validation.
+    - No implementation or test manipulates the OS mouse.
