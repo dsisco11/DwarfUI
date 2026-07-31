@@ -6,6 +6,10 @@ local shipped_modules = {
     'dwarfui/module_registry.lua',
     'dwarfui/class.lua',
     'dwarfui/text.lua',
+    'dwarfui/utils/numbers.lua',
+    'dwarfui/utils/immutable_enum.lua',
+    'dwarfui/context_menu/definition.lua',
+    'dwarfui/context_menu/target.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/widgets/asset_button.lua',
     'dwarfui/widgets/hover_action_rail.lua',
@@ -77,7 +81,37 @@ end
 
 local function load_public_module(package_path)
     local options
-    if package_path == 'scripts_modinstalled/dwarfui/widget_extensions.lua' then
+    if package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/definition.lua' then
+        local _, numbers = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/numbers.lua')
+        options = {
+            reqscript={
+                ['dwarfui/utils/numbers']=numbers,
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/target.lua' then
+        local _, numbers = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/numbers.lua')
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        local _, definitions = module_loader.load(
+            repo_root,
+            'src/scripts_modinstalled/dwarfui/context_menu/definition.lua', {
+                reqscript={
+                    ['dwarfui/utils/numbers']=numbers,
+                },
+            })
+        options = {
+            reqscript={
+                ['dwarfui/context_menu/definition']=definitions,
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfui/utils/numbers']=numbers,
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/widget_extensions.lua' then
         local widget_harness = require('support.widget_harness')
         local default_nil = widget_harness.default_nil()
         options = {

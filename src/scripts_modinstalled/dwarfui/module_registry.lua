@@ -10,6 +10,18 @@
 MODULES = {
     {name='dwarfui/class', contract='is_instance_of'},
     {name='dwarfui/text', contract='wrap_text'},
+    {name='dwarfui/utils/numbers', contract='is_integer'},
+    {name='dwarfui/utils/immutable_enum', contract='define'},
+    {
+        name='dwarfui/context_menu/definition',
+        contract='ContextMenuDefinitionSlot',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/target',
+        contract='ContextMenuOpenSession',
+        contract_type='table',
+    },
     {name='dwarfui/widget_extensions', contract='install_pointer_attributes'},
     {
         name='dwarfui/widgets/asset_button',
