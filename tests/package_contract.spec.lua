@@ -8,6 +8,7 @@ local shipped_modules = {
     'dwarfui/text.lua',
     'dwarfui/utils/numbers.lua',
     'dwarfui/utils/immutable_enum.lua',
+    'dwarfui/utils/function_chain.lua',
     'dwarfui/context_menu/definition.lua',
     'dwarfui/context_menu/target.lua',
     'dwarfui/context_menu/root_discovery.lua',
@@ -21,6 +22,8 @@ local shipped_modules = {
     'dwarfui/context_menu/registration.lua',
     'dwarfui/context_menu/input_sample.lua',
     'dwarfui/context_menu/target_detector.lua',
+    'dwarfui/context_menu/input_hook.lua',
+    'dwarfui/context_menu/service.lua',
     'dwarfui/tooltip_target.lua',
     'dwarfui/tooltip_target_detector.lua',
     'dwarfui/tooltip_map_target.lua',
@@ -348,6 +351,83 @@ local function load_public_module(package_path)
             },
         }
     elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/input_hook.lua' then
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        local _, function_chain = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')
+        options = {
+            globals={dfhack={dwarfui={}}},
+            require_modules={
+                ['plugins.overlay']={
+                    feed_viewscreen_widgets=function() end,
+                },
+            },
+            reqscript={
+                ['dwarfui/utils/function_chain']=function_chain,
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/context_menu/service.lua' then
+        local registration_manager = {
+            map_registration_count=function() return 0 end,
+            set_menu_open_predicate=function() end,
+            set_root_observer=function() end,
+            set_failure_observer=function() end,
+            shutdown=function() return false end,
+            disable=function() return false end,
+            get_diagnostics=function() return {} end,
+        }
+        local hook_manager = {
+            set_handler=function() end,
+            set_failure_handler=function() end,
+            reconcile_roots=function() return false end,
+            shutdown=function() return false end,
+            get_diagnostics=function() return {} end,
+        }
+        options = {
+            globals={dfhack={dwarfui={}}},
+            reqscript={
+                ['dwarfui/context_menu/input_hook']={
+                    manager=hook_manager,
+                },
+                ['dwarfui/context_menu/input_sample']={
+                    ContextMenuInputSampler={
+                        new=function()
+                            return {capture=function() return {} end}
+                        end,
+                    },
+                },
+                ['dwarfui/context_menu/registration']={
+                    manager=registration_manager,
+                },
+                ['dwarfui/context_menu/target_detector']={
+                    ContextMenuDetectionKind={
+                        TARGET=1,
+                        BLOCKED=2,
+                        MISS=3,
+                    },
+                    ContextMenuTargetDetector={
+                        new=function()
+                            return {detect=function()
+                                return {kind=3}
+                            end}
+                        end,
+                    },
+                },
+                ['dwarfui/context_menu/target']={
+                    ContextMenuTargetKind={WIDGET=1, MAP_TILE=2},
+                    ContextMenuOpenSession={new=function() return {} end},
+                },
+                ['dwarfui/utils/numbers']={
+                    is_integer=function(value)
+                        return type(value) == 'number' and value % 1 == 0
+                    end,
+                },
+            },
+        }
+    elseif package_path ==
             'scripts_modinstalled/dwarfui/tooltip_target.lua' then
         options = {}
     elseif package_path ==
@@ -390,12 +470,17 @@ local function load_public_module(package_path)
         }
     elseif package_path ==
             'scripts_modinstalled/dwarfui/tooltip_render_hook.lua' then
+        local _, function_chain = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')
         options = {
             globals={dfhack={dwarfui={}}},
             require_modules={
                 ['plugins.overlay']={
                     render_viewscreen_widgets=function() end,
                 },
+            },
+            reqscript={
+                ['dwarfui/utils/function_chain']=function_chain,
             },
         }
     elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
@@ -686,6 +771,35 @@ describe('DwarfUI package contract', function()
         assert.equals('number', type(module.PointerResultKind.TARGET))
         assert.equals('number', type(module.PointerResultKind.BLOCKED))
         assert.equals('number', type(module.PointerResultKind.MISS))
+    end)
+
+    it('ships the context-menu input-hook manager contract', function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/context_menu/input_hook.lua')
+
+        assert.equals('table', type(module.ContextMenuInputHookManager))
+        assert.equals('number',
+            type(module.ContextMenuInputTransport.NATIVE))
+        assert.equals('number',
+            type(module.ContextMenuInputTransport.SCREEN))
+        assert.equals('table', type(module.manager))
+        assert.equals('function', type(module.manager.ensure_native))
+        assert.equals('function', type(module.manager.ensure_screen))
+    end)
+
+    it('ships the presentation-neutral context-menu service contract',
+            function()
+        local _, module = load_public_module(
+            'scripts_modinstalled/dwarfui/context_menu/service.lua')
+
+        assert.equals('table', type(module.ContextMenuService))
+        assert.equals('table', type(module.service))
+        assert.equals('function', type(module.service.open))
+        assert.equals('function', type(module.service.close))
+        assert.equals('function', type(module.service.select))
+        assert.equals('function',
+            type(module.service.set_presentation_factory))
+        assert.is_false(module.service:get_diagnostics().started)
     end)
 
     it('ships the process-wide tooltip render-hook manager', function()

@@ -12,6 +12,7 @@ MODULES = {
     {name='dwarfui/text', contract='wrap_text'},
     {name='dwarfui/utils/numbers', contract='is_integer'},
     {name='dwarfui/utils/immutable_enum', contract='define'},
+    {name='dwarfui/utils/function_chain', contract='wraps'},
     {
         name='dwarfui/context_menu/definition',
         contract='ContextMenuDefinitionSlot',
@@ -71,6 +72,16 @@ MODULES = {
     {
         name='dwarfui/context_menu/target_detector',
         contract='ContextMenuTargetDetector',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/input_hook',
+        contract='ContextMenuInputHookManager',
+        contract_type='table',
+    },
+    {
+        name='dwarfui/context_menu/service',
+        contract='ContextMenuService',
         contract_type='table',
     },
     {

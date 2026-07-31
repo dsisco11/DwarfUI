@@ -217,11 +217,12 @@ describe('DwarfUI context-menu target detector', function()
         env.manager:register(target, definition())
         local map_owner = {}
         present(env, map_owner, blocker_root)
-        env.manager:register_map_tile{
+        local map_handle = env.manager:register_map_tile{
             owner=map_owner,
             pos={x=5, y=6, z=7},
             definition=definition('Map'),
         }
+        assert.is_not_nil(map_handle)
 
         local result = env.detector:detect(
             sample(env, 3, 3, {x=5, y=6, z=7}))
