@@ -88,15 +88,15 @@
     - One process-wide context-menu runtime.
     - Unit and package parity evidence, with focused live parity explicitly deferred until post-cutover verification.
 
-☐ [Phase 6 - DwarfUICore Development Lifecycle] Give the extracted project an explicit reload boundary while keeping consumer initialization non-destructive.
-    ☐ Move current shared-runtime validation and module-registry reload responsibilities from `dwarfui.lua` into `dwarfuicore.lua`.
-    ☐ Implement `dwarfuicore reload` as the only command that clears DwarfUICore-managed script environments and rebuilds Core modules.
-    ☐ Preserve current dependency-safe teardown and reload ordering for tooltip and context-menu runtime owners.
-    ☐ Ensure `reqscript('dwarfuicore')` as a module performs no reload, teardown, environment clearing, or overlay rescan.
-    ☐ Ensure repeated normal API imports reuse healthy singleton state and registrations.
-    ☐ Keep DwarfUICore reload behavior explicit and development-only; do not expose it through tooltip or context-menu APIs.
-    ☐ Detect and report missing registry entries, missing files, malformed module contracts, partial service state, and failed reload reconstruction clearly.
-    ☐ Add focused tests for validation, repeated validation, explicit reload, failed reload, teardown order, and absence of destructive work during normal loading.
+✔ [Phase 6 - DwarfUICore Development Lifecycle] Give the extracted project an explicit reload boundary while keeping consumer initialization non-destructive. @done(26-07-31 22:46)
+    ✔ Move current shared-runtime validation and module-registry reload responsibilities from `dwarfui.lua` into `dwarfuicore.lua`. @done(26-07-31 22:46)
+    ✔ Implement `dwarfuicore reload` as the only command that clears DwarfUICore-managed script environments and rebuilds Core modules. @done(26-07-31 22:46)
+    ✔ Preserve current dependency-safe teardown and reload ordering for tooltip and context-menu runtime owners. @done(26-07-31 22:46)
+    ✔ Ensure `reqscript('dwarfuicore')` as a module performs no reload, teardown, environment clearing, or overlay rescan. @done(26-07-31 22:46)
+    ✔ Ensure repeated normal API imports reuse healthy singleton state and registrations. @done(26-07-31 22:46)
+    ✔ Keep DwarfUICore reload behavior explicit and development-only; do not expose it through tooltip or context-menu APIs. @done(26-07-31 22:46)
+    ✔ Detect and report missing registry entries, missing files, malformed module contracts, partial service state, and failed reload reconstruction clearly. @done(26-07-31 22:46)
+    ✔ Add focused tests for validation, repeated validation, explicit reload, failed reload, teardown order, and absence of destructive work during normal loading. @done(26-07-31 22:46)
     Deliverables:
     - Independent `dwarfuicore` validation and explicit reload command.
     - Non-destructive normal import behavior.
