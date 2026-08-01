@@ -1,0 +1,275 @@
+☐ [Phase 1 - Split Contract and Baseline] Freeze the DwarfUICore ownership boundary and capture reproducible pre-split evidence.
+    ☐ Record the current DwarfUI repository path, branch, status, index state, and source package version without stashing, committing, or altering unrelated changes.
+    ☐ Inventory every production module, test, fixture, tool, document, and package entry that participates in tooltip, context-menu, pointer, widget-extension, projection, root-discovery, or shared service lifecycle behavior.
+    ☐ Produce a transitive dependency map beginning at `dwarfui/tooltip/api`, `dwarfui/context_menu/api`, and their runtime owners.
+    ☐ Classify every dependency as DwarfUICore-owned, DwarfUI-owned, duplicated temporarily for migration, or retained as an external DFHack dependency.
+    ☐ Confirm that DwarfUICore will be a standalone sibling repository at `D:\CODE\DFHack\DwarfUICore`, not a nested checkout, submodule, subtree, or vendored directory.
+    ☐ Fix the public project identifiers: repository `DwarfUICore`, mod ID `dwarfuicore`, LuaRocks package `dwarfuicore`, root script `dwarfuicore`, LuaDoc namespace `dwarfuicore`, and process-state root `dfhack.dwarfuicore`.
+    ☐ Define contract-major 1 as the initial tooltip and context-menu public API contract independently of the DwarfUICore package version.
+    ☐ Record the current focused unit, full unit, syntax, package, and available live-test results as separate baseline evidence.
+    ☐ Record any pre-existing failures or unavailable live prerequisites without treating them as split regressions.
+    Deliverables:
+    - Approved source-and-test ownership inventory.
+    - Transitive dependency map with no unclassified module.
+    - Baseline evidence report separated by test category.
+    - Confirmed public naming and repository boundary.
+
+☐ [Phase 2 - Standalone Repository Bootstrap] Establish DwarfUICore as an independently buildable local project while preserving relevant source history.
+    ☐ Create the sibling `DwarfUICore` working directory from DwarfUI history using a history-preserving split mechanism.
+    ☐ Ensure the new checkout does not remain connected to the DwarfUI remote as a writable destination.
+    ☐ Decide the DwarfUICore remote owner, repository visibility, default branch, and release destination before creating external state.
+    ☐ Obtain explicit authorization before creating or pushing the new remote repository.
+    ☐ Configure the approved DwarfUICore remote as `origin` and verify no push URL targets the DwarfUI repository.
+    ☐ Retain only the extracted infrastructure history, relevant test infrastructure, build tools, license, and documentation history needed by DwarfUICore.
+    ☐ Create `src/info.txt` with mod ID `dwarfuicore`, name `DwarfUICore`, initial package version, compatibility metadata, author, description, and DFHack tags.
+    ☐ Create `dwarfuicore.rockspec` with the correct package identity, source location, Lua version, runtime dependencies, and DwarfSpec test dependency.
+    ☐ Create `README.md`, `AGENTS.md`, `.gitignore`, `.luarc.json`, `.busted`, environment example, and editor workspace configuration appropriate to the new project.
+    ☐ Copy and rename the project-local `tools/` scripts so DwarfUICore can build, test, publish, and verify its package without invoking DwarfUI tooling.
+    ☐ Ensure every tool resolves paths relative to the DwarfUICore repository and uses mod ID `dwarfuicore` for explicit live reload.
+    ☐ Add an initial root module at `src/scripts_modinstalled/dwarfuicore.lua` with `--@ module=true` and no dependency on DwarfUI.
+    ☐ Add an initial DwarfUICore module registry and package-contract test.
+    ☐ Run the empty-foundation syntax, focused unit, full unit, and package checks independently.
+    Deliverables:
+    - Standalone local DwarfUICore repository structure.
+    - Independently runnable build, test, publish, and package-verification tools.
+    - Initial package containing only DwarfUICore paths.
+    Evidence:
+    - DwarfUICore syntax result.
+    - Focused and full unit results.
+    - Package manifest comparison and archive inspection.
+
+☐ [Phase 3 - Public Root and Installation Manifest] Implement the stable DwarfUICore dependency boundary and coherent-installation detection.
+    ☐ Define the minimal public `dwarfuicore` root environment and its closed `services` namespace.
+    ☐ Implement the services namespace as an empty read-only proxy with private backing storage so existing and future provider exports cannot be replaced or extended by consumers.
+    ☐ Keep command routing, registry access, reload helpers, module paths, and process state private.
+    ☐ Add a private installation manifest containing package version, installation/build identity, runtime generation, initialization status, supported service contract majors, and internal dependency contracts.
+    ☐ Define how an installation/build identity is generated for source builds and published packages.
+    ☐ Validate that cached prerequisites, facades, and service records agree with one installation identity and runtime generation.
+    ☐ Reject missing, malformed, partial, mixed-generation, and unsupported installations with stable DwarfUICore-prefixed errors.
+    ☐ Ensure `reqscript('dwarfuicore')` performs no eager tooltip or context-menu initialization.
+    ☐ Ensure normal root loading never invokes reload, teardown, environment clearing, or overlay rescan.
+    ☐ Add LuaDoc comments for every new class and function and immutable numeric enums for all closed discriminator sets.
+    ☐ Add focused tests for cold root load, repeated root load, read-only exports, malformed manifests, and mixed-installation rejection.
+    Deliverables:
+    - Stable lazy root module.
+    - Private coherent-installation manifest.
+    - Root and installation-contract regression coverage.
+
+☐ [Phase 4 - Consumer Namespace and Composite Identity System] Implement namespace validation, ownership state, and service-independent composite identities.
+    ☐ Add a namespace validator enforcing the approved length, character, leading-character, period, and reserved-name rules.
+    ☐ Reserve the `dwarfuicore` namespace for Core internals and `dwarfui` for the DwarfUI project.
+    ☐ Document that namespaces are declared ownership domains and not authenticated security principals.
+    ☐ Add process-owned namespace state that is shared by multiple API objects and entrypoints using the same namespace.
+    ☐ Define an immutable internal composite identity containing runtime generation, service kind, contract major, namespace, and locally allocated identity.
+    ☐ Use an immutable numeric enum for the internal service-kind discriminator.
+    ☐ Add monotonic identity allocation with no consumer-supplied local identity.
+    ☐ Implement exact validation of identity generation, service kind, contract major, and namespace before lookup, update, removal, callback dispatch, or diagnostics.
+    ☐ Ensure dropping an API object does not implicitly remove namespace registrations.
+    ☐ Add namespace-scoped explicit cleanup primitives that never affect another namespace or service.
+    ☐ Add focused tests for valid namespaces, every invalid namespace category, reserved namespaces, same-namespace sharing, different-namespace isolation, and foreign-identity rejection.
+    Deliverables:
+    - Reusable namespace ownership module.
+    - Composite identity allocator and validator.
+    - Namespace and identity regression suite.
+
+☐ [Phase 5 - Typed Provider and Acquisition Framework] Implement exact-version providers and immutable namespace-bound API objects.
+    ☐ Add stable root-defined `TooltipServiceProvider` and `ContextMenuServiceProvider` classes.
+    ☐ Require `new(contractVersion, consumerNamespace)` with both arguments mandatory.
+    ☐ Reject missing, non-integer, zero, negative, and unsupported contract versions before service initialization.
+    ☐ Treat the requested integer as an exact service contract major and never silently bind it to a different major.
+    ☐ Implement provider-specific Lua errors suitable for recovery through `pcall`; constructors must not return `nil, error` or call `qerror()`.
+    ☐ Add a private typed provider specification for each service without exposing a public enum, string service name, or module registry.
+    ☐ Implement atomic facade publication with reentrancy detection and an in-progress acquisition marker.
+    ☐ Require every prerequisite initializer to be idempotent and to publish its local process state only after successful construction.
+    ☐ Distinguish compatible healthy, initializing, retiring, disabled, stale, malformed, and absent service states.
+    ☐ Reuse compatible healthy singletons and reject unhealthy singletons without automatically repairing or replacing them.
+    ☐ Implement immutable API objects with private backing state containing facade, contract major, namespace, and generation.
+    ☐ Validate the active generation on every API method before delegating to its facade.
+    ☐ Prevent consumers from attaching fields, replacing methods, inspecting facades, or changing namespaces.
+    ☐ Add `get_contract_version()`, `get_namespace()`, namespace-scoped diagnostics, and namespace cleanup to each version 1 service API.
+    ☐ Add LuaDoc comments and complete public type definitions for every provider, API object, option, update, handle, definition, diagnostic, and error-facing contract.
+    ☐ Add focused tests for constructor validation, repeated construction, same-namespace sharing, different-namespace objects, reentrant acquisition, initialization failure, healthy retry, and immutable handles.
+    Deliverables:
+    - Shared private provider/acquisition framework.
+    - Version 1 provider classes and immutable namespace-bound API shells.
+    - Focused provider lifecycle and failure coverage.
+
+☐ [Phase 6 - Shared Infrastructure Extraction] Move reusable prerequisites into DwarfUICore without activating duplicate service owners.
+    ☐ Move and rename the class-model helper required by Core runtime validation.
+    ☐ Move and rename numeric, immutable-enum, function-chain, and other utilities required transitively by Core.
+    ☐ Move and rename map projection, pointer dispatch, pointer polling, root resolution, and widget-extension infrastructure.
+    ☐ Rename all internal `reqscript` paths and LuaDoc types from `dwarfui` to `dwarfuicore` within Core-owned modules.
+    ☐ Add every moved production module to the DwarfUICore registry in dependency order.
+    ☐ Preserve existing pointer-policy and widget-extension behavior while moving ownership to `dfhack.dwarfuicore`.
+    ☐ Make widget-extension installation explicitly idempotent across repeated provider construction and same-generation root loads.
+    ☐ Detect incompatible pre-existing widget contracts rather than silently replacing foreign or stale definitions during normal acquisition.
+    ☐ Move the corresponding focused tests and fixtures to DwarfUICore, updating them to assert Core contracts rather than old file paths.
+    ☐ Keep temporary DwarfUI copies inactive or unreferenced; do not allow both projects to install competing process owners.
+    ☐ Run focused infrastructure tests, the full DwarfUICore unit suite, syntax checks, and package verification separately.
+    Deliverables:
+    - Core-owned reusable prerequisite modules.
+    - Idempotent shared widget and pointer initialization.
+    - No active dependency from DwarfUICore back to DwarfUI.
+
+☐ [Phase 7 - Namespaced Tooltip Service Extraction] Move tooltip ownership to DwarfUICore and adapt every registration identity to namespaces.
+    ☐ Move and rename tooltip target, detector, map-target, service, registration, render-hook, renderer, presenter, runtime, and facade modules.
+    ☐ Replace widget-only registration keys with `(namespace, widget)` ownership keys.
+    ☐ Preserve idempotent same-namespace widget registration while allowing different namespaces to register the same widget independently.
+    ☐ Make map-registration handles immutable composite identities issued to exactly one namespace, service contract, and generation.
+    ☐ Scope register, update, unregister, cleanup, and diagnostics operations to the API object's namespace.
+    ☐ Implement deterministic tooltip collision behavior in which the most recently registered eligible contribution wins and an older contribution becomes eligible again after removal of the winner.
+    ☐ Retain the winning namespace identity through target mediation, intent publication, presentation, and diagnostics.
+    ☐ Preserve weak widget lifetime semantics without using API-object garbage collection as registration cleanup.
+    ☐ Preserve the single process-wide presenter, poller, detector, render-hook manager, and tooltip service across all namespaces.
+    ☐ Ensure repeated provider construction preserves registrations, intent, hooks, diagnostics, and active generation.
+    ☐ Ensure failed acquisition publishes neither a tooltip facade nor a healthy tooltip marker.
+    ☐ Define and document every version 1 tooltip option, update, opaque handle, result, and diagnostic shape.
+    ☐ Move generic tooltip tests into DwarfUICore and add namespace collision, namespace cleanup, foreign-handle, repeated-load, partial-state, and runtime-preservation cases.
+    ☐ Add focused native evidence for two independent namespaces sharing the real tooltip backend.
+    Deliverables:
+    - DwarfUICore-owned namespaced tooltip contract version 1.
+    - One process-wide tooltip runtime with isolated namespace ownership.
+    - Unit, package, and focused live tooltip evidence.
+
+☐ [Phase 8 - Namespaced Context-Menu Service Extraction] Move context-menu ownership to DwarfUICore and compose namespace contributions deterministically.
+    ☐ Move and rename context-menu definition, target, root-discovery, map-target, registration, input-sample, detector, input-hook, service, renderer, screen, and facade modules.
+    ☐ Replace widget-only registration keys with `(namespace, widget)` contribution keys.
+    ☐ Preserve idempotent same-namespace replacement while allowing multiple namespaces to contribute to the same widget or map tile.
+    ☐ Make map-registration handles immutable composite identities issued to exactly one namespace, service contract, and generation.
+    ☐ Scope register, update, unregister, cleanup, and diagnostics operations to the API object's namespace.
+    ☐ Combine all eligible namespace contributions into one menu ordered by process-wide registration sequence while preserving entry order within each definition.
+    ☐ Retain each entry's composite source identity through rendering and selection so dispatch invokes exactly its contributing callback.
+    ☐ Define deterministic behavior for duplicate labels, shortcuts, unavailable entries, failed callbacks, and contributions removed while a menu is open.
+    ☐ Preserve one process-wide registration manager, root discovery owner, input-hook manager, service, presentation owner, and screen lifecycle across all namespaces.
+    ☐ Ensure one failed consumer callback is contained and cannot disable or erase unrelated namespace registrations.
+    ☐ Ensure repeated provider construction preserves registrations, active menu state, hooks, diagnostics, and active generation.
+    ☐ Ensure failed acquisition publishes neither a context-menu facade nor a healthy context-menu marker.
+    ☐ Define and document every version 1 context-menu definition, option, update, opaque handle, result, and diagnostic shape.
+    ☐ Move generic context-menu tests into DwarfUICore and add composition, namespace cleanup, callback-source, foreign-handle, partial-state, and runtime-preservation cases.
+    ☐ Add focused native evidence for two independent namespaces contributing to one real context menu.
+    Deliverables:
+    - DwarfUICore-owned namespaced context-menu contract version 1.
+    - Deterministic cross-namespace menu composition and callback routing.
+    - Unit, package, and focused live context-menu evidence.
+
+☐ [Phase 9 - DwarfUICore Reload and Generation Lifecycle] Separate explicit global Core development reload from all consumer initialization and DwarfUI reload behavior.
+    ☐ Implement `dwarfuicore reload` as an explicit developer-only command path.
+    ☐ Mark the active generation as retiring and block new acquisitions before destructive teardown begins.
+    ☐ Retire presentation, input, polling, hook, screen, callback, and registration owners in a documented dependency-safe order.
+    ☐ Clear only DwarfUICore-managed script environments during explicit Core reload.
+    ☐ Construct and validate a complete fresh generation before marking it healthy.
+    ☐ Leave no old or partial facade marked healthy if fresh construction fails.
+    ☐ Make every old API object and opaque registration handle fail clearly as stale after retirement.
+    ☐ Ensure provider construction and API methods can never invoke reload, teardown, environment clearing, or overlay rescan.
+    ☐ Define whether explicit global Core reload clears all namespace registrations and document that disruptive behavior prominently.
+    ☐ Add tests for successful reload, failed reload, acquisition during retirement, stale API objects, stale handles, cleared callbacks, and absence of mixed-generation calls.
+    Deliverables:
+    - Explicit global DwarfUICore reload command.
+    - Generation-safe retirement and failed-reload behavior.
+    - Reload lifecycle regression suite.
+
+☐ [Phase 10 - DwarfUI Consumer Migration] Convert DwarfUI into a normal DwarfUICore consumer without modifying independent consumer plugins.
+    ☐ Add the DwarfUICore development/package dependency to DwarfUI with an explicit compatible package range.
+    ☐ Add DwarfUICore public definitions to DwarfUI's LuaLS workspace without importing Core internal modules as public dependencies.
+    ☐ Acquire tooltip and context-menu contract major 1 under the reserved namespace `dwarfui`.
+    ☐ Replace DwarfUI production imports of `dwarfui/tooltip/*` and `dwarfui/context_menu/*` with the namespace-bound public APIs.
+    ☐ Update DwarfUI feature registrations for minecart markers, mood UI, hover-action rails, and other internal consumers without changing their observable behavior.
+    ☐ Convert any temporarily required legacy DwarfUI API paths into thin deprecated adapters that delegate to DwarfUICore and own no process state.
+    ☐ Ensure compatibility adapters do not expose Core internals, accept alternate namespaces, or create a second service generation.
+    ☐ Remove Core-owned modules from the DwarfUI registry only after all DwarfUI production imports have migrated.
+    ☐ Remove DwarfUI's duplicate tooltip, context-menu, pointer, widget-extension, hook, presenter, screen, and service process owners.
+    ☐ Update DwarfUI tests and fixtures to use or stub the public DwarfUICore provider contract instead of importing Core internals.
+    ☐ Keep generic DwarfUICore behavior tests in DwarfUICore; DwarfUI tests assert only DwarfUI feature integration and namespace ownership.
+    ☐ Do not modify DwarfDirect, DwarfSearch, or any other independent consumer plugin during this task.
+    Deliverables:
+    - DwarfUI consuming DwarfUICore only through contract-major 1 providers.
+    - No duplicate Core runtime implementation in DwarfUI.
+    - No independent consumer-plugin changes.
+
+☐ [Phase 11 - DwarfUI Reload Isolation and Compatibility Retirement] Make DwarfUI development lifecycle safe for every other DwarfUICore consumer.
+    ☐ Change `dwarfui reload` so it never invokes `dwarfuicore reload` or clears DwarfUICore script environments.
+    ☐ During DwarfUI reload, clear and rebuild only registrations owned by namespace `dwarfui` when feature reconstruction requires it.
+    ☐ Preserve the DwarfUICore runtime generation, other namespaces, shared hooks, and other consumers' active registrations.
+    ☐ Ensure repeated `reqscript('dwarfui')` and repeated provider acquisition perform no development reload or destructive cleanup.
+    ☐ Test DwarfUI reload while an independent test namespace owns tooltip and context-menu registrations.
+    ☐ Test failed DwarfUI reload without corrupting Core health or other namespaces.
+    ☐ Decide and document the deprecation lifetime for temporary `dwarfui/tooltip/api` and `dwarfui/context_menu/api` adapters.
+    ☐ Remove adapters only in accordance with the documented compatibility policy and outside unrelated consumer migrations.
+    Deliverables:
+    - Consumer-local DwarfUI reload behavior.
+    - Evidence that another namespace survives successful and failed DwarfUI reload.
+    - Explicit adapter deprecation policy.
+
+☐ [Phase 12 - Cross-Project Test and Tooling Integration] Establish reproducible local and live validation across two independent repositories.
+    ☐ Add both sibling repositories to the development workspace without nesting either Git checkout.
+    ☐ Define a reproducible DwarfUI test dependency source for DwarfUICore; do not silently consume whichever sibling files happen to be present.
+    ☐ Keep DwarfUICore unit tests self-contained and keep DwarfUI unit tests capable of using typed public API doubles where live Core is unnecessary.
+    ☐ Add a controlled integration setup that installs the intended DwarfUICore package before DwarfUI live tests.
+    ☐ Record the resolved `dwarfuicore` script path, installed package version, build identity, and service contract majors in integration evidence.
+    ☐ Detect stale or duplicate installed DwarfUICore copies before interpreting live failures.
+    ☐ Keep focused Core service tests, full Core tests, focused DwarfUI integration tests, full DwarfUI tests, syntax checks, package checks, and live evidence as separate results.
+    ☐ Ensure DwarfSpec-based tests assert product behavior and cleanup rather than retesting generic DwarfSpec contracts.
+    ☐ Preserve cleanup confirmation for every live test that installs callbacks, hooks, screens, overlays, registrations, or temporary package content.
+    Deliverables:
+    - Reproducible two-repository development configuration.
+    - Controlled package-based live integration setup.
+    - Resolution and cleanup evidence for every live run.
+
+☐ [Phase 13 - Packaging and Installation Contract] Publish DwarfUICore and DwarfUI as separate verifiable artifacts with a one-way dependency.
+    ☐ Make the DwarfUICore package contain `info.txt`, `dwarfuicore.lua`, all registered Core modules, public documentation, and no DwarfUI feature files.
+    ☐ Make the DwarfUI package contain no `dwarfuicore.lua`, `dwarfuicore/` modules, or duplicate Core service implementations.
+    ☐ Update both package-contract tests and module-registry tests for their final ownership boundaries.
+    ☐ Verify source, expanded package, and zip manifests by relative path and content hash for both projects.
+    ☐ Inspect both final archives directly after publishing.
+    ☐ Install DwarfUICore first and verify its root, providers, contract majors, and explicit reload command.
+    ☐ Install DwarfUI second and verify it resolves the intended DwarfUICore installation.
+    ☐ Verify missing-Core, unsupported-contract, partial-Core, and stale-Core failures are clear and actionable from DwarfUI.
+    ☐ Verify ordinary DwarfUI initialization never copies, repairs, reloads, or clears DwarfUICore.
+    ☐ Define the supported DwarfUICore package range in DwarfUI metadata and document that runtime service-major validation remains authoritative.
+    Deliverables:
+    - Separately publishable DwarfUICore and DwarfUI artifacts.
+    - Archive and installed-resolution evidence.
+    - Explicit package and runtime compatibility contract.
+
+☐ [Phase 14 - Public Documentation and Migration Guidance] Document DwarfUICore from an independent consumer's perspective.
+    ☐ Document installation of DwarfUICore as a separate required DFHack mod.
+    ☐ Document the canonical `reqscript('dwarfuicore')` provider pattern with mandatory contract major and namespace.
+    ☐ Document namespace naming, stability, same-plugin entrypoint sharing, collision avoidance, and lack of caller authentication.
+    ☐ Document tooltip winner behavior and context-menu contribution composition across namespaces.
+    ☐ Document opaque handle ownership, explicit unregister, namespace cleanup, diagnostics, and stale-handle behavior.
+    ☐ Document package versioning separately from per-service contract majors.
+    ☐ Document additive and breaking service-contract changes.
+    ☐ Document normal initialization separately from explicit global Core reload and consumer-local DwarfUI reload.
+    ☐ Document clear remediation for missing, partial, incompatible, disabled, stale, and unsupported installations.
+    ☐ Update DwarfUI documentation to describe it as a DwarfUICore consumer and remove direct internal Core import examples.
+    ☐ Add an extraction/migration note for maintainers without changing independent consumer plugins.
+    Deliverables:
+    - DwarfUICore README and public API documentation.
+    - Compatibility/versioning policy.
+    - DwarfUI dependency and maintainer migration documentation.
+
+☐ [Phase 15 - Final Verification and Project Establishment Gate] Prove that DwarfUICore is independently healthy and that DwarfUI uses it without ownership duplication.
+    ☐ Run DwarfUICore focused provider, namespace, tooltip, context-menu, reload, and package-contract tests.
+    ☐ Run the complete DwarfUICore unit suite.
+    ☐ Run DwarfUICore production and test syntax checks.
+    ☐ Publish and verify the DwarfUICore package, then inspect the archive.
+    ☐ Run focused native DwarfUICore tooltip and context-menu multi-namespace tests with cleanup confirmed.
+    ☐ Run DwarfUI focused Core-consumer, feature-integration, reload-isolation, and package-contract tests.
+    ☐ Run the complete DwarfUI unit suite.
+    ☐ Run DwarfUI production and test syntax checks.
+    ☐ Publish and verify the DwarfUI package, then inspect the archive for absence of Core implementation files.
+    ☐ Run focused native DwarfUI feature tests against the installed DwarfUICore package with cleanup confirmed.
+    ☐ Verify cold start with DwarfUICore and DwarfUI installed, repeated provider acquisition, two independent namespaces, DwarfUI reload isolation, and explicit Core reload staleness.
+    ☐ Reconcile all results against the Phase 1 baseline and classify every difference.
+    ☐ Audit both repositories for unresolved placeholders, obsolete imports, duplicate runtime owners, stale documentation, and unexpected generated or packaged files.
+    ☐ Confirm unrelated pre-existing worktree and index changes remain preserved in both repositories.
+    ☐ Confirm that no independent consumer plugin was modified.
+    ☐ Record separate final outcomes for focused tests, full tests, syntax, package verification, archive inspection, installed resolution, native behavior, cleanup, and any unavailable evidence.
+    Completion gate:
+    - DwarfUICore builds, tests, packages, installs, and operates independently.
+    - DwarfUI depends only on the documented DwarfUICore public service-provider contract.
+    - Exactly one tooltip runtime and one context-menu runtime exist process-wide.
+    - Namespace ownership prevents one consumer's ordinary operations or DwarfUI reload from removing another consumer's registrations.
+    - Normal acquisition never performs development reload, teardown, environment clearing, singleton replacement, or overlay rescan.
+    - Missing, partial, incompatible, unhealthy, stale, and unsupported installations fail clearly.
+    - All required documentation and verification evidence are complete.
