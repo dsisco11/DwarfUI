@@ -72,17 +72,17 @@
     - One process-wide tooltip runtime.
     - Unit and package parity evidence, with focused live parity explicitly deferred until post-cutover verification.
 
-☐ [Phase 5 - Context-Menu System Extraction] Move the current context-menu system into DwarfUICore without introducing provider, namespace, or menu-composition redesigns.
-    ☐ Move and rename context-menu definition, target, root-discovery, map-target, registration, input-sample, detector, input-hook, service, renderer, screen, and API modules.
-    ☐ Preserve the existing `register`, `update`, `unregister`, `register_map_tile`, `update_map_tile`, `unregister_map_tile`, and diagnostics operations.
-    ☐ Preserve current widget and map-registration identity, replacement, eligibility, detection, input, failure containment, presentation, and selection semantics.
-    ☐ Preserve one process-wide context-menu registration manager, root-discovery owner, input-hook manager, service, presentation owner, and screen lifecycle.
-    ☐ Move context-menu process state from `dfhack.dwarfui` to the DwarfUICore-owned state root without changing current deliberate reload cleanup behavior.
-    ☐ Ensure ordinary `reqscript` loading never invokes development reload or clears script environments.
-    ☐ Rename internal paths and LuaDoc ownership without publishing internal prerequisites as a new consumer contract.
-    ☐ Move generic context-menu tests and fixtures to DwarfUICore.
-    ☐ Add extraction regressions for cold load, repeated load, singleton preservation, registration preservation, map-handle behavior, callback containment, diagnostics, partial state, and explicit reload.
-    ☐ Run focused context-menu tests, full DwarfUICore tests, syntax checks, and package verification separately; defer focused live context-menu evidence until DwarfUI has removed its duplicate context-menu system and consumes DwarfUICore.
+✔ [Phase 5 - Context-Menu System Extraction] Move the current context-menu system into DwarfUICore without introducing provider, namespace, or menu-composition redesigns. @done(26-07-31 22:31)
+    ✔ Move and rename context-menu definition, target, root-discovery, map-target, registration, input-sample, detector, input-hook, service, renderer, screen, and API modules. @done(26-07-31 22:31)
+    ✔ Preserve the existing `register`, `update`, `unregister`, `register_map_tile`, `update_map_tile`, `unregister_map_tile`, and diagnostics operations. @done(26-07-31 22:31)
+    ✔ Preserve current widget and map-registration identity, replacement, eligibility, detection, input, failure containment, presentation, and selection semantics. @done(26-07-31 22:31)
+    ✔ Preserve one process-wide context-menu registration manager, root-discovery owner, input-hook manager, service, presentation owner, and screen lifecycle. @done(26-07-31 22:31)
+    ✔ Move context-menu process state from `dfhack.dwarfui` to the DwarfUICore-owned state root without changing current deliberate reload cleanup behavior. @done(26-07-31 22:31)
+    ✔ Ensure ordinary `reqscript` loading never invokes development reload or clears script environments. @done(26-07-31 22:31)
+    ✔ Rename internal paths and LuaDoc ownership without publishing internal prerequisites as a new consumer contract. @done(26-07-31 22:31)
+    ✔ Move generic context-menu tests and fixtures to DwarfUICore. @done(26-07-31 22:31)
+    ✔ Add extraction regressions for cold load, repeated load, singleton preservation, registration preservation, map-handle behavior, callback containment, diagnostics, partial state, and explicit reload. @done(26-07-31 22:31)
+    ✔ Run focused context-menu tests, full DwarfUICore tests, syntax checks, and package verification separately; defer focused live context-menu evidence until DwarfUI has removed its duplicate context-menu system and consumes DwarfUICore. @done(26-07-31 22:31)
     Deliverables:
     - DwarfUICore-owned context-menu system with current behavior preserved.
     - One process-wide context-menu runtime.
