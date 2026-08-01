@@ -90,18 +90,26 @@
     - `src/scripts_modinstalled/dwarfui/hotkeys/model.lua`
     - `tests/hotkey_model.spec.lua`
 
-☐ [Phase 5 - Generic Bounded Overlay] Implement reusable rendering for independently positioned hotkey groups.
-    ☐ Add `dwarfui/hotkeys/overlay.lua` containing a reusable `HotkeyGroupOverlay` base class.
-    ☐ Accept a model builder and configurable label anchor, inset, and pen.
-    ☐ Fit each overlay frame to the current resolved group bounds instead of allocating a fullscreen host.
-    ☐ Render through the overlay body painter using overlay-local coordinates derived from screen-space element bounds.
-    ☐ Re-layout when the group moves or changes size, including changes that preserve the screen resolution.
-    ☐ Collapse safely to an inert minimal frame when the group is unavailable.
-    ☐ Keep keyboard and pointer input fully pass-through.
-    ☐ Support multiple independently registered group overlays without shared mutable geometry or lifecycle state.
+✔ [Phase 5 - Generic Bounded Overlay] Implement reusable rendering for independently positioned hotkey groups. @done(26-07-31 17:34)
+    ✔ Add `dwarfui/hotkeys/overlay.lua` containing a reusable `HotkeyGroupOverlay` base class. @done(26-07-31 17:34)
+    ✔ Accept a model builder and configurable label anchor, inset, and pen. @done(26-07-31 17:34)
+    ✔ Fit each overlay frame to the current resolved group bounds instead of allocating a fullscreen host. @done(26-07-31 17:34)
+    ✔ Render through the overlay body painter using overlay-local coordinates derived from screen-space element bounds. @done(26-07-31 17:34)
+    ✔ Re-layout when the group moves or changes size, including changes that preserve the screen resolution. @done(26-07-31 17:34)
+    ✔ Collapse safely to an inert minimal frame when the group is unavailable. @done(26-07-31 17:34)
+    ✔ Keep keyboard and pointer input fully pass-through. @done(26-07-31 17:34)
+    ✔ Support multiple independently registered group overlays without shared mutable geometry or lifecycle state. @done(26-07-31 17:34)
     Deliverables:
     - Reusable bounded overlay base class.
     - Test fixture demonstrating two independent hotkey groups with different positions and layouts.
+    Decisions:
+    - Overlay frames are derived from screen-space group bounds and become a one-cell inert frame when no group is available.
+    - Labels are painted in overlay-local coordinates after explicit screen-to-local conversion; no pointer or input mutation is involved.
+    - Each overlay instance owns its model, frame, snapshot, and lifecycle state, allowing independently registered groups.
+    - Input handling always returns false so native keyboard and pointer behavior remains untouched.
+    Docs:
+    - `src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua`
+    - `tests/hotkey_overlay.spec.lua`
 
 ☐ [Phase 6 - Fortress Main Toolbar Migration] Reimplement the current eight-button toolbar as a concrete reusable-group definition.
     ☐ Add `dwarfui/hotkeys/groups/fortress_main.lua`.

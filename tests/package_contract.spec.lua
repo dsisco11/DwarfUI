@@ -45,6 +45,7 @@ local shipped_modules = {
       'dwarfui/hotkeys/geometry.lua',
       'dwarfui/hotkeys/layout_provider.lua',
       'dwarfui/hotkeys/model.lua',
+      'dwarfui/hotkeys/overlay.lua',
     'dwarfui/popover.lua',
     'dwarfui/unit_card_task.lua',
 }
@@ -264,6 +265,28 @@ local function load_public_module(package_path)
               reqscript={
                   ['dwarfui/hotkeys/geometry']=geometry_environment.HotkeyGeometry,
                   ['dwarfui/hotkeys/layout_provider']=provider_environment.HotkeyLayoutProvider,
+              },
+          }
+      elseif package_path ==
+             'scripts_modinstalled/dwarfui/hotkeys/overlay.lua' then
+          local _, immutable_enum = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+          local _, geometry_environment = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua', {
+                  reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+              })
+          options = {
+              globals={
+                  defclass=widget_harness.defclass,
+                  COLOR_WHITE='white',
+              },
+              require_modules={
+                  ['plugins.overlay']={OverlayWidget=widget_harness.defclass(nil,
+                      widget_harness.widgets().Panel)},
+              },
+              reqscript={
+                  ['dwarfui/utils/immutable_enum']=immutable_enum,
+                  ['dwarfui/hotkeys/geometry']=geometry_environment.HotkeyGeometry,
               },
           }
     elseif package_path ==
