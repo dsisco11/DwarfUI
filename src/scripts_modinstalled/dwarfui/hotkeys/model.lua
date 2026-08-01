@@ -2,7 +2,9 @@
 
 local geometry_module = reqscript('dwarfui/hotkeys/geometry')
 local geometry = geometry_module.HotkeyGeometry or geometry_module
-local provider_api = reqscript('dwarfui/hotkeys/layout_provider')
+local provider_module = reqscript('dwarfui/hotkeys/layout_provider')
+-- DFHack module environments export public class globals beneath their names.
+local provider_api = provider_module.HotkeyLayoutProvider or provider_module
 
 ---@class dwarfui.HotkeyGroupModel.attrs
 ---@field definition dwarfui.HotkeyGroupDefinition

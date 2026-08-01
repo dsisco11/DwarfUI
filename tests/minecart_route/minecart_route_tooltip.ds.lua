@@ -7,7 +7,7 @@ local MinecartRouteFixture = require('tests.minecart_route.support.route_fixture
 local REGISTERED_WIDGET =
     'dwarfui-minecart-route-markers.minecart_route_markers'
 local RENDER_OVERLAY_SOURCE =
-    'tests/tooltip/support/tooltip_render_seam_overlays.lua'
+    'tests/minecart_route/support/tooltip_render_seam_overlays.lua'
 local RENDER_PROBE_SLOT = 'tooltip_final_render_probe'
 
 ---Returns one fully visible native minecart stop row.
