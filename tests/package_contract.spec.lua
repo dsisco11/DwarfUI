@@ -41,6 +41,7 @@ local shipped_modules = {
     'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
     'dwarfui/ui_hotkeys.lua',
+    'dwarfui/hotkeys/geometry.lua',
     'dwarfui/popover.lua',
     'dwarfui/unit_card_task.lua',
 }
@@ -212,6 +213,15 @@ local function load_public_module(package_path)
                 end,
                 DEFAULT_NIL={},
             },
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/hotkeys/geometry.lua' then
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        options = {
             reqscript={
                 ['dwarfui/utils/immutable_enum']=immutable_enum,
             },
