@@ -140,17 +140,17 @@
     - Separately publishable and verifiable packages.
     - Installed script-resolution evidence.
 
-☐ [Phase 9 - Documentation and Proposal Handoff] Document the completed split and transfer the unfinished architecture proposal to its owning repository.
-    ☐ Document DwarfUICore installation, current module entrypoints, explicit reload command, package compatibility, and DwarfUI dependency order.
-    ☐ Document DwarfUICore as the owner of reusable tooltip, context-menu, pointer, registration, and presentation infrastructure.
-    ☐ Update DwarfUI documentation to describe DwarfUI as a feature/component library that depends on DwarfUICore.
-    ☐ Remove stale DwarfUI documentation that claims ownership of moved Core internals while retaining accurate feature-integration documentation.
-    ☐ Copy `Docs/service-provider-api-proposal.md` into the DwarfUICore repository as a proposed, unimplemented architecture document.
-    ☐ Update proposal paths and project terminology so future design work occurs entirely within DwarfUICore.
-    ☐ Mark every provider, namespace, composite-identity, exact-contract-version, immutable-handle, and new collision rule as not implemented by the repository split.
-    ☐ Do not create `dwarfuicore-service-provider.todo` until the architecture proposal is finalized and explicitly approved.
-    ☐ Leave an appropriate pointer in DwarfUI documentation to the DwarfUICore-owned proposal instead of maintaining divergent copies.
-    ☐ Document that migration of independent consumer plugins is separate future work.
+✔ [Phase 9 - Documentation and Proposal Handoff] Document the completed split and transfer the unfinished architecture proposal to its owning repository. @done(26-07-31 23:59)
+    ✔ Document DwarfUICore installation, current module entrypoints, explicit reload command, package compatibility, and DwarfUI dependency order. @done(26-07-31 23:59)
+    ✔ Document DwarfUICore as the owner of reusable tooltip, context-menu, pointer, registration, and presentation infrastructure. @done(26-07-31 23:59)
+    ✔ Update DwarfUI documentation to describe DwarfUI as a feature/component library that depends on DwarfUICore. @done(26-07-31 23:59)
+    ✔ Remove stale DwarfUI documentation that claims ownership of moved Core internals while retaining accurate feature-integration documentation. @done(26-07-31 23:59)
+    ✔ Copy `Docs/service-provider-api-proposal.md` into the DwarfUICore repository as a proposed, unimplemented architecture document. @done(26-07-31 23:59)
+    ✔ Update proposal paths and project terminology so future design work occurs entirely within DwarfUICore. @done(26-07-31 23:59)
+    ✔ Mark every provider, namespace, composite-identity, exact-contract-version, immutable-handle, and new collision rule as not implemented by the repository split. @done(26-07-31 23:59)
+    ✔ Do not create `dwarfuicore-service-provider.todo` until the architecture proposal is finalized and explicitly approved. @done(26-07-31 23:59)
+    ✔ Leave an appropriate pointer in DwarfUI documentation to the DwarfUICore-owned proposal instead of maintaining divergent copies. @done(26-07-31 23:59)
+    ✔ Document that migration of independent consumer plugins is separate future work. @done(26-07-31 23:59)
     Deliverables:
     - Accurate DwarfUICore and DwarfUI ownership documentation.
     - One canonical unimplemented service-provider proposal in DwarfUICore.
