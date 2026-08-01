@@ -121,20 +121,20 @@
     - No duplicate Core implementation or process owner in DwarfUI.
     - DwarfUI reload isolated from DwarfUICore reload.
 
-☐ [Phase 8 - Cross-Project Development and Package Integration] Establish reproducible resolution across two independent repositories and packages.
-    ☐ Add both sibling repositories to the development workspace without nesting either Git checkout.
-    ☐ Define a reproducible DwarfUI test dependency source for DwarfUICore; do not silently consume whichever sibling files happen to be present.
-    ☐ Keep DwarfUICore unit tests self-contained and keep DwarfUI feature tests explicit about whether they use doubles, source modules, expanded packages, or installed runtime modules.
-    ☐ Add a controlled integration setup that installs the intended DwarfUICore package before DwarfUI live tests.
-    ☐ Record the resolved `dwarfuicore` script path, installed package version, source identity, and sibling checkout identity in integration evidence.
-    ☐ Detect stale or duplicate installed DwarfUICore copies before interpreting live failures.
-    ☐ Make the DwarfUICore package contain `info.txt`, `dwarfuicore.lua`, all registered Core modules, and no DwarfUI feature files.
-    ☐ Make the DwarfUI package contain no `dwarfuicore.lua`, `dwarfuicore/` modules, or duplicate Core implementation.
-    ☐ Update both module-registry and package-contract suites for their final ownership boundaries.
-    ☐ Verify source, expanded package, and zip manifests by relative path and content hash for both projects.
-    ☐ Inspect both final archives directly after publishing.
-    ☐ Install DwarfUICore first, then DwarfUI, and prove DwarfUI resolves the intended Core package.
-    ☐ Verify missing, partial, incompatible, and stale installed DwarfUICore copies fail clearly enough to diagnose the package boundary.
+✔ [Phase 8 - Cross-Project Development and Package Integration] Establish reproducible resolution across two independent repositories and packages. @done(26-07-31 23:58)
+    ✔ Add both sibling repositories to the development workspace without nesting either Git checkout. @done(26-07-31 23:58)
+    ✔ Define a reproducible DwarfUI test dependency source for DwarfUICore; do not silently consume whichever sibling files happen to be present. @done(26-07-31 23:58)
+    ✔ Keep DwarfUICore unit tests self-contained and keep DwarfUI feature tests explicit about whether they use doubles, source modules, expanded packages, or installed runtime modules. @done(26-07-31 23:58)
+    ✔ Add a controlled integration setup that installs the intended DwarfUICore package before DwarfUI live tests. @done(26-07-31 23:58)
+    ✔ Record the resolved `dwarfuicore` script path, installed package version, source identity, and sibling checkout identity in integration evidence. @done(26-07-31 23:58)
+    ✔ Detect stale or duplicate installed DwarfUICore copies before interpreting live failures. @done(26-07-31 23:58)
+    ✔ Make the DwarfUICore package contain `info.txt`, `dwarfuicore.lua`, all registered Core modules, and no DwarfUI feature files. @done(26-07-31 23:58)
+    ✔ Make the DwarfUI package contain no `dwarfuicore.lua`, `dwarfuicore/` modules, or duplicate Core implementation. @done(26-07-31 23:58)
+    ✔ Update both module-registry and package-contract suites for their final ownership boundaries. @done(26-07-31 23:58)
+    ✔ Verify source, expanded package, and zip manifests by relative path and content hash for both projects. @done(26-07-31 23:58)
+    ✔ Inspect both final archives directly after publishing. @done(26-07-31 23:58)
+    ✔ Install DwarfUICore first, then DwarfUI, and prove DwarfUI resolves the intended Core package. @done(26-07-31 23:58)
+    ✔ Verify missing, partial, incompatible, and stale installed DwarfUICore copies fail clearly enough to diagnose the package boundary. @done(26-07-31 23:58)
     Deliverables:
     - Reproducible two-repository development configuration.
     - Separately publishable and verifiable packages.
