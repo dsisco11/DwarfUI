@@ -1,5 +1,6 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
+local widget_harness = require('support.widget_harness')
 
 local separator = package.config:sub(1, 1)
 local shipped_modules = {
@@ -43,6 +44,7 @@ local shipped_modules = {
     'dwarfui/ui_hotkeys.lua',
       'dwarfui/hotkeys/geometry.lua',
       'dwarfui/hotkeys/layout_provider.lua',
+      'dwarfui/hotkeys/model.lua',
     'dwarfui/popover.lua',
     'dwarfui/unit_card_task.lua',
 }
@@ -239,6 +241,29 @@ local function load_public_module(package_path)
               reqscript={
                   ['dwarfui/utils/immutable_enum']=immutable_enum,
                   ['dwarfui/hotkeys/geometry']=geometry,
+              },
+          }
+      elseif package_path ==
+             'scripts_modinstalled/dwarfui/hotkeys/model.lua' then
+          local _, immutable_enum = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+          local _, geometry_environment = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua', {
+                  reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+              })
+          local _, provider_environment = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua', {
+                  reqscript={
+                      ['dwarfui/utils/immutable_enum']=immutable_enum,
+                      ['dwarfui/hotkeys/geometry']=geometry_environment.HotkeyGeometry,
+                  },
+              })
+          options = {
+              globals={defclass=widget_harness.defclass,
+                  DEFAULT_NIL=widget_harness.default_nil()},
+              reqscript={
+                  ['dwarfui/hotkeys/geometry']=geometry_environment.HotkeyGeometry,
+                  ['dwarfui/hotkeys/layout_provider']=provider_environment.HotkeyLayoutProvider,
               },
           }
     elseif package_path ==

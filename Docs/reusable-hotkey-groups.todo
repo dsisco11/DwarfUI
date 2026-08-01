@@ -68,19 +68,27 @@
     - `src/scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua`
     - `tests/hotkey_layout_provider.spec.lua`
 
-☐ [Phase 4 - Generic Hotkey Group Model] Move binding resolution, caching, and snapshot construction into a reusable model.
-    ☐ Add `dwarfui/hotkeys/model.lua` containing `HotkeyGroupModel`.
-    ☐ Accept a `HotkeyGroupDefinition` and injectable dimensions, tile-reading, binding, and activity collaborators.
-    ☐ Resolve active key displays by converting named actions through `df.interface_key` before calling DFHack key-display APIs.
-    ☐ Move compact label normalization into the generic hotkey subsystem.
-    ☐ Cache geometry by the provider-owned layout signature while resolving active bindings independently of geometry-cache changes.
-    ☐ Map semantic button definitions to provider elements without coupling the model to visual position.
-    ☐ Return a canonical snapshot containing group bounds, resolved buttons, active state, and layout signature.
-    ☐ Clear all cached geometry immediately when the group becomes inactive.
-    ☐ Preserve per-button suppression when either geometry or a binding is unavailable.
+✔ [Phase 4 - Generic Hotkey Group Model] Move binding resolution, caching, and snapshot construction into a reusable model. @done(26-07-31 17:25)
+    ✔ Add `dwarfui/hotkeys/model.lua` containing `HotkeyGroupModel`. @done(26-07-31 17:25)
+    ✔ Accept a `HotkeyGroupDefinition` and injectable dimensions, tile-reading, binding, and activity collaborators. @done(26-07-31 17:25)
+    ✔ Resolve active key displays by converting named actions through `df.interface_key` before calling DFHack key-display APIs. @done(26-07-31 17:25)
+    ✔ Move compact label normalization into the generic hotkey subsystem. @done(26-07-31 17:25)
+    ✔ Cache geometry by the provider-owned layout signature while resolving active bindings independently of geometry-cache changes. @done(26-07-31 17:25)
+    ✔ Map semantic button definitions to provider elements without coupling the model to visual position. @done(26-07-31 17:25)
+    ✔ Return a canonical snapshot containing group bounds, resolved buttons, active state, and layout signature. @done(26-07-31 17:25)
+    ✔ Clear all cached geometry immediately when the group becomes inactive. @done(26-07-31 17:25)
+    ✔ Preserve per-button suppression when either geometry or a binding is unavailable. @done(26-07-31 17:25)
     Deliverables:
     - Reusable `HotkeyGroupModel` with injectable providers and no concrete toolbar catalog.
     - Compatibility adapter or specialization retaining the existing `UiHotkeyModel` entry point.
+    Decisions:
+    - The model invokes providers each snapshot to observe same-resolution movement, but retains validated geometry while the provider signature is unchanged.
+    - Binding labels are resolved on every snapshot and normalized after the named action is converted through `df.interface_key`.
+    - Semantic definitions join provider elements by `element_id`; visual ordering is never inferred by the model.
+    - Inactive, unavailable, and ambiguous layouts clear cached geometry immediately; missing geometry or labels suppress only that button.
+    Docs:
+    - `src/scripts_modinstalled/dwarfui/hotkeys/model.lua`
+    - `tests/hotkey_model.spec.lua`
 
 ☐ [Phase 5 - Generic Bounded Overlay] Implement reusable rendering for independently positioned hotkey groups.
     ☐ Add `dwarfui/hotkeys/overlay.lua` containing a reusable `HotkeyGroupOverlay` base class.
