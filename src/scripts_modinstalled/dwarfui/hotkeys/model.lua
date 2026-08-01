@@ -1,6 +1,7 @@
 --@ module=true
 
-local geometry = reqscript('dwarfui/hotkeys/geometry')
+local geometry_module = reqscript('dwarfui/hotkeys/geometry')
+local geometry = geometry_module.HotkeyGeometry or geometry_module
 local provider_api = reqscript('dwarfui/hotkeys/layout_provider')
 
 ---@class dwarfui.HotkeyGroupModel.attrs

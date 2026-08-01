@@ -111,18 +111,25 @@
     - `src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua`
     - `tests/hotkey_overlay.spec.lua`
 
-☐ [Phase 6 - Fortress Main Toolbar Migration] Reimplement the current eight-button toolbar as a concrete reusable-group definition.
-    ☐ Add `dwarfui/hotkeys/groups/fortress_main.lua`.
-    ☐ Move `dwarfmode/Default` activity detection into the concrete group definition.
-    ☐ Configure the rendered search region and candidate validation for the native main-toolbar strip.
-    ☐ Define the semantic element order as Citizens, Tasks, Places, Labor, Work Orders, Nobles, Objects, and Justice.
-    ☐ Map those elements to `D_UNITLIST`, `D_JOBLIST`, `D_LOCATIONS`, `D_LABOR`, `D_ORDERS`, `D_NOBLES`, `D_ARTLIST`, and `D_JUSTICE`.
-    ☐ Convert `dwarfui-ui-hotkeys.lua` into a thin registration wrapper around the generic overlay and fortress-main definition.
-    ☐ Retain the existing overlay registration key and default-enabled behavior.
-    ☐ Remove bottom-band scanning, concrete catalog data, and generic rendering mechanics from the compatibility module once callers are migrated.
+✔ [Phase 6 - Fortress Main Toolbar Migration] Reimplement the current eight-button toolbar as a concrete reusable-group definition. @done(26-07-31 17:42)
+    ✔ Add `dwarfui/hotkeys/groups/fortress_main.lua`. @done(26-07-31 17:42)
+    ✔ Move `dwarfmode/Default` activity detection into the concrete group definition. @done(26-07-31 17:42)
+    ✔ Configure the rendered search region and candidate validation for the native main-toolbar strip. @done(26-07-31 17:42)
+    ✔ Define the semantic element order as Citizens, Tasks, Places, Labor, Work Orders, Nobles, Objects, and Justice. @done(26-07-31 17:42)
+    ✔ Map those elements to `D_UNITLIST`, `D_JOBLIST`, `D_LOCATIONS`, `D_LABOR`, `D_ORDERS`, `D_NOBLES`, `D_ARTLIST`, and `D_JUSTICE`. @done(26-07-31 17:42)
+    ✔ Convert `dwarfui-ui-hotkeys.lua` into a thin registration wrapper around the generic overlay and fortress-main definition. @done(26-07-31 17:42)
+    ✔ Retain the existing overlay registration key and default-enabled behavior. @done(26-07-31 17:42)
+    ✔ Remove bottom-band scanning, concrete catalog data, and generic rendering mechanics from the compatibility module once callers are migrated. @done(26-07-31 17:42)
     Deliverables:
     - Concrete fortress-main group definition using only public reusable contracts.
     - Existing live toolbar behavior preserved with eight correctly positioned labels.
+    Decisions:
+    - Fortress-specific screen eligibility, bottom-band search, semantic order, and DF action catalog live only in `fortress_main.lua`.
+    - The persisted `ui_hotkeys` overlay registration remains unchanged and delegates to the generic bounded overlay.
+    - The compatibility wrapper keeps the existing class export while removing concrete scanning and rendering logic.
+    Docs:
+    - `src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua`
+    - `tests/fortress_main_hotkeys.spec.lua`
 
 ☐ [Phase 7 - Focused Regression Coverage] Prove generic geometry, provider, model, overlay, and migration behavior independently.
     ☐ Add geometry tests for variable element width, height, spacing, origin, and screen dimensions.

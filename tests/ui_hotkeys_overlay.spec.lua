@@ -23,6 +23,46 @@ end
 local function load_overlay(state)
     local widgets = widget_harness.widgets()
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
+    local _, immutable_enum = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+    local geometry_environment = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua', {
+            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+        })
+    local provider_environment = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua', {
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfui/hotkeys/geometry']=geometry_environment,
+            },
+        })
+    local model_environment = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/hotkeys/model.lua', {
+            globals={defclass=widget_harness.defclass,
+                DEFAULT_NIL=widget_harness.default_nil()},
+            reqscript={
+                ['dwarfui/hotkeys/geometry']=geometry_environment,
+                ['dwarfui/hotkeys/layout_provider']=provider_environment,
+            },
+        })
+    local overlay_environment = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua', {
+            globals={defclass=widget_harness.defclass, COLOR_WHITE='white'},
+            require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfui/hotkeys/geometry']=geometry_environment,
+            },
+        })
+    local fortress_environment = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua', {
+            reqscript={
+                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfui/hotkeys/geometry']=geometry_environment,
+                ['dwarfui/hotkeys/layout_provider']=provider_environment,
+                ['dwarfui/hotkeys/model']=model_environment,
+            },
+        })
     local model = {
         build_snapshot=function()
             state.snapshot_reads = (state.snapshot_reads or 0) + 1
@@ -40,9 +80,8 @@ local function load_overlay(state)
                 ['plugins.overlay']={OverlayWidget=OverlayWidget},
             },
             reqscript={
-                ['dwarfui/ui_hotkeys']={
-                    UiHotkeyModel=function() return model end,
-                },
+                ['dwarfui/hotkeys/overlay']=overlay_environment,
+                ['dwarfui/hotkeys/groups/fortress_main']=fortress_environment,
             },
         })
 
@@ -89,7 +128,7 @@ describe('DwarfUI UI hotkeys overlay', function()
 
         assert.is_true(state.snapshot_reads >= 1)
         assert.equals(1, #dc.strings)
-        assert.same({x=15, y=20, text='u', pen='white'}, dc.strings[1])
+        assert.same({x=5, y=0, text='u', pen='white'}, dc.strings[1])
     end)
 
     it('resamples both on update and on render to track layout drift',

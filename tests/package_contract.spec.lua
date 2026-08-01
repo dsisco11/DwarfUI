@@ -45,6 +45,7 @@ local shipped_modules = {
       'dwarfui/hotkeys/geometry.lua',
       'dwarfui/hotkeys/layout_provider.lua',
       'dwarfui/hotkeys/model.lua',
+      'dwarfui/hotkeys/groups/fortress_main.lua',
       'dwarfui/hotkeys/overlay.lua',
     'dwarfui/popover.lua',
     'dwarfui/unit_card_task.lua',
@@ -287,6 +288,38 @@ local function load_public_module(package_path)
               reqscript={
                   ['dwarfui/utils/immutable_enum']=immutable_enum,
                   ['dwarfui/hotkeys/geometry']=geometry_environment.HotkeyGeometry,
+              },
+          }
+      elseif package_path ==
+             'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua' then
+          local _, immutable_enum = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+          local geometry_environment = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua', {
+                  reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+              })
+          local provider_environment = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua', {
+                  reqscript={
+                      ['dwarfui/utils/immutable_enum']=immutable_enum,
+                      ['dwarfui/hotkeys/geometry']=geometry_environment,
+                  },
+              })
+          local model_environment = module_loader.load(repo_root,
+              'src/scripts_modinstalled/dwarfui/hotkeys/model.lua', {
+                  globals={defclass=widget_harness.defclass,
+                      DEFAULT_NIL=widget_harness.default_nil()},
+                  reqscript={
+                      ['dwarfui/hotkeys/geometry']=geometry_environment,
+                      ['dwarfui/hotkeys/layout_provider']=provider_environment,
+                  },
+              })
+          options = {
+              reqscript={
+                  ['dwarfui/utils/immutable_enum']=immutable_enum,
+                  ['dwarfui/hotkeys/geometry']=geometry_environment,
+                  ['dwarfui/hotkeys/layout_provider']=provider_environment,
+                  ['dwarfui/hotkeys/model']=model_environment,
               },
           }
     elseif package_path ==

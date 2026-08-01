@@ -164,6 +164,11 @@ MODULES = {
         contract_type='table',
     },
     {
+        name='dwarfui/hotkeys/groups/fortress_main',
+        contract='FortressMainGroup',
+        contract_type='table',
+    },
+    {
         name='dwarfui/hotkeys/overlay',
         contract='HotkeyGroupOverlay',
         contract_type='table',
