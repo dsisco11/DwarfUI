@@ -17,21 +17,21 @@
     Docs:
     - `Docs/dwarfuicore-extraction-phase1-audit.md`
 
-☐ [Phase 2 - Standalone Repository Bootstrap] Establish DwarfUICore as an independently buildable local project while preserving relevant history.
-    ☐ Create the sibling `DwarfUICore` working directory from DwarfUI history using a history-preserving split mechanism.
-    ☐ Ensure the new checkout does not remain connected to the DwarfUI remote as a writable destination.
-    ☐ Decide the DwarfUICore remote owner, visibility, default branch, and release destination before creating external state.
-    ☐ Obtain explicit authorization before creating or pushing a new remote repository.
-    ☐ Configure the approved DwarfUICore remote as `origin` and verify no push URL targets the DwarfUI repository.
-    ☐ Retain only extracted infrastructure history, relevant test infrastructure, build tools, license, and documentation history needed by DwarfUICore.
-    ☐ Create `src/info.txt` with mod ID `dwarfuicore`, name `DwarfUICore`, initial package version, compatibility metadata, author, description, and DFHack tags.
-    ☐ Create `dwarfuicore.rockspec` with the correct package identity, source location, Lua version, runtime dependencies, and DwarfSpec test dependency.
-    ☐ Create `README.md`, `AGENTS.md`, `.gitignore`, `.luarc.json`, `.busted`, environment example, and editor workspace configuration appropriate to the new project.
-    ☐ Copy and rename the project-local `tools/` scripts so DwarfUICore can build, test, publish, and verify its package without invoking DwarfUI tooling.
-    ☐ Ensure every tool resolves paths relative to the DwarfUICore repository and uses mod ID `dwarfuicore` for explicit live reload.
-    ☐ Add `src/scripts_modinstalled/dwarfuicore.lua` as a `--@ module=true` command/module entrypoint with current-generation validation and explicit development reload behavior.
-    ☐ Add a DwarfUICore module registry and an initial package-contract test.
-    ☐ Run foundation syntax, focused unit, full unit, and package checks independently.
+✔ [Phase 2 - Standalone Repository Bootstrap] Establish DwarfUICore as an independently buildable local project while preserving relevant history. @done(26-07-31 21:23)
+    ✔ Create the sibling `DwarfUICore` working directory from DwarfUI history using a history-preserving split mechanism. @done(26-07-31 21:03)
+    ✔ Ensure the new checkout does not remain connected to the DwarfUI remote as a writable destination. @done(26-07-31 21:03)
+    ✔ Decide the DwarfUICore remote owner, visibility, default branch, and release destination before creating external state: `dsisco11/DwarfUICore`, public, `main`, GitHub Releases. @done(26-07-31 21:23)
+    ✔ Obtain explicit authorization before creating or pushing a new remote repository. @done(26-07-31 21:23)
+    ✔ Configure the approved DwarfUICore remote as `origin` and verify no push URL targets the DwarfUI repository. @done(26-07-31 21:23)
+    ✔ Retain only extracted infrastructure history, relevant test infrastructure, build tools, license, and documentation history needed by DwarfUICore. @done(26-07-31 21:03)
+    ✔ Create `src/info.txt` with mod ID `dwarfuicore`, name `DwarfUICore`, initial package version, compatibility metadata, author, description, and DFHack tags. @done(26-07-31 21:03)
+    ✔ Create `dwarfuicore.rockspec` with the correct package identity, source location, Lua version, runtime dependencies, and DwarfSpec test dependency. @done(26-07-31 21:03)
+    ✔ Create `README.md`, `AGENTS.md`, `.gitignore`, `.luarc.json`, `.busted`, environment example, and editor workspace configuration appropriate to the new project. @done(26-07-31 21:03)
+    ✔ Copy and rename the project-local `tools/` scripts so DwarfUICore can build, test, publish, and verify its package without invoking DwarfUI tooling. @done(26-07-31 21:03)
+    ✔ Ensure every tool resolves paths relative to the DwarfUICore repository and uses mod ID `dwarfuicore` for explicit live reload. @done(26-07-31 21:03)
+    ✔ Add `src/scripts_modinstalled/dwarfuicore.lua` as a `--@ module=true` command/module entrypoint with current-generation validation and explicit development reload behavior. @done(26-07-31 21:03)
+    ✔ Add a DwarfUICore module registry and an initial package-contract test. @done(26-07-31 21:03)
+    ✔ Run foundation syntax, focused unit, full unit, and package checks independently. @done(26-07-31 21:03)
     Deliverables:
     - Standalone local DwarfUICore repository.
     - Independently runnable build, test, publish, and package-verification tools.
