@@ -25,6 +25,18 @@ local function filled_reader(rectangles)
 end
 
 describe('DwarfUI reusable hotkey geometry', function()
+    it('recognizes indexable native tile values without requiring plain tables', function()
+        local geometry = load_geometry()
+        local tile_like = setmetatable({}, {
+            __index=function(_, key)
+                if key == 'write_to_lower' then return true end
+            end,
+        })
+
+        assert.is_true(geometry.is_native_tile(tile_like))
+        assert.is_false(geometry.is_native_tile('not a tile'))
+    end)
+
     it('validates and manipulates inclusive rectangles', function()
         local geometry = load_geometry()
         local rect = geometry.validate_rect({x1=2, y1=3, x2=6, y2=8})

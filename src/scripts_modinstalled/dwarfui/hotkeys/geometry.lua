@@ -144,10 +144,11 @@ function HotkeyGeometry.union(rectangles)
 end
 
 ---Returns the default predicate for native rendered screen cells.
----@param tile table|nil
+---@param tile table|userdata|nil
 ---@return boolean
 function HotkeyGeometry.is_native_tile(tile)
-    if type(tile) ~= 'table' then return false end
+    local tile_type = type(tile)
+    if tile_type ~= 'table' and tile_type ~= 'userdata' then return false end
     if tile.write_to_lower then return true end
     return type(tile.tile) == 'number' and tile.tile ~= 0
 end

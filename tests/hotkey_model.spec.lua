@@ -36,6 +36,29 @@ local function definition()
 end
 
 describe('DwarfUI reusable hotkey model', function()
+    it('uses the layout provider owned by the group definition by default', function()
+        local Model, provider = load_model()
+        local fixture_definition = definition()
+        fixture_definition.layout_provider = function()
+            return {group_id='model-fixture', bounds={x1=1,y1=1,x2=4,y2=2},
+                elements={one={bounds={x1=1,y1=1,x2=2,y2=2}},
+                    two={bounds={x1=3,y1=1,x2=4,y2=2}}},
+                signature='definition-provider'}
+        end
+        local model = Model{
+            definition=fixture_definition,
+            active_provider=function() return true end,
+            dimensions_provider=function() return 80, 25 end,
+            binding_lookup=function() return 'u' end,
+        }
+
+        local snapshot = model:build_snapshot()
+
+        assert.equals(provider.HotkeyGroupState.READY, snapshot.state)
+        assert.equals('definition-provider', snapshot.layout_signature)
+        assert.equals(2, #snapshot.buttons)
+    end)
+
     it('accepts the DFHack module environment shape for its layout provider', function()
         local Model, provider = load_model()
         local model = Model{

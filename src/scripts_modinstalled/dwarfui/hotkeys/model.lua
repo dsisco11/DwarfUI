@@ -84,6 +84,10 @@ end
 function HotkeyGroupModel:init()
     self.cached_signature = nil
     self.cached_layout = nil
+    if self.layout_provider == nil or self.layout_provider == DEFAULT_NIL then
+        self.layout_provider = type(self.definition) == 'table' and
+            self.definition.layout_provider or nil
+    end
     if self.binding_lookup == nil or self.binding_lookup == DEFAULT_NIL then
         self.binding_lookup = default_binding_lookup
     end
