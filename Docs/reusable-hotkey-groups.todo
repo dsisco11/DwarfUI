@@ -48,17 +48,25 @@
     - `src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua`
     - `tests/hotkey_geometry.spec.lua`
 
-☐ [Phase 3 - Reusable Layout Providers] Support native-structure, widget-tree, and rendered-signature sources through one layout contract.
-    ☐ Add `dwarfui/hotkeys/layout_provider.lua` with the common provider interface and result validation.
-    ☐ Implement a rendered-strip provider backed by the generic geometry primitives.
-    ☐ Allow rendered providers to supply a search-region provider, component validator, semantic element ordering, and layout-signature data.
-    ☐ Implement a native-control provider that accepts a feature-specific callback for locating native structures or widget roots and extracting their rectangles.
-    ☐ Support native widget traversal only when the located object is a `df.widget_container`; do not assume all native controls are widgets.
-    ☐ Allow custom providers to adapt other exposed native screen structures without changing the generic model.
-    ☐ Validate all provider results at the module boundary and suppress invalid layouts safely.
+✔ [Phase 3 - Reusable Layout Providers] Support native-structure, widget-tree, and rendered-signature sources through one layout contract. @done(26-07-31 17:12)
+    ✔ Add `dwarfui/hotkeys/layout_provider.lua` with the common provider interface and result validation. @done(26-07-31 17:12)
+    ✔ Implement a rendered-strip provider backed by the generic geometry primitives. @done(26-07-31 17:12)
+    ✔ Allow rendered providers to supply a search-region provider, component validator, semantic element ordering, and layout-signature data. @done(26-07-31 17:12)
+    ✔ Implement a native-control provider that accepts a feature-specific callback for locating native structures or widget roots and extracting their rectangles. @done(26-07-31 17:12)
+    ✔ Support native widget traversal only when the located object is a `df.widget_container`; do not assume all native controls are widgets. @done(26-07-31 17:12)
+    ✔ Allow custom providers to adapt other exposed native screen structures without changing the generic model. @done(26-07-31 17:12)
+    ✔ Validate all provider results at the module boundary and suppress invalid layouts safely. @done(26-07-31 17:12)
     Deliverables:
     - Interchangeable rendered-strip and native-control provider implementations.
     - A provider test double suitable for deterministic model and overlay tests.
+    Decisions:
+    - Providers are plain callable adapters; `invoke` contains exceptions and validates every returned rectangle, group ID, element map, and signature.
+    - Rendered providers delegate scanning and ambiguity handling to `HotkeyGeometry`, while definitions supply search, candidate, ordering, and signature callbacks.
+    - Native providers call widget traversal only after an explicit `df.widget_container` test; all other located values use a feature-specific extractor.
+    - Native and rendered adapters share the same canonical layout boundary, allowing custom native structures without generic-model changes.
+    Docs:
+    - `src/scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua`
+    - `tests/hotkey_layout_provider.spec.lua`
 
 ☐ [Phase 4 - Generic Hotkey Group Model] Move binding resolution, caching, and snapshot construction into a reusable model.
     ☐ Add `dwarfui/hotkeys/model.lua` containing `HotkeyGroupModel`.

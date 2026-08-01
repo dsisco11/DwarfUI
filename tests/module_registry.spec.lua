@@ -56,9 +56,10 @@ describe('DwarfUI module registry', function()
         assert.equals('dwarfui/popover', calls[35])
         assert.equals('dwarfui/ui_hotkeys', calls[36])
         assert.equals('dwarfui/hotkeys/geometry', calls[37])
-        assert.equals('dwarfui/mood_popover', calls[38])
-        assert.equals('dwarfui/minecart_route', calls[39])
-        assert.equals('dwarfui/unit_card_task', calls[40])
+        assert.equals('dwarfui/hotkeys/layout_provider', calls[38])
+        assert.equals('dwarfui/mood_popover', calls[39])
+        assert.equals('dwarfui/minecart_route', calls[40])
+        assert.equals('dwarfui/unit_card_task', calls[41])
         assert.equals('table',
             type(loaded['dwarfui/widgets/asset_button']))
         assert.equals('table',
@@ -115,6 +116,7 @@ describe('DwarfUI module registry', function()
         assert.equals('table', type(loaded['dwarfui/popover']))
         assert.equals('table', type(loaded['dwarfui/ui_hotkeys']))
         assert.equals('table', type(loaded['dwarfui/hotkeys/geometry']))
+        assert.equals('table', type(loaded['dwarfui/hotkeys/layout_provider']))
         assert.equals('table', type(loaded['dwarfui/mood_popover']))
         assert.equals('table', type(loaded['dwarfui/minecart_route']))
     end)
@@ -137,6 +139,7 @@ describe('DwarfUI module registry', function()
             'dwarfui/unit_card_task',
             'dwarfui/minecart_route',
             'dwarfui/mood_popover',
+            'dwarfui/hotkeys/layout_provider',
             'dwarfui/hotkeys/geometry',
             'dwarfui/ui_hotkeys',
             'dwarfui/popover',
