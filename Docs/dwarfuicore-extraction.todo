@@ -37,20 +37,20 @@
     - Independently runnable build, test, publish, and package-verification tools.
     - Initial valid DwarfUICore package structure.
 
-☐ [Phase 3 - Shared Infrastructure Extraction] Move the reusable prerequisites required by tooltip and context-menu systems without redesigning their contracts.
-    ☐ Move and rename the class-model helper required by current service validation.
-    ☐ Move and rename numeric, immutable-enum, function-chain, text, and other utilities required transitively by the extracted systems.
-    ☐ Move and rename map projection, pointer dispatch, pointer polling, root resolution, and widget-extension infrastructure.
-    ☐ Rename production paths from `dwarfui/...` to `dwarfuicore/...` inside DwarfUICore-owned modules.
-    ☐ Rename LuaDoc types from `dwarfui.*` to `dwarfuicore.*` only for types now owned by DwarfUICore.
-    ☐ Start every moved production module with `--@ module=true` and load project modules only with `reqscript('dwarfuicore/...')`.
-    ☐ Add LuaDoc comments for every moved or changed class and function.
-    ☐ Preserve immutable numeric enums for all existing closed discriminator sets.
-    ☐ Add every moved module to the DwarfUICore registry in dependency order and update registry/package tests.
-    ☐ Move the corresponding focused tests and fixtures, changing only repository paths, module names, LuaDoc ownership, and test harness dependencies needed by the split.
-    ☐ Preserve current pointer, projection, root-discovery, and widget-extension behavior exactly.
-    ☐ Verify repeated same-generation loads preserve current process-owned state and widget contracts.
-    ☐ Run focused infrastructure tests, full DwarfUICore unit tests, syntax checks, and package verification separately.
+✔ [Phase 3 - Shared Infrastructure Extraction] Move the reusable prerequisites required by tooltip and context-menu systems without redesigning their contracts. @done(26-07-31 21:47)
+    ✔ Move and rename the class-model helper required by current service validation. @done(26-07-31 21:47)
+    ✔ Move and rename numeric, immutable-enum, function-chain, text, and other utilities required transitively by the extracted systems. @done(26-07-31 21:47)
+    ✔ Move and rename map projection, pointer dispatch, pointer polling, root resolution, and widget-extension infrastructure. @done(26-07-31 21:47)
+    ✔ Rename production paths from `dwarfui/...` to `dwarfuicore/...` inside DwarfUICore-owned modules. @done(26-07-31 21:47)
+    ✔ Rename LuaDoc types from `dwarfui.*` to `dwarfuicore.*` only for types now owned by DwarfUICore. @done(26-07-31 21:47)
+    ✔ Start every moved production module with `--@ module=true` and load project modules only with `reqscript('dwarfuicore/...')`. @done(26-07-31 21:47)
+    ✔ Add LuaDoc comments for every moved or changed class and function. @done(26-07-31 21:47)
+    ✔ Preserve immutable numeric enums for all existing closed discriminator sets. @done(26-07-31 21:47)
+    ✔ Add every moved module to the DwarfUICore registry in dependency order and update registry/package tests. @done(26-07-31 21:47)
+    ✔ Move the corresponding focused tests and fixtures, changing only repository paths, module names, LuaDoc ownership, and test harness dependencies needed by the split. @done(26-07-31 21:47)
+    ✔ Preserve current pointer, projection, root-discovery, and widget-extension behavior exactly. @done(26-07-31 21:47)
+    ✔ Verify repeated same-generation loads preserve current process-owned state and widget contracts. @done(26-07-31 21:47)
+    ✔ Run focused infrastructure tests, full DwarfUICore unit tests, syntax checks, and package verification separately. @done(26-07-31 21:47)
     Deliverables:
     - Core-owned shared prerequisite modules.
     - Moved tests proving behavior parity.
