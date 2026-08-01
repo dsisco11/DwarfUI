@@ -2,7 +2,7 @@
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local class_helpers = reqscript('dwarfui/class')
+local class_helpers = reqscript('dwarfuicore/class')
 
 ---Returns whether a value is an integer.
 ---@param value any

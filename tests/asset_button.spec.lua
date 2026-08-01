@@ -78,7 +78,7 @@ local function make_context(graphics_available)
             ['gui.widgets']=widgets,
         },
         reqscript={
-            ['dwarfui/widget_extensions']={},
+            ['dwarfuicore/widget_extensions']={},
         },
     })
     return {

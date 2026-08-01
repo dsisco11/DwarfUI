@@ -1,5 +1,6 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
+local dwarfuicore_root = require('support.dwarfuicore_root')
 local widget_harness = require('support.widget_harness')
 
 local function painter()
@@ -13,11 +14,11 @@ local function painter()
 end
 
 local function load_overlay()
-    local _, immutable_enum = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+    local _, immutable_enum = module_loader.load(dwarfuicore_root,
+        'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
     local geometry_environment = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua', {
-            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+            reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
         })
     local widgets = widget_harness.widgets()
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
@@ -26,7 +27,7 @@ local function load_overlay()
             globals={defclass=widget_harness.defclass, COLOR_WHITE='white'},
             require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
             reqscript={
-                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
                 ['dwarfui/hotkeys/geometry']=geometry_environment.HotkeyGeometry,
             },
         })

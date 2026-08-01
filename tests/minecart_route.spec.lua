@@ -25,7 +25,7 @@ local route_environment = module_loader.load(repo_root,
             }},
         },
         reqscript={
-            ['dwarfui/map_projection']={
+            ['dwarfuicore/map_projection']={
                 world_to_interface=function(pos, viewport)
                     return viewport:tileToScreen(pos)
                 end,

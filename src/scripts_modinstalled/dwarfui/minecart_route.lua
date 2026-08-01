@@ -1,6 +1,6 @@
 --@ module=true
 
-local map_projection = reqscript('dwarfui/map_projection')
+local map_projection = reqscript('dwarfuicore/map_projection')
 
 -- Selection support for the native Premium DF minecart route menu.
 

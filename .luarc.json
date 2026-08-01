@@ -9,6 +9,8 @@
     ],
     "workspace.library": [
         "./src/scripts_modinstalled",
+        "../DwarfUICore/src/scripts_modinstalled/dwarfuicore/tooltip/api.lua",
+        "../DwarfUICore/src/scripts_modinstalled/dwarfuicore/context_menu/api.lua",
         "./tests/support",
         "./.luarocks/share/lua/5.4",
         "C:/Users/Sisco/AppData/Roaming/luarocks/share/lua/5.4",

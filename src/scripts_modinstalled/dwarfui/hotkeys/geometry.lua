@@ -1,6 +1,6 @@
 --@ module=true
 
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
 ---@enum dwarfui.HotkeyStripAxis
 HotkeyStripAxis = immutable_enum.define({

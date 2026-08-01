@@ -7,9 +7,9 @@ local guidm = require('gui.dwarfmode')
 local route_model = reqscript('dwarfui/minecart_route')
 local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
-local tooltip = reqscript('dwarfui/tooltip/api')
+local tooltip = reqscript('dwarfuicore/tooltip/api')
 local MarkerKind = route_model.MinecartRouteMarkerKind
-local PointerPolicy = reqscript('dwarfui/pointer').PointerPolicy
+local PointerPolicy = reqscript('dwarfuicore/pointer').PointerPolicy
 
 local HAULING_FOCUS = 'dwarfmode/Hauling'
 local ZOOM_ACTION_ID = 'recenter'

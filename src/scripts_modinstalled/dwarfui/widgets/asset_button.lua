@@ -2,7 +2,7 @@
 
 local utils = require('utils')
 local widgets = require('gui.widgets')
-reqscript('dwarfui/widget_extensions')
+reqscript('dwarfuicore/widget_extensions')
 
 local getval = utils.getval
 

@@ -1,12 +1,13 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
+local dwarfuicore_root = require('support.dwarfuicore_root')
 
 local function load_geometry()
-    local _, immutable_enum = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+    local _, immutable_enum = module_loader.load(dwarfuicore_root,
+        'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
     local environment = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua', {
-            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+            reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
         })
     return environment.HotkeyGeometry
 end

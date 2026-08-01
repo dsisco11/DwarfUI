@@ -1,14 +1,14 @@
 --@ module=true
 
--- DwarfUI module validation and explicit development reload command.
+-- DwarfUI validation and explicit development reload command.
 --[====[
 dwarfui
 =======
 
 Tags: fort | interface | development
 
-Validates the installed DwarfUI runtime or explicitly reloads all DwarfUI
-modules and overlays.
+Validates the installed DwarfUI feature runtime or explicitly reloads
+DwarfUI-owned modules and overlays. DwarfUICore has its own reload command.
 
 Usage
 -----
@@ -18,10 +18,6 @@ Usage
 ]====]
 
 local MODULE_REGISTRY_SCRIPT = 'dwarfui/module_registry'
-local CONTEXT_MENU_SERVICE_SCRIPT =
-    'dwarfui/context_menu/service'
-local CONTEXT_MENU_REGISTRATION_SCRIPT =
-    'dwarfui/context_menu/registration'
 local OVERLAY_SCRIPTS = {
     'dwarfui-ui-hotkeys',
     'dwarfui-mood-popover',
@@ -43,59 +39,13 @@ local function retire_overlays()
     end
 end
 
----Returns a loaded script environment without loading an absent script.
----@param script_name string
----@return table|nil environment
-local function find_loaded_script_environment(script_name)
-    local path = dfhack.findScript(script_name)
-    if not path or not dfhack.internal.scripts[path] then return nil end
-    return reqscript(script_name)
-end
-
----Destructively retires the loaded context-menu service or partial registration state.
-local function retire_context_menu()
-    local service = find_loaded_script_environment(
-        CONTEXT_MENU_SERVICE_SCRIPT)
-    if service and service.service and
-            type(service.service.shutdown) == 'function' then
-        service.service:shutdown()
-        return
-    end
-
-    local registration = find_loaded_script_environment(
-        CONTEXT_MENU_REGISTRATION_SCRIPT)
-    if not registration then return end
-    if registration.manager and
-            type(registration.manager.shutdown) == 'function' then
-        registration.manager:shutdown()
-    end
-end
-
----Returns whether a value implements the DwarfUI registry contract.
----@param registry any
----@return boolean
-local function is_valid_registry(registry)
-    return type(registry) == 'table' and
-        type(registry.load_all) == 'function' and
-        type(registry.get_script_names) == 'function' and
-        type(registry.MODULES) == 'table'
-end
-
----Loads the registry and repairs a partially cleared script environment.
----@return table
+---Loads the DwarfUI-owned module registry.
+---@return table registry
 local function load_module_registry()
-    local registry = reqscript(MODULE_REGISTRY_SCRIPT)
-    if not is_valid_registry(registry) then
-        dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)
-        dfhack.run_script(MODULE_REGISTRY_SCRIPT)
-        registry = reqscript(MODULE_REGISTRY_SCRIPT)
-    end
-    assert(is_valid_registry(registry),
-        'DwarfUI could not load its module registry.')
-    return registry
+    return reqscript(MODULE_REGISTRY_SCRIPT)
 end
 
----Clears cached environments for script names that are currently loaded.
+---Clears cached environments only for loaded DwarfUI-owned scripts.
 ---@param script_names string[]
 local function clear_script_environments(script_names)
     local loaded_names = {}
@@ -110,7 +60,7 @@ local function clear_script_environments(script_names)
     end
 end
 
----Evicts overlay registrations so DFHack discovers their fresh classes.
+---Evicts DwarfUI overlay registrations so DFHack discovers their fresh classes.
 local function reload_overlays()
     for _, script in ipairs(OVERLAY_SCRIPTS) do
         local path = assert(dfhack.findScript(script),
@@ -120,19 +70,18 @@ local function reload_overlays()
     require('plugins.overlay').rescan()
 end
 
----Validates and returns the currently loaded DwarfUI module generation.
+---Validates and returns the currently loaded DwarfUI feature generation.
 ---@return table<string, table>
 function initialize()
     return load_module_registry().load_all(reqscript)
 end
 
----Retires every DwarfUI overlay and context-menu runtime owner.
+---Retires every DwarfUI-owned overlay before an explicit development reload.
 function teardown()
     retire_overlays()
-    retire_context_menu()
 end
 
----Rebuilds every DwarfUI module and overlay as one runtime generation.
+---Rebuilds DwarfUI-owned modules and overlays without reloading DwarfUICore.
 ---@return table<string, table>
 function reload()
     local old_registry = load_module_registry()
@@ -155,15 +104,15 @@ function reload()
         table.insert(fresh_modules, spec.name)
     end
     clear_script_environments(fresh_modules)
-    for _, spec in ipairs(fresh_registry.MODULES) do
-        dfhack.run_script(spec.name)
+    for _, script_name in ipairs(fresh_modules) do
+        dfhack.run_script(script_name)
     end
 
     reload_overlays()
     return fresh_registry.load_all(reqscript)
 end
 
----Runs the DwarfUI validation or reload command.
+---Runs DwarfUI validation or its explicit development reload command.
 ---@param ... string
 function main(...)
     local args = {...}

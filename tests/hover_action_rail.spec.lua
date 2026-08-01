@@ -1,12 +1,13 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
+local dwarfuicore_root = require('support.dwarfuicore_root')
 local widget_harness = require('support.widget_harness')
 local stub = require('luassert.stub')
 
 local module_path =
     'src/scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua'
-local _, class_helpers = module_loader.load(repo_root,
-    'src/scripts_modinstalled/dwarfui/class.lua')
+local _, class_helpers = module_loader.load(dwarfuicore_root,
+    'src/scripts_modinstalled/dwarfuicore/class.lua')
 
 ---Builds an isolated generic hover-action rail module context.
 ---@return table
@@ -33,7 +34,7 @@ local function make_context()
             end}},
         },
         require_modules={gui=gui, ['gui.widgets']=widgets},
-        reqscript={['dwarfui/class']=class_helpers},
+        reqscript={['dwarfuicore/class']=class_helpers},
     })
     return {
         HoverAction=module.HoverAction,

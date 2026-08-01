@@ -1,6 +1,6 @@
 --@ module=true
 
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 local provider_module = reqscript('dwarfui/hotkeys/layout_provider')
 local provider_api = provider_module.HotkeyLayoutProvider or provider_module
 local model_module = reqscript('dwarfui/hotkeys/model')

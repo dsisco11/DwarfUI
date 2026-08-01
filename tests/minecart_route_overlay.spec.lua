@@ -1,5 +1,6 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
+local dwarfuicore_root = require('support.dwarfuicore_root')
 local widget_harness = require('support.widget_harness')
 
 local MarkerKind = {
@@ -147,7 +148,7 @@ local function load_overlay(state)
                 ['gui.widgets']=widgets,
             },
             reqscript={
-                ['dwarfui/widget_extensions']={},
+                ['dwarfuicore/widget_extensions']={},
             },
         })
     local _, hover_action_rail = module_loader.load(repo_root,
@@ -162,8 +163,8 @@ local function load_overlay(state)
                 ['gui.widgets']=widgets,
             },
             reqscript={
-                ['dwarfui/class']=select(2, module_loader.load(repo_root,
-                    'src/scripts_modinstalled/dwarfui/class.lua')),
+                ['dwarfuicore/class']=select(2, module_loader.load(dwarfuicore_root,
+                    'src/scripts_modinstalled/dwarfuicore/class.lua')),
             },
         })
     local _, module = module_loader.load(repo_root,
@@ -220,8 +221,8 @@ local function load_overlay(state)
                 },
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
-                ['dwarfui/tooltip/api']=tooltip,
-                ['dwarfui/pointer']={PointerPolicy=PointerPolicy},
+                ['dwarfuicore/tooltip/api']=tooltip,
+                ['dwarfuicore/pointer']={PointerPolicy=PointerPolicy},
             },
         })
     local instance = module.MinecartRouteMarkersOverlay{}

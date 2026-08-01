@@ -1,6 +1,6 @@
 --@ module=true
 
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 local geometry_module = reqscript('dwarfui/hotkeys/geometry')
 local geometry = geometry_module.HotkeyGeometry or geometry_module
 

@@ -1,12 +1,13 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
+local dwarfuicore_root = require('support.dwarfuicore_root')
 local widget_harness = require('support.widget_harness')
 
 ---@param globals? table
 ---@return table
 local function load_module(globals)
-    local _, immutable_enum = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+    local _, immutable_enum = module_loader.load(dwarfuicore_root,
+        'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
     local _, module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/ui_hotkeys.lua', {
             globals={
@@ -16,7 +17,7 @@ local function load_module(globals)
                 dfhack=globals and globals.dfhack,
             },
             reqscript={
-                ['dwarfui/utils/immutable_enum']=immutable_enum,
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
             },
         })
     return module

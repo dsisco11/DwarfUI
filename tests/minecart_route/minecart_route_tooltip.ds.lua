@@ -170,7 +170,7 @@ end
 local function tooltip_text_cell(intent)
     local screen_width, screen_height = dfhack.screen.getWindowSize()
     local content_width = math.max(1, math.min(60, screen_width - 2))
-    local lines = reqscript('dwarfui/text').wrap_text(
+    local lines = reqscript('dwarfuicore/text').wrap_text(
         intent.text, content_width)
     local width = 2
     for _, line in ipairs(lines) do
@@ -227,7 +227,7 @@ end
 local function assert_native_render_diagnostics(
         state, minimum_rendered_revision, expected_outermost)
     local transport =
-        reqscript('dwarfui/tooltip/render_hook').TooltipRenderTransport
+        reqscript('dwarfuicore/tooltip/render_hook').TooltipRenderTransport
     assert.is_true(state.presenter.active)
     assert.is_true(state.presenter.supported_surface)
     assert.equals(transport.OVERLAY,
@@ -258,7 +258,7 @@ end
 ---Installs a reversible foreign wrapper outside the active tooltip hook.
 ---@return table record
 local function install_foreign_overlay_wrapper()
-    local hook = reqscript('dwarfui/tooltip/render_hook')
+    local hook = reqscript('dwarfuicore/tooltip/render_hook')
     local active_record = assert(hook.manager._state.overlay_hook,
         'active tooltip overlay hook is unavailable')
     local current_export = overlay.render_viewscreen_widgets
@@ -274,8 +274,8 @@ local function install_foreign_overlay_wrapper()
     record.installed = function(...)
         local results = table.pack(record.predecessor(...))
         record.call_count = record.call_count + 1
-        local probe = dfhack.dwarfui and
-            dfhack.dwarfui[RENDER_PROBE_SLOT] or nil
+        local probe = dfhack.dwarfuicore and
+            dfhack.dwarfuicore[RENDER_PROBE_SLOT] or nil
         if probe and probe.enabled ~= false then
             gui.Painter.new():seek(probe.x, probe.y):char('F', {
                 fg=COLOR_WHITE,
@@ -338,7 +338,7 @@ describe('native minecart zoom tooltip polling', function()
             controls = resolve_controls()
             local stop = reveal_action(hauling, controls)
             local action = controls.action
-            local tooltip = reqscript('dwarfui/tooltip/api')
+            local tooltip = reqscript('dwarfuicore/tooltip/api')
             local environment = capture_environment(native_subject)
 
             -- The production overlay already registered this button. Cycle
@@ -469,6 +469,7 @@ describe('native minecart zoom tooltip polling', function()
             local old_module_generation =
                 before_reload.poller_module_generation
             local old_service_generation = before_reload.generation
+            dfhack.run_command('dwarfuicore', 'reload')
             dfhack.run_command('dwarfui', 'reload')
 
             ds.await('one new poller generation resumes after reload',
@@ -516,7 +517,7 @@ describe('native minecart zoom tooltip polling', function()
             state = ds.tooltip_state()
             assert.is_equal(controls.action, state.target,
                 'recreated Hauling action did not become the tooltip target')
-            assert.is_table(reqscript('dwarfui/tooltip/service').service:
+            assert.is_table(reqscript('dwarfuicore/tooltip/service').service:
                 get_registrations()[controls.action],
                 'recreated Hauling action was not automatically registered')
             assert_input_only_diagnostics(state)
@@ -539,7 +540,7 @@ describe('native minecart zoom tooltip polling', function()
         cleanup_step('restore action overrides', restore_action)
         cleanup_step('restore interrupted registration', function()
             if registration_to_restore then
-                reqscript('dwarfui/tooltip/api').register(
+                reqscript('dwarfuicore/tooltip/api').register(
                     registration_to_restore)
                 registration_to_restore = nil
             end
@@ -579,6 +580,7 @@ describe('native minecart zoom tooltip polling', function()
             native_subject = nil
         end)
         cleanup_step('restore current DwarfUI runtime', function()
+            dfhack.run_command('dwarfuicore', 'reload')
             dfhack.run_command('dwarfui', 'reload')
         end)
         if #cleanup_failures > 0 then
@@ -642,7 +644,7 @@ describe('native minecart zoom tooltip final rendering', function()
                 overlay_paint_order={},
                 foreign_paint_count=0,
             }
-            dfhack.dwarfui[RENDER_PROBE_SLOT] = probe
+            dfhack.dwarfuicore[RENDER_PROBE_SLOT] = probe
 
             local minimum_rendered_revision = state.intent.revision
             local viewscreen_before = staged_overlay_render_count(
@@ -742,6 +744,7 @@ describe('native minecart zoom tooltip final rendering', function()
                 state.presenter.generation
             local hook_generation_before =
                 state.render_hook.generation
+            dfhack.run_command('dwarfuicore', 'reload')
             dfhack.run_command('dwarfui', 'reload')
             ds.await('native tooltip generations recover after reload',
                 function()
@@ -810,7 +813,7 @@ describe('native minecart zoom tooltip final rendering', function()
             if probe then probe.enabled = false end
         end)
         cleanup_step('retire tooltip render hooks', function()
-            reqscript('dwarfui/tooltip/render_hook').manager:shutdown()
+            reqscript('dwarfuicore/tooltip/render_hook').manager:shutdown()
         end)
         cleanup_step('restore foreign and displaced overlay wrappers',
             function()
@@ -857,12 +860,13 @@ describe('native minecart zoom tooltip final rendering', function()
             native_subject = nil
         end)
         cleanup_step('clear final-render process probe', function()
-            if dfhack.dwarfui then
-                dfhack.dwarfui[RENDER_PROBE_SLOT] = nil
+            if dfhack.dwarfuicore then
+                dfhack.dwarfuicore[RENDER_PROBE_SLOT] = nil
             end
             probe = nil
         end)
         cleanup_step('restore current DwarfUI runtime', function()
+            dfhack.run_command('dwarfuicore', 'reload')
             dfhack.run_command('dwarfui', 'reload')
         end)
         if #cleanup_failures > 0 then

@@ -1,5 +1,6 @@
 --@ module=true
 
+---Describes one reload-managed DwarfUI feature module contract.
 ---@class dwarfui.ModuleSpec
 ---@field name string
 ---@field contract string
@@ -8,33 +9,6 @@
 ---Dependencies precede consumers so reload constructs one coherent generation.
 ---@type dwarfui.ModuleSpec[]
 MODULES = {
-    {name='dwarfui/class', contract='is_instance_of'},
-    {name='dwarfui/text', contract='wrap_text'},
-    {name='dwarfui/utils/numbers', contract='is_integer'},
-    {name='dwarfui/utils/immutable_enum', contract='define'},
-    {name='dwarfui/utils/function_chain', contract='wraps'},
-    {name='dwarfui/map_projection', contract='project_visible'},
-    {
-        name='dwarfui/context_menu/definition',
-        contract='ContextMenuDefinitionSlot',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/target',
-        contract='ContextMenuOpenSession',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/root_discovery',
-        contract='ContextMenuRootDiscovery',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/pointer',
-        contract='PointerDispatcher',
-        contract_type='table',
-    },
-    {name='dwarfui/widget_extensions', contract='install_pointer_attributes'},
     {
         name='dwarfui/widgets/asset_button',
         contract='AssetButton',
@@ -45,104 +19,7 @@ MODULES = {
         contract='HoverActionRail',
         contract_type='table',
     },
-    {
-        name='dwarfui/pointer_poller',
-        contract='PointerPoller',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/view_root_resolver',
-        contract='ViewRootResolver',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/map_target',
-        contract='ContextMenuMapTargetRegistry',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/registration',
-        contract='manager',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/input_sample',
-        contract='ContextMenuInputSampler',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/target_detector',
-        contract='ContextMenuTargetDetector',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/input_hook',
-        contract='ContextMenuInputHookManager',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/service',
-        contract='ContextMenuService',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/renderer',
-        contract='ContextMenuWindow',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/context_menu/screen',
-        contract='ContextMenuScreen',
-        contract_type='table',
-    },
-    {name='dwarfui/context_menu/api', contract='register'},
-    {
-        name='dwarfui/tooltip/target',
-        contract='TooltipTargetAdapter',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/tooltip/target_detector',
-        contract='TooltipTargetDetector',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/tooltip/map_target',
-        contract='TooltipMapTargetRegistry',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/tooltip/service',
-        contract='service',
-        contract_type='table',
-    },
-    {name='dwarfui/tooltip/registration', contract='register'},
-    {
-        name='dwarfui/tooltip/render_hook',
-        contract='manager',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/tooltip/renderer',
-        contract='TooltipRenderer',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/tooltip/presenter',
-        contract='TooltipPresenter',
-        contract_type='table',
-    },
-    {
-        name='dwarfui/tooltip/runtime',
-        contract='presenter',
-        contract_type='table',
-    },
-    {name='dwarfui/tooltip/api', contract='register'},
-    {
-        name='dwarfui/popover',
-        contract='Popover',
-        contract_type='table',
-    },
+    {name='dwarfui/popover', contract='Popover', contract_type='table'},
     {
         name='dwarfui/ui_hotkeys',
         contract='UiHotkeyModel',
@@ -188,7 +65,7 @@ MODULES = {
 
 local REGISTRY_SCRIPT = 'dwarfui/module_registry'
 
----Loads and validates every registered module in dependency order.
+---Loads and validates every registered DwarfUI feature module in dependency order.
 ---@param loader fun(name: string): table
 ---@return table<string, table>
 function load_all(loader)

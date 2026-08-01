@@ -167,7 +167,7 @@ end
 local function tooltip_text_cell(intent)
     local screen_width, screen_height = dfhack.screen.getWindowSize()
     local content_width = math.max(1, math.min(60, screen_width - 2))
-    local lines = reqscript('dwarfui/text').wrap_text(
+    local lines = reqscript('dwarfuicore/text').wrap_text(
         intent.text, content_width)
     local width = 2
     for _, line in ipairs(lines) do
@@ -831,6 +831,7 @@ describe('registered Minecart Route overlay against the native menu', function()
                 'reenabled overlay did not recreate native map handles')
 
             local pre_reload_overlay = overlay
+            dfhack.run_command('dwarfuicore', 'reload')
             dfhack.run_command('dwarfui', 'reload')
             ds.await('reload retires old native map handles', function()
                 return next(pre_reload_overlay.map_tooltip_handles) == nil and

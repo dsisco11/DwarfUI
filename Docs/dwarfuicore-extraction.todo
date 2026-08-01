@@ -102,20 +102,20 @@
     - Non-destructive normal import behavior.
     - Lifecycle regression coverage.
 
-☐ [Phase 7 - DwarfUI Cutover] Convert DwarfUI into a consumer of the extracted current APIs and remove duplicate Core ownership.
-    ☐ Add an explicit DwarfUICore development and package dependency to DwarfUI.
-    ☐ Add DwarfUICore public/current API definitions to DwarfUI's LuaLS workspace without treating arbitrary Core internals as DwarfUI modules.
-    ☐ Replace DwarfUI production imports of moved modules with their `dwarfuicore/...` paths.
-    ☐ Update DwarfUI tooltip and context-menu registrations for minecart markers, mood UI, hover-action rails, and other feature integrations without changing observable behavior.
-    ☐ Retain DwarfUI-owned widgets, popovers, hotkeys, feature models, and overlay entrypoints in DwarfUI.
-    ☐ Update the DwarfUI module registry to remove every moved Core module and preserve dependency order among the remaining feature modules.
-    ☐ Remove DwarfUI's duplicate tooltip, context-menu, pointer, widget-extension, hook, presenter, screen, registration, and service implementations only after all DwarfUI imports have migrated.
-    ☐ Remove DwarfUI-owned process-state slots that were transferred to `dfhack.dwarfuicore` without clearing the live DwarfUICore owners during normal initialization.
-    ☐ Change `dwarfui reload` so it reloads only DwarfUI-owned modules and overlays and never invokes `dwarfuicore reload`.
-    ☐ Ensure DwarfUI overlay retirement unregisters or releases only resources those overlays currently own under the existing APIs.
-    ☐ Update DwarfUI tests and fixtures to resolve the separately owned DwarfUICore modules.
-    ☐ Keep generic tooltip, context-menu, pointer, and lifecycle tests in DwarfUICore; DwarfUI tests assert only feature integration behavior.
-    ☐ Do not modify DwarfDirect, DwarfSearch, or any other independent consumer plugin.
+✔ [Phase 7 - DwarfUI Cutover] Convert DwarfUI into a consumer of the extracted current APIs and remove duplicate Core ownership. @done(26-07-31 23:38)
+    ✔ Add an explicit DwarfUICore development and package dependency to DwarfUI. @done(26-07-31 23:38)
+    ✔ Add DwarfUICore public/current API definitions to DwarfUI's LuaLS workspace without treating arbitrary Core internals as DwarfUI modules. @done(26-07-31 23:38)
+    ✔ Replace DwarfUI production imports of moved modules with their `dwarfuicore/...` paths. @done(26-07-31 23:38)
+    ✔ Update DwarfUI tooltip and context-menu registrations for minecart markers, mood UI, hover-action rails, and other feature integrations without changing observable behavior. @done(26-07-31 23:38)
+    ✔ Retain DwarfUI-owned widgets, popovers, hotkeys, feature models, and overlay entrypoints in DwarfUI. @done(26-07-31 23:38)
+    ✔ Update the DwarfUI module registry to remove every moved Core module and preserve dependency order among the remaining feature modules. @done(26-07-31 23:38)
+    ✔ Remove DwarfUI's duplicate tooltip, context-menu, pointer, widget-extension, hook, presenter, screen, registration, and service implementations only after all DwarfUI imports have migrated. @done(26-07-31 23:38)
+    ✔ Remove DwarfUI-owned process-state slots that were transferred to `dfhack.dwarfuicore` without clearing the live DwarfUICore owners during normal initialization. @done(26-07-31 23:38)
+    ✔ Change `dwarfui reload` so it reloads only DwarfUI-owned modules and overlays and never invokes `dwarfuicore reload`. @done(26-07-31 23:38)
+    ✔ Ensure DwarfUI overlay retirement unregisters or releases only resources those overlays currently own under the existing APIs. @done(26-07-31 23:38)
+    ✔ Update DwarfUI tests and fixtures to resolve the separately owned DwarfUICore modules. @done(26-07-31 23:38)
+    ✔ Keep generic tooltip, context-menu, pointer, and lifecycle tests in DwarfUICore; DwarfUI tests assert only feature integration behavior. @done(26-07-31 23:38)
+    ✔ Do not modify DwarfDirect, DwarfSearch, or any other independent consumer plugin. @done(26-07-31 23:38)
     Deliverables:
     - DwarfUI consuming separately packaged DwarfUICore modules.
     - No duplicate Core implementation or process owner in DwarfUI.
