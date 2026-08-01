@@ -1,19 +1,21 @@
-☐ [Phase 1 - Split Contract and Baseline] Freeze the behavior-preserving DwarfUICore extraction boundary and capture reproducible evidence before moving files.
-    ☐ Record the current DwarfUI repository path, branch, status, index state, source package version, and installed runtime path without stashing, committing, or altering unrelated changes.
-    ☐ Inventory every production module, test, fixture, tool, document, and package entry involved in tooltip, context-menu, pointer, widget-extension, projection, root-discovery, and shared runtime behavior.
-    ☐ Produce a transitive dependency map beginning at `dwarfui/tooltip/api`, `dwarfui/context_menu/api`, and their runtime owners.
-    ☐ Classify every dependency as DwarfUICore-owned, DwarfUI-owned, temporarily bridged during extraction, or retained as an external DFHack dependency.
-    ☐ Confirm that DwarfUICore will be a standalone sibling repository at `D:\CODE\DFHack\DwarfUICore`, not a nested checkout, submodule, subtree, or vendored directory.
-    ☐ Fix the project identifiers: repository `DwarfUICore`, mod ID `dwarfuicore`, LuaRocks package `dwarfuicore`, root script `dwarfuicore`, LuaDoc namespace `dwarfuicore`, and process-state root `dfhack.dwarfuicore`.
-    ☐ Define the extraction rule: preserve current service behavior and public operations; do not implement providers, consumer namespaces, composite identities, contract-major negotiation, immutable API objects, or the proposed new collision rules.
-    ☐ Identify every behavior change that would be tempting during the move and defer it to the still-unfinalized service-provider proposal.
-    ☐ Record current focused unit, full unit, syntax, package, archive, and available live-test results as separate baseline evidence.
-    ☐ Record pre-existing failures and unavailable live prerequisites without treating them as split regressions.
+✔ [Phase 1 - Split Contract and Baseline] Freeze the behavior-preserving DwarfUICore extraction boundary and capture reproducible evidence before moving files. @done(26-07-31 20:51)
+    ✔ Record the current DwarfUI repository path, branch, status, index state, source package version, and installed runtime path without stashing, committing, or altering unrelated changes. @done(26-07-31 20:51)
+    ✔ Inventory every production module, test, fixture, tool, document, and package entry involved in tooltip, context-menu, pointer, widget-extension, projection, root-discovery, and shared runtime behavior. @done(26-07-31 20:51)
+    ✔ Produce a transitive dependency map beginning at `dwarfui/tooltip/api`, `dwarfui/context_menu/api`, and their runtime owners. @done(26-07-31 20:51)
+    ✔ Classify every dependency as DwarfUICore-owned, DwarfUI-owned, temporarily bridged during extraction, or retained as an external DFHack dependency. @done(26-07-31 20:51)
+    ✔ Confirm that DwarfUICore will be a standalone sibling repository at `D:\CODE\DFHack\DwarfUICore`, not a nested checkout, submodule, subtree, or vendored directory. @done(26-07-31 20:51)
+    ✔ Fix the project identifiers: repository `DwarfUICore`, mod ID `dwarfuicore`, LuaRocks package `dwarfuicore`, root script `dwarfuicore`, LuaDoc namespace `dwarfuicore`, and process-state root `dfhack.dwarfuicore`. @done(26-07-31 20:51)
+    ✔ Define the extraction rule: preserve current service behavior and public operations; do not implement providers, consumer namespaces, composite identities, contract-major negotiation, immutable API objects, or the proposed new collision rules. @done(26-07-31 20:51)
+    ✔ Identify every behavior change that would be tempting during the move and defer it to the still-unfinalized service-provider proposal. @done(26-07-31 20:51)
+    ✔ Record current focused unit, full unit, syntax, package, archive, and available live-test results as separate baseline evidence. @done(26-07-31 20:51)
+    ✔ Record pre-existing failures and unavailable live prerequisites without treating them as split regressions. @done(26-07-31 20:51)
     Deliverables:
     - Approved source-and-test ownership inventory.
     - Transitive dependency map with no unclassified module.
     - Explicit behavior-preservation and deferral list.
     - Baseline evidence report separated by test category.
+    Docs:
+    - `Docs/dwarfuicore-extraction-phase1-audit.md`
 
 ☐ [Phase 2 - Standalone Repository Bootstrap] Establish DwarfUICore as an independently buildable local project while preserving relevant history.
     ☐ Create the sibling `DwarfUICore` working directory from DwarfUI history using a history-preserving split mechanism.
