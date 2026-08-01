@@ -56,21 +56,21 @@
     - Moved tests proving behavior parity.
     - No production dependency from DwarfUICore back to DwarfUI.
 
-☐ [Phase 4 - Tooltip System Extraction] Move the current tooltip system into DwarfUICore without introducing the proposed provider or namespace architecture.
-    ☐ Move and rename tooltip target, detector, map-target, service, registration, render-hook, renderer, presenter, runtime, and API modules.
-    ☐ Preserve the existing `register`, `unregister`, `register_map_tile`, `update_map_tile`, `unregister_map_tile`, and diagnostics operations.
-    ☐ Preserve current widget and map-registration identity, weak lifetime, eligibility, ordering, intent, presentation, polling, and hook semantics.
-    ☐ Preserve one process-wide tooltip service, presenter, poller, detector, render-hook manager, and registration state.
-    ☐ Move tooltip process state from `dfhack.dwarfui` to the DwarfUICore-owned state root without resetting healthy state during normal repeated loads.
-    ☐ Ensure ordinary `reqscript` loading never invokes development reload or clears script environments.
-    ☐ Rename internal paths and LuaDoc ownership without publishing internal prerequisites as a new consumer contract.
-    ☐ Move generic tooltip tests and fixtures to DwarfUICore.
-    ☐ Add extraction regressions for cold load, repeated load, singleton preservation, registration preservation, map-handle behavior, diagnostics, partial state, and explicit reload.
-    ☐ Run focused tooltip tests, full DwarfUICore tests, syntax checks, package verification, and focused live tooltip evidence separately.
+✔ [Phase 4 - Tooltip System Extraction] Move the current tooltip system into DwarfUICore without introducing the proposed provider or namespace architecture. @done(26-07-31 22:15)
+    ✔ Move and rename tooltip target, detector, map-target, service, registration, render-hook, renderer, presenter, runtime, and API modules. @done(26-07-31 22:10)
+    ✔ Preserve the existing `register`, `unregister`, `register_map_tile`, `update_map_tile`, `unregister_map_tile`, and diagnostics operations. @done(26-07-31 22:10)
+    ✔ Preserve current widget and map-registration identity, weak lifetime, eligibility, ordering, intent, presentation, polling, and hook semantics. @done(26-07-31 22:10)
+    ✔ Preserve one process-wide tooltip service, presenter, poller, detector, render-hook manager, and registration state. @done(26-07-31 22:10)
+    ✔ Move tooltip process state from `dfhack.dwarfui` to the DwarfUICore-owned state root without resetting healthy state during normal repeated loads. @done(26-07-31 22:10)
+    ✔ Ensure ordinary `reqscript` loading never invokes development reload or clears script environments. @done(26-07-31 22:10)
+    ✔ Rename internal paths and LuaDoc ownership without publishing internal prerequisites as a new consumer contract. @done(26-07-31 22:10)
+    ✔ Move generic tooltip tests and fixtures to DwarfUICore. @done(26-07-31 22:10)
+    ✔ Add extraction regressions for cold load, repeated load, singleton preservation, registration preservation, map-handle behavior, diagnostics, partial state, and explicit reload. @done(26-07-31 22:10)
+    ✔ Run focused tooltip tests, full DwarfUICore tests, syntax checks, and package verification separately; defer focused live tooltip evidence until DwarfUI has removed its duplicate tooltip system and consumes DwarfUICore. @done(26-07-31 22:15)
     Deliverables:
     - DwarfUICore-owned tooltip system with current behavior preserved.
     - One process-wide tooltip runtime.
-    - Unit, package, and focused live parity evidence.
+    - Unit and package parity evidence, with focused live parity explicitly deferred until post-cutover verification.
 
 ☐ [Phase 5 - Context-Menu System Extraction] Move the current context-menu system into DwarfUICore without introducing provider, namespace, or menu-composition redesigns.
     ☐ Move and rename context-menu definition, target, root-discovery, map-target, registration, input-sample, detector, input-hook, service, renderer, screen, and API modules.
@@ -82,11 +82,11 @@
     ☐ Rename internal paths and LuaDoc ownership without publishing internal prerequisites as a new consumer contract.
     ☐ Move generic context-menu tests and fixtures to DwarfUICore.
     ☐ Add extraction regressions for cold load, repeated load, singleton preservation, registration preservation, map-handle behavior, callback containment, diagnostics, partial state, and explicit reload.
-    ☐ Run focused context-menu tests, full DwarfUICore tests, syntax checks, package verification, and focused live context-menu evidence separately.
+    ☐ Run focused context-menu tests, full DwarfUICore tests, syntax checks, and package verification separately; defer focused live context-menu evidence until DwarfUI has removed its duplicate context-menu system and consumes DwarfUICore.
     Deliverables:
     - DwarfUICore-owned context-menu system with current behavior preserved.
     - One process-wide context-menu runtime.
-    - Unit, package, and focused live parity evidence.
+    - Unit and package parity evidence, with focused live parity explicitly deferred until post-cutover verification.
 
 ☐ [Phase 6 - DwarfUICore Development Lifecycle] Give the extracted project an explicit reload boundary while keeping consumer initialization non-destructive.
     ☐ Move current shared-runtime validation and module-registry reload responsibilities from `dwarfui.lua` into `dwarfuicore.lua`.
