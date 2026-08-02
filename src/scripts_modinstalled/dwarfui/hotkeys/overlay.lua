@@ -19,6 +19,7 @@ HotkeyLabelAnchor = immutable_enum.define({
 ---@field latest_snapshot dwarfui.HotkeyGroupSnapshot
 ---@field label_anchor_kind dwarfui.HotkeyLabelAnchor
 ---@field label_pen any
+---@field resolved_label_pen any
 ---@field label_inset_x integer
 ---@field label_inset_y integer
 HotkeyGroupOverlay = defclass(HotkeyGroupOverlay, overlay.OverlayWidget)
@@ -48,7 +49,29 @@ function HotkeyGroupOverlay:init()
     self.latest_snapshot = {
         active=false, layout_signature='init', bounds=nil, buttons={},
     }
+    self.resolved_label_pen = self:resolve_label_pen()
     self.frame = {l=0, t=0, w=1, h=1}
+end
+
+---Builds a graphics pen that preserves the native tile beneath each label.
+---@return any pen
+function HotkeyGroupOverlay:resolve_label_pen()
+    local screen = dfhack and dfhack.screen
+    local font = df and df.global and df.global.init and
+        df.global.init.font or nil
+    local font_base = font and font.small_font_texpos and
+        font.small_font_texpos[0] or nil
+    if not screen or type(screen.inGraphicsMode) ~= 'function' or
+            not screen.inGraphicsMode() or type(font_base) ~= 'number' or
+            font_base <= 0 or not dfhack.pen or
+            type(dfhack.pen.parse) ~= 'function' then
+        return self.label_pen
+    end
+    return dfhack.pen.parse(self.label_pen, {
+        tile=font_base,
+        tile_color=true,
+        keep_lower=true,
+    })
 end
 
 ---Refreshes the model snapshot used for frame and body layout.
@@ -104,7 +127,7 @@ function HotkeyGroupOverlay:render_button_label(dc, button, group_bounds)
         {x=group_bounds.x1, y=group_bounds.y1})
     if not local_bounds then return end
     local x, y = self:label_position(local_bounds, button.label)
-    dc:seek(x, y):string(button.label, self.label_pen)
+    dc:seek(x, y):string(button.label, self.resolved_label_pen)
 end
 
 ---Synchronizes the snapshot and renders through the resolved widget frame.

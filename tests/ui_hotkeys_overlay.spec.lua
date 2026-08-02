@@ -94,6 +94,15 @@ local function load_overlay(state)
                 ['dwarfui/hotkeys/model']=model_environment,
             },
         })
+    local fortress_bottom_middle_environment = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_middle.lua', {
+            reqscript={
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
+                ['dwarfui/hotkeys/geometry']=geometry_environment,
+                ['dwarfui/hotkeys/layout_provider']=provider_environment,
+                ['dwarfui/hotkeys/model']=model_environment,
+            },
+        })
     local model = {
         build_snapshot=function()
             state.snapshot_reads = (state.snapshot_reads or 0) + 1
@@ -113,18 +122,20 @@ local function load_overlay(state)
             reqscript={
                 ['dwarfui/hotkeys/overlay']=overlay_environment,
                 ['dwarfui/hotkeys/groups/fortress_main']=fortress_environment,
+                ['dwarfui/hotkeys/groups/fortress_bottom_middle']=
+                    fortress_bottom_middle_environment,
             },
         })
 
     return module.UiMenuHotkeysOverlay{
         model_builder=function() return model end,
-    }
+    }, module
 end
 
 describe('DwarfUI UI hotkeys overlay', function()
     it('declares a default-enabled bounded dwarfmode overlay', function()
         local state = {snapshot={active=false, buttons={}}}
-        local overlay = load_overlay(state)
+        local overlay, module = load_overlay(state)
 
         assert.is_true(overlay.default_enabled)
         assert.equals('dwarfmode/Default', overlay.viewscreens)
@@ -133,6 +144,8 @@ describe('DwarfUI UI hotkeys overlay', function()
         assert.is_true(overlay.full_interface)
         assert.equals(0, overlay.overlay_onupdate_max_freq_seconds)
         assert.is_false(overlay:onInput({_MOUSE_L=true}))
+        assert.equals(module.UiBottomMiddleHotkeysOverlay,
+            module.OVERLAY_WIDGETS.bottom_middle_hotkeys)
     end)
 
     it('renders live model labels and includes the citizen hotkey token',

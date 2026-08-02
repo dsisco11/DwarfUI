@@ -13,7 +13,7 @@ local function painter()
     return dc
 end
 
-local function load_overlay()
+local function load_overlay(graphics_mode)
     local _, immutable_enum = module_loader.load(dwarfuicore_root,
         'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
     local geometry_environment = module_loader.load(repo_root,
@@ -22,9 +22,22 @@ local function load_overlay()
         })
     local widgets = widget_harness.widgets()
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
+    local globals = {defclass=widget_harness.defclass, COLOR_WHITE='white'}
+    if graphics_mode then
+        globals.df = {
+            global={init={font={small_font_texpos={[0]=256}}}},
+        }
+        globals.dfhack = {
+            screen={inGraphicsMode=function() return true end},
+            pen={parse=function(base, additions)
+                additions.fg = base
+                return additions
+            end},
+        }
+    end
     local environment = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua', {
-            globals={defclass=widget_harness.defclass, COLOR_WHITE='white'},
+            globals=globals,
             require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
             reqscript={
                 ['dwarfuicore/utils/immutable_enum']=immutable_enum,
@@ -82,5 +95,21 @@ describe('DwarfUI bounded hotkey overlay', function()
         right:overlay_onupdate()
         assert.same({l=0, t=0, w=1, h=1}, right.frame)
         assert.equals(5, left.frame.l)
+    end)
+
+    it('uses a transparent graphics pen that preserves the native lower tile',
+            function()
+        local Overlay = load_overlay(true)
+        local state = {snapshot=snapshot('one', 10, 20, {'u', 'p'})}
+        local instance = Overlay{
+            model_builder=function()
+                return {build_snapshot=function() return state.snapshot end}
+            end,
+        }
+
+        assert.equals('white', instance.resolved_label_pen.fg)
+        assert.equals(256, instance.resolved_label_pen.tile)
+        assert.is_true(instance.resolved_label_pen.tile_color)
+        assert.is_true(instance.resolved_label_pen.keep_lower)
     end)
 end)
