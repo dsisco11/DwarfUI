@@ -120,6 +120,57 @@ describe('DwarfUI reusable hotkey model', function()
         assert.equals('stable', model.cached_signature)
     end)
 
+    it('invalidates cached geometry after same-resolution movement', function()
+        local Model = load_model()
+        local origin = 1
+        local model = Model{
+            definition=definition(), active_provider=function() return true end,
+            dimensions_provider=function() return 80, 25 end,
+            binding_lookup=function() return 'u' end,
+            layout_provider=function()
+                return {group_id='model-fixture',
+                    bounds={x1=origin,y1=1,x2=origin + 3,y2=2},
+                    elements={
+                        one={bounds={x1=origin,y1=1,x2=origin + 1,y2=2}},
+                        two={bounds={x1=origin + 2,y1=1,x2=origin + 3,y2=2}},
+                    },
+                    signature='position:' .. origin}
+            end,
+        }
+        local first = model:build_snapshot()
+        local first_layout = model.cached_layout
+        origin = 9
+        local moved = model:build_snapshot()
+        assert.equals(1, first.bounds.x1)
+        assert.equals(9, moved.bounds.x1)
+        assert.not_equals(first_layout, model.cached_layout)
+        assert.equals('position:9', model.cached_signature)
+    end)
+
+    it('suppresses only buttons with missing geometry or bindings', function()
+        local Model = load_model()
+        local labels = {ACTION_ONE='u', ACTION_TWO=nil}
+        local model = Model{
+            definition=definition(), active_provider=function() return true end,
+            dimensions_provider=function() return 80, 25 end,
+            binding_lookup=function(action) return labels[action] end,
+            layout_provider=function()
+                return {group_id='model-fixture', bounds={x1=1,y1=1,x2=4,y2=2},
+                    elements={one={bounds={x1=1,y1=1,x2=2,y2=2}}},
+                    signature='partial'}
+            end,
+        }
+        local missing_binding = model:build_snapshot()
+        assert.equals(1, #missing_binding.buttons)
+        assert.equals('one', missing_binding.buttons[1].semantic_id)
+
+        labels.ACTION_ONE = nil
+        labels.ACTION_TWO = 'p'
+        local missing_geometry = model:build_snapshot()
+        assert.equals(0, #missing_geometry.buttons)
+        assert.equals(1, missing_geometry.bounds.x1)
+    end)
+
     it('clears geometry on inactive or unavailable groups', function()
         local Model, provider = load_model()
         local active, available = true, true

@@ -104,6 +104,94 @@ describe('DwarfUI reusable hotkey geometry', function()
         assert.same({x1=10, y1=24, x2=13, y2=27}, vertical.elements[2])
     end)
 
+    it('supports varied element sizes, origins, and bounded screen regions', function()
+        local geometry = load_geometry()
+        local cases = {
+            {
+                component={x1=3, y1=4, x2=8, y2=5, cell_count=12},
+                count=3,
+                first={x1=3, y1=4, x2=4, y2=5},
+                last={x1=7, y1=4, x2=8, y2=5},
+            },
+            {
+                component={x1=17, y1=9, x2=36, y2=14, cell_count=120},
+                count=4,
+                first={x1=17, y1=9, x2=21, y2=14},
+                last={x1=32, y1=9, x2=36, y2=14},
+            },
+        }
+        for _, fixture in ipairs(cases) do
+            local strip = geometry.find_repeated_strip({fixture.component}, {
+                expected_count=fixture.count,
+                axis=geometry.HotkeyStripAxis.HORIZONTAL,
+            })
+            assert.same(fixture.first, strip.elements[1])
+            assert.same(fixture.last, strip.elements[fixture.count])
+        end
+
+        local components = geometry.scan_components(
+            {x1=10, y1=6, x2=29, y2=15}, filled_reader{
+                {x1=8, y1=7, x2=11, y2=8},
+                {x1=14, y1=8, x2=25, y2=10},
+                {x1=31, y1=8, x2=33, y2=10},
+            })
+        assert.equals(2, #components)
+        assert.same({x1=10, y1=7, x2=11, y2=8, cell_count=4}, components[1])
+        assert.same({x1=14, y1=8, x2=25, y2=10, cell_count=36}, components[2])
+    end)
+
+    it('scans varied screen dimensions and spacing between components', function()
+        local geometry = load_geometry()
+        local cases = {
+            {
+                screen={x1=0, y1=0, x2=15, y2=7},
+                rectangles={
+                    {x1=1, y1=2, x2=3, y2=3},
+                    {x1=5, y1=2, x2=8, y2=4},
+                },
+                expected={
+                    {x1=1, y1=2, x2=3, y2=3, cell_count=6},
+                    {x1=5, y1=2, x2=8, y2=4, cell_count=12},
+                },
+            },
+            {
+                screen={x1=10, y1=5, x2=49, y2=24},
+                rectangles={
+                    {x1=12, y1=10, x2=15, y2=12},
+                    {x1=20, y1=10, x2=25, y2=13},
+                },
+                expected={
+                    {x1=12, y1=10, x2=15, y2=12, cell_count=12},
+                    {x1=20, y1=10, x2=25, y2=13, cell_count=24},
+                },
+            },
+        }
+        for _, fixture in ipairs(cases) do
+            assert.same(fixture.expected, geometry.scan_components(
+                fixture.screen, filled_reader(fixture.rectangles)))
+        end
+    end)
+
+    it('handles adjacent controls and rejects nearby distractor components', function()
+        local geometry = load_geometry()
+        local components = geometry.scan_components(
+            {x1=0, y1=0, x2=30, y2=12}, filled_reader{
+                {x1=4, y1=7, x2=7, y2=8},
+                {x1=10, y1=6, x2=21, y2=8},
+            })
+        local strip, error_code = geometry.find_repeated_strip(components, {
+            expected_count=3,
+            axis=geometry.HotkeyStripAxis.HORIZONTAL,
+            component_predicate=function(component)
+                return component.y1 == 6 and component.cell_count == 36
+            end,
+        })
+        assert.is_nil(error_code)
+        assert.same({x1=10, y1=6, x2=13, y2=8}, strip.elements[1])
+        assert.same({x1=14, y1=6, x2=17, y2=8}, strip.elements[2])
+        assert.same({x1=18, y1=6, x2=21, y2=8}, strip.elements[3])
+    end)
+
     it('rejects ambiguous or invalid strip candidates', function()
         local geometry = load_geometry()
         local options = {
@@ -160,5 +248,36 @@ describe('DwarfUI reusable hotkey geometry', function()
         assert.is_nil(geometry.make_signature('example', group, {
             bad={x1=1, y1=2, x2=0, y2=4},
         }))
+    end)
+
+    it('changes geometry signatures when a group moves at the same resolution',
+            function()
+        local geometry = load_geometry()
+        local first = geometry.make_signature('moving',
+            {x1=2, y1=20, x2=9, y2=23}, {
+                one={x1=2, y1=20, x2=5, y2=23},
+                two={x1=6, y1=20, x2=9, y2=23},
+            })
+        local moved = geometry.make_signature('moving',
+            {x1=7, y1=20, x2=14, y2=23}, {
+                one={x1=7, y1=20, x2=10, y2=23},
+                two={x1=11, y1=20, x2=14, y2=23},
+            })
+        assert.not_equals(first, moved)
+    end)
+
+    it('rejects malformed and incomplete geometry safely', function()
+        local geometry = load_geometry()
+        assert.is_nil(geometry.validate_rect({x1=0.5, y1=0, x2=2, y2=2}))
+        assert.same({}, geometry.scan_components(
+            {x1=5, y1=5, x2=4, y2=6}, filled_reader{}))
+        local strip, error_code = geometry.find_repeated_strip({
+            {x1=0, y1=0, x2=8, y2=1, cell_count=18},
+        }, {
+            expected_count=2,
+            axis=geometry.HotkeyStripAxis.HORIZONTAL,
+        })
+        assert.is_nil(strip)
+        assert.equals('not_found', error_code)
     end)
 end)

@@ -43,6 +43,46 @@ describe('DwarfUI hotkey layout providers', function()
         assert.same({x1=4, y1=3, x2=5, y2=4}, layout.elements.two.bounds)
     end)
 
+    it('tracks rendered strips that move without screen-dimension changes', function()
+        local provider, geometry = load_provider()
+        local origin = 4
+        local rendered = provider.rendered_strip({
+            search_region=function(context)
+                return {x1=0, y1=0, x2=context.width - 1, y2=context.height - 1}
+            end,
+            expected_count=2,
+            axis=geometry.HotkeyStripAxis.HORIZONTAL,
+            element_ids={'one', 'two'},
+            component_predicate=function(component)
+                return component.cell_count == 16
+            end,
+            signature_data=function(context)
+                return {width=context.width, height=context.height}
+            end,
+        })
+        local context = {
+            width=40,
+            height=12,
+            read_tile=function(x, y)
+                local target = x >= origin and x <= origin + 7 and y >= 8 and y <= 9
+                local distractor = x >= 1 and x <= 2 and y >= 7 and y <= 8
+                return (target or distractor) and {tile=1} or {tile=0}
+            end,
+        }
+
+        local first = provider.invoke(rendered, context, definition())
+        origin = 13
+        local moved = provider.invoke(rendered, context, definition())
+
+        assert.equals(4, first.bounds.x1)
+        assert.equals(13, moved.bounds.x1)
+        assert.not_equals(first.signature, moved.signature)
+
+        context.width = 48
+        local resized = provider.invoke(rendered, context, definition())
+        assert.not_equals(moved.signature, resized.signature)
+    end)
+
     it('maps ambiguity to a typed failure and contains provider errors', function()
         local provider, geometry = load_provider()
         local rendered = provider.rendered_strip({
@@ -87,5 +127,94 @@ describe('DwarfUI hotkey layout providers', function()
         layout, err = provider.invoke(extracted, {}, definition())
         assert.is_nil(err)
         assert.equals(5, layout.bounds.x1)
+    end)
+
+    it('invalidates native signatures when widget and structure bounds change',
+            function()
+        local provider = load_provider()
+        local widget_x = 2
+        local widget_provider = provider.native_control({
+            locate=function() return {kind='widget'} end,
+            is_widget_container=function(root) return root.kind == 'widget' end,
+            walk_widgets=function()
+                return {elements={
+                    one={bounds={x1=widget_x, y1=3, x2=widget_x + 1, y2=4}},
+                    two={bounds={x1=widget_x + 2, y1=3, x2=widget_x + 3, y2=4}},
+                }}
+            end,
+        })
+        local first_widget = provider.invoke(widget_provider, {}, definition())
+        widget_x = 8
+        local moved_widget = provider.invoke(widget_provider, {}, definition())
+        assert.not_equals(first_widget.signature, moved_widget.signature)
+        assert.equals(8, moved_widget.bounds.x1)
+
+        local structure_x = 12
+        local structure_provider = provider.native_control({
+            locate=function() return {kind='native'} end,
+            is_widget_container=function() return false end,
+            extract=function()
+                return {elements={
+                    one={x1=structure_x, y1=5, x2=structure_x + 1, y2=6},
+                    two={x1=structure_x + 2, y1=5, x2=structure_x + 3, y2=6},
+                }}
+            end,
+        })
+        local first_structure = provider.invoke(structure_provider, {}, definition())
+        structure_x = 18
+        local moved_structure = provider.invoke(structure_provider, {}, definition())
+        assert.not_equals(first_structure.signature, moved_structure.signature)
+        assert.equals(18, moved_structure.bounds.x1)
+    end)
+
+    it('rejects incomplete, off-bounds, and malformed layouts', function()
+        local provider, geometry = load_provider()
+        local incomplete = provider.rendered_strip({
+            search_region={x1=0, y1=0, x2=8, y2=4},
+            expected_count=2,
+            axis=geometry.HotkeyStripAxis.HORIZONTAL,
+            element_ids={'one', 'two', 'three'},
+        })
+        local layout, failure = provider.invoke(incomplete, {
+            read_tile=function(x, y)
+                return x >= 2 and x <= 5 and y >= 1 and y <= 2 and
+                    {tile=1} or {tile=0}
+            end,
+        }, definition())
+        assert.is_nil(layout)
+        assert.equals('incomplete_layout', failure.reason)
+
+        layout, failure = provider.validate_result(definition(), {
+            group_id='fixture',
+            bounds={x1=2, y1=2, x2=5, y2=4},
+            elements={one={x1=1, y1=2, x2=2, y2=3}},
+            signature='off-bounds',
+        })
+        assert.is_nil(layout)
+        assert.equals('invalid_element', failure.reason)
+
+        layout, failure = provider.validate_result(definition(), {
+            group_id='wrong-group',
+            bounds={x1=2, y1=2, x2=5, y2=4},
+            elements={},
+            signature='',
+        })
+        assert.is_nil(layout)
+        assert.equals('malformed_layout', failure.reason)
+
+        local off_screen = provider.rendered_strip({
+            search_region={x1=0, y1=0, x2=8, y2=4},
+            expected_count=2,
+            axis=geometry.HotkeyStripAxis.HORIZONTAL,
+            element_ids={'one', 'two'},
+        })
+        layout, failure = provider.invoke(off_screen, {
+            read_tile=function(x, y)
+                return x >= 20 and x <= 23 and y >= 1 and y <= 2 and
+                    {tile=1} or {tile=0}
+            end,
+        }, definition())
+        assert.is_nil(layout)
+        assert.equals('not_found', failure.reason)
     end)
 end)

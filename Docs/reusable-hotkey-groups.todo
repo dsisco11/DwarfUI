@@ -131,17 +131,17 @@
     - `src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua`
     - `tests/fortress_main_hotkeys.spec.lua`
 
-☐ [Phase 7 - Focused Regression Coverage] Prove generic geometry, provider, model, overlay, and migration behavior independently.
-    ☐ Add geometry tests for variable element width, height, spacing, origin, and screen dimensions.
-    ☐ Cover adjacent controls with no blank separator and distractor components near the target group.
-    ☐ Cover ambiguous, incomplete, off-screen, and malformed layouts.
-    ☐ Cover same-resolution movement and provider-signature invalidation.
-    ☐ Add rendered-strip provider tests using synthetic native-tile fixtures.
-    ☐ Add native-control provider tests using fake native structures and widget trees with changing rectangles.
-    ☐ Add model tests for binding changes, label normalization, inactive-cache reset, and per-button suppression.
-    ☐ Add overlay tests for bounded frames, screen-to-local conversion, movement, disappearance, multiple groups, and input pass-through.
-    ☐ Add concrete fortress-main tests for semantic ordering and exact DF action mappings.
-    ☐ Retain regression coverage for the default Citizens `u` label.
+✔ [Phase 7 - Focused Regression Coverage] Prove generic geometry, provider, model, overlay, and migration behavior independently. @done(26-08-02 07:06)
+    ✔ Add geometry tests for variable element width, height, spacing, origin, and screen dimensions. @done(26-08-02 07:06)
+    ✔ Cover adjacent controls with no blank separator and distractor components near the target group. @done(26-08-02 07:06)
+    ✔ Cover ambiguous, incomplete, off-screen, and malformed layouts. @done(26-08-02 07:06)
+    ✔ Cover same-resolution movement and provider-signature invalidation. @done(26-08-02 07:06)
+    ✔ Add rendered-strip provider tests using synthetic native-tile fixtures. @done(26-08-02 07:06)
+    ✔ Add native-control provider tests using fake native structures and widget trees with changing rectangles. @done(26-08-02 07:06)
+    ✔ Add model tests for binding changes, label normalization, inactive-cache reset, and per-button suppression. @done(26-08-02 07:06)
+    ✔ Add overlay tests for bounded frames, screen-to-local conversion, movement, disappearance, multiple groups, and input pass-through. @done(26-08-02 07:06)
+    ✔ Add concrete fortress-main tests for semantic ordering and exact DF action mappings. @done(26-08-02 07:06)
+    ✔ Retain regression coverage for the default Citizens `u` label. @done(26-08-02 07:06)
     Deliverables:
     - Focused specs for each new module and the migrated concrete group.
     - No tests that depend on OS-level mouse movement.

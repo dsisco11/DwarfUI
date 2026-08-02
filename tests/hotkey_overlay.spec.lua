@@ -72,6 +72,7 @@ describe('DwarfUI bounded hotkey overlay', function()
         assert.same({x=3, y=3, text='u', pen='white'}, dc.strings[1])
         assert.same({x=7, y=3, text='p', pen='white'}, dc.strings[2])
         assert.is_false(instance:onInput({_MOUSE_L=true}))
+        assert.is_false(instance:onInput({CUSTOM_CTRL_A=true}))
     end)
 
     it('tracks movement and collapses unavailable groups independently', function()
@@ -94,6 +95,9 @@ describe('DwarfUI bounded hotkey overlay', function()
         right:overlay_onupdate()
         assert.same({l=0, t=0, w=1, h=1}, right.frame)
         assert.equals(5, left.frame.l)
+        local dc = painter()
+        right:onRenderBody(dc)
+        assert.same({}, dc.strings)
     end)
 
     it('uses a transparent graphics pen that preserves the native lower tile',

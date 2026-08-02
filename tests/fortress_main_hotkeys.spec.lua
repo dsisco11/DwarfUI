@@ -35,7 +35,7 @@ local function load_group()
                 ['dwarfui/hotkeys/model']=model_environment,
             },
         })
-    return environment.FortressMainGroup
+    return environment.FortressMainGroup, model_environment.HotkeyGroupModel
 end
 
 describe('DwarfUI fortress main hotkey group', function()
@@ -71,5 +71,29 @@ describe('DwarfUI fortress main hotkey group', function()
         assert.equals(49, layout.bounds.x2)
         assert.equals(8, #definition.buttons)
     end)
-end)
 
+    it('retains the default Citizens u label regression', function()
+        local group, Model = load_group()
+        local model = Model{
+            definition=group.definition,
+            active_provider=function() return true end,
+            dimensions_provider=function() return 80, 25 end,
+            binding_lookup=function(action)
+                return action == 'D_UNITLIST' and 'u' or nil
+            end,
+            layout_provider=function()
+                return {
+                    group_id=group.definition.group_id,
+                    bounds={x1=0, y1=20, x2=39, y2=23},
+                    elements={citizens={bounds={x1=0, y1=20, x2=4, y2=23}}},
+                    signature='citizens-u',
+                }
+            end,
+        }
+        local snapshot = model:build_snapshot()
+        assert.equals(1, #snapshot.buttons)
+        assert.equals('citizens', snapshot.buttons[1].semantic_id)
+        assert.equals('D_UNITLIST', snapshot.buttons[1].action_binding)
+        assert.equals('u', snapshot.buttons[1].label)
+    end)
+end)
