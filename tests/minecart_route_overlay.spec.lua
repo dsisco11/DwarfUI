@@ -374,6 +374,51 @@ describe('DwarfUI minecart route markers overlay', function()
             'the adjacent label cell must not become a map target')
     end)
 
+    it('clears local route state without consulting the tooltip service', function()
+        local route = {id=8}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route}},
+        }
+        local instance, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+        instance:render(painter())
+        assert.equals(1, map_tooltip_count(state))
+
+        instance:clear_local_state()
+
+        assert.is_nil(selection.selected_route_id)
+        assert.equals(0, #instance.map_tooltip_order)
+        assert.is_nil(instance.map_tooltip_route_id)
+        assert.equals(1, map_tooltip_count(state),
+            'root namespace clearing owns deferred registration removal')
+    end)
+
+    it('removes explicit map registrations once when the overlay is disabled',
+            function()
+        local route = {id=8}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route}},
+        }
+        local instance = load_overlay(state)
+        instance.selection.selected_route_id = route.id
+        instance:render(painter())
+
+        instance.overlay_ondisable()
+        instance.overlay_ondisable()
+
+        assert.equals(0, map_tooltip_count(state))
+        assert.equals(1, state.map_tooltip_removals)
+        assert.is_nil(instance.selection.selected_route_id)
+    end)
+
     it('refreshes names, positions, membership, and duplicate order', function()
         local route = {id=8}
         local first = marker(80, MarkerKind.SAME_Z, 'First',

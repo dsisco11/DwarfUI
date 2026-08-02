@@ -25,8 +25,14 @@ end
 ---Explicitly clears both DwarfUI-owned service namespaces.
 ---@return boolean changed
 function clear_namespaces()
-    local tooltip_changed = TooltipService:clear_namespace()
-    local context_menu_changed = ContextMenuService:clear_namespace()
+    local tooltip_ok, tooltip_changed = pcall(function()
+        return TooltipService:clear_namespace()
+    end)
+    local context_ok, context_menu_changed = pcall(function()
+        return ContextMenuService:clear_namespace()
+    end)
+    if not tooltip_ok then error(tooltip_changed, 0) end
+    if not context_ok then error(context_menu_changed, 0) end
     return tooltip_changed or context_menu_changed
 end
 

@@ -62,6 +62,7 @@ describe('DwarfUI package contract', function()
         for _, removed in ipairs({
                 'src/scripts_modinstalled/dwarfuicore.lua',
                 'src/scripts_modinstalled/dwarfuicore/tooltip/api.lua',
+                'src/scripts_modinstalled/dwarfuicore/context_menu/api.lua',
                 'src/scripts_modinstalled/dwarfui/tooltip/api.lua',
                 'src/scripts_modinstalled/dwarfui/context_menu/api.lua',
                 'src/scripts_modinstalled/dwarfui/pointer.lua',
@@ -96,6 +97,15 @@ describe('DwarfUI package contract', function()
         assert.is_nil(root:find("dwarfuicore/context_menu", 1, true))
         assert.is_truthy(root:find('services.refresh()', 1, true))
         assert.is_truthy(root:find('services.clear_namespaces()', 1, true))
+    end)
+
+    it('documents local cleanup before DwarfUI namespace clearing', function()
+        local lifecycle = read_file('Docs/service-provider-lifecycle.md')
+        local root = read_file('src/scripts_modinstalled/dwarfui.lua')
+
+        assert.is_truthy(lifecycle:find('Feature-local', 1, true))
+        assert.is_truthy(lifecycle:find('Core reload clears', 1, true))
+        assert.is_truthy(root:find('clear_overlay_local_state()', 1, true))
     end)
 
     it('exposes only the Core public API definitions to LuaLS', function()

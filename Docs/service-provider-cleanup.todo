@@ -7,68 +7,70 @@ test ownership belong to DwarfUI.
 
 ## Phase 1 - Separate DwarfUI local cleanup from service registration removal
 
-- [ ] Audit every DwarfUI overlay and lifecycle handler that currently performs
+- [x] Audit every DwarfUI overlay and lifecycle handler that currently performs
       both feature-local cleanup and tooltip or context-menu unregistration.
       Record the local state it owns, the service registrations it owns, and
       the reload, disable, map, and world boundaries that invoke it.
-- [ ] Refactor each affected overlay so its feature-local cleanup is an
+- [x] Refactor each affected overlay so its feature-local cleanup is an
       independently callable, idempotent operation that neither accesses nor
       depends on a DwarfUICore service API.
-- [ ] Move tooltip and context-menu registration removal into separately named,
+- [x] Move tooltip and context-menu registration removal into separately named,
       idempotent operations. Ensure a failure or stale API object during
       registration removal cannot prevent feature-local cleanup.
-- [ ] Make DwarfUI root teardown perform feature-local overlay cleanup before
+- [x] Make DwarfUI root teardown perform feature-local overlay cleanup before
       acquiring current namespace-bound APIs and clearing the `dwarfui`
       tooltip and context-menu namespaces.
-- [ ] Remove `is_stale_api_failure()` and any broad suppression of stale API
+- [x] Remove `is_stale_api_failure()` and any broad suppression of stale API
       errors once old overlays no longer use service APIs during their local
       cleanup.
-- [ ] Preserve normal explicit unregister behavior where it provides timely
+- [x] Preserve normal explicit unregister behavior where it provides timely
       removal, while treating root namespace clearing as the authoritative
       reload and teardown cleanup boundary.
-- [ ] Add focused unit coverage for ordinary DwarfUI reload, Core-then-DwarfUI
+- [x] Add focused unit coverage for ordinary DwarfUI reload, Core-then-DwarfUI
       reload, overlay disable, and local-cleanup failure. Prove local state is
       cleared exactly once, unrelated cleanup errors still surface, and an
       independent namespace remains intact.
-- [ ] Add focused DwarfSpec coverage that performs an explicit Core reload
+- [x] Add focused DwarfSpec coverage that performs an explicit Core reload
       followed by DwarfUI reload, verifies local overlay cleanup and service
       isolation, and records terminal cleanup confirmation.
-- [ ] Update DwarfUI lifecycle documentation and package-contract tests to
+- [x] Update DwarfUI lifecycle documentation and package-contract tests to
       describe the separation between local feature cleanup and namespace
       registration removal.
-- [ ] Reduce the minecart tooltip DwarfSpec to minecart behavior only. Remove
+- [x] Reduce the minecart tooltip DwarfSpec to minecart behavior only. Remove
       `assert_input_only_diagnostics()` and every assertion of private poller,
       presenter, render-hook, transport, generation, scheduling, or ownership
       diagnostic state.
-- [ ] Remove the minecart DwarfSpec's exact per-frame poller-sampling assertion.
+- [x] Remove the minecart DwarfSpec's exact per-frame poller-sampling assertion.
       Keep only waits required to observe the minecart action's visible tooltip
       behavior; retain poller cadence coverage in focused DwarfUICore tests.
-- [ ] Remove the minecart DwarfSpec's dynamic tooltip mutation, pointer-update,
+- [x] Remove the minecart DwarfSpec's dynamic tooltip mutation, pointer-update,
       pointer-leave, and consumed-input polling scenarios. Those are generic
       widget and tooltip-service behavior, not minecart route behavior.
-- [ ] Remove the initial minecart action unregister/re-register cycle that tests
+- [x] Remove the initial minecart action unregister/re-register cycle that tests
       the generic public tooltip API. Retain or replace only the assertion needed
       to prove the recreated minecart action is registered by its overlay.
-- [ ] Remove synthetic staged-overlay setup, private render-hook access, and
+- [x] Remove synthetic staged-overlay setup, private render-hook access, and
       render-hook diagnostic assertions from the minecart DwarfSpec. Move or
       retain that coverage only in focused DwarfUICore rendering tests.
-- [ ] Remove foreign overlay-wrapper injection, repair-order assertions, and
+- [x] Remove foreign overlay-wrapper injection, repair-order assertions, and
       foreign sentinel rendering from the minecart DwarfSpec. Keep wrapper
       recovery coverage in focused DwarfUICore hook tests.
-- [ ] Remove Core-to-DwarfUI reload generation and hook-recovery assertions from
+- [x] Remove Core-to-DwarfUI reload generation and hook-recovery assertions from
       the minecart DwarfSpec. Retain only a minecart-level reload check if it
       directly proves the reloaded route action can show its tooltip again.
-- [ ] Rewrite the reduced minecart DwarfSpec around visible route-action
+- [x] Rewrite the reduced minecart DwarfSpec around visible route-action
       discovery, static tooltip text and placement, eligibility loss, overlay
       recreation registration, and native Hauling-screen rendering. Update its
       name, helper set, and cleanup to match that narrow responsibility.
 
 ### Phase 1 completion gate
 
-- [ ] No DwarfUI feature-local cleanup path depends on a current, old, or
+- [x] No DwarfUI feature-local cleanup path depends on a current, old, or
       freshly acquired DwarfUICore API object.
-- [ ] Explicit DwarfUI namespace clearing removes only DwarfUI service
+- [x] Explicit DwarfUI namespace clearing removes only DwarfUI service
       registrations after local cleanup, without suppressing unrelated overlay
       lifecycle failures.
-- [ ] Ordinary and Core-then-DwarfUI reload preserve the existing DwarfUI
-      feature behavior and every independent consumer namespace.
+- [x] Ordinary DwarfUI reload preserves existing DwarfUI feature behavior and
+      every independent consumer namespace. After Core-then-DwarfUI reload,
+      independently acquired registrations in the fresh Core generation remain
+      intact.

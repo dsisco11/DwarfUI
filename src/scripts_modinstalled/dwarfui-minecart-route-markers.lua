@@ -116,6 +116,7 @@ end
 ---@field map_tooltip_handles table<integer, dwarfui.MapTileTooltipRegistration>
 ---@field map_tooltip_order integer[]
 ---@field map_tooltip_route_id integer|nil
+---@field dwarfui_clear_local_state fun()
 MinecartRouteMarkersOverlay = defclass(MinecartRouteMarkersOverlay,
     overlay.OverlayWidget)
 MinecartRouteMarkersOverlay.ATTRS{
@@ -180,17 +181,33 @@ function MinecartRouteMarkersOverlay:init()
         end,
     }
     self:addviews{self.stop_rail}
+    self.dwarfui_clear_local_state = function()
+        self:clear_local_state()
+    end
     self.overlay_ondisable = function() self:clear_overlay_state() end
 end
 
----Removes every exact-tile tooltip owned by this overlay.
-function MinecartRouteMarkersOverlay:clear_map_tooltips()
-    for _, handle in pairs(self.map_tooltip_handles) do
-        tooltip:unregister_map_tile(handle)
-    end
+---Clears local references to every exact-tile tooltip owned by this overlay.
+---@return table<integer, dwarfui.MapTileTooltipRegistration> handles
+function MinecartRouteMarkersOverlay:clear_map_tooltip_state()
+    local handles = self.map_tooltip_handles
     self.map_tooltip_handles = {}
     self.map_tooltip_order = {}
     self.map_tooltip_route_id = nil
+    return handles
+end
+
+---Removes exact-tile tooltip registrations without retaining local state.
+---@param handles table<integer, dwarfui.MapTileTooltipRegistration>
+function MinecartRouteMarkersOverlay:unregister_map_tooltips(handles)
+    for _, handle in pairs(handles) do
+        tooltip:unregister_map_tile(handle)
+    end
+end
+
+---Clears local references and unregisters every exact-tile tooltip.
+function MinecartRouteMarkersOverlay:clear_map_tooltips()
+    self:unregister_map_tooltips(self:clear_map_tooltip_state())
 end
 
 ---Returns whether the registered same-z stop order matches fresh descriptors.
@@ -263,10 +280,18 @@ function MinecartRouteMarkersOverlay:clear_selection()
     self:clear_map_tooltips()
 end
 
----Clears selection and every pooled stop-row binding.
-function MinecartRouteMarkersOverlay:clear_overlay_state()
-    self:clear_selection()
+---Clears selection and every pooled stop-row binding without accessing Core.
+---@return table<integer, dwarfui.MapTileTooltipRegistration> handles
+function MinecartRouteMarkersOverlay:clear_local_state()
+    self.selection:clear()
+    local handles = self:clear_map_tooltip_state()
     self.stop_rail:clear()
+    return handles
+end
+
+---Clears local state and removes current explicit tooltip registrations.
+function MinecartRouteMarkersOverlay:clear_overlay_state()
+    self:unregister_map_tooltips(self:clear_local_state())
 end
 
 ---Expands the transparent hit-test and render host across the parent screen.

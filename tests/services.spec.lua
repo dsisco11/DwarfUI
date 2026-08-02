@@ -89,4 +89,32 @@ describe('DwarfUI service bindings', function()
         assert.is_equal(old_tooltip, services.TooltipService)
         assert.is_equal(old_context, services.ContextMenuService)
     end)
+
+    it('attempts both namespace removals before surfacing a removal failure',
+            function()
+        local calls = {}
+        local _, services = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/services.lua', {
+                reqscript={
+                    ['dwarfuicore/services']={
+                        TooltipServiceProvider={new=function()
+                            return {clear_namespace=function()
+                                table.insert(calls, 'tooltip')
+                                error('stale tooltip API')
+                            end}
+                        end},
+                        ContextMenuServiceProvider={new=function()
+                            return {clear_namespace=function()
+                                table.insert(calls, 'context-menu')
+                                return true
+                            end}
+                        end},
+                    },
+                },
+            })
+
+        assert.has_error(function() services.clear_namespaces() end,
+            'stale tooltip API')
+        assert.same({'tooltip', 'context-menu'}, calls)
+    end)
 end)

@@ -96,11 +96,11 @@ describe('dwarfui command', function()
         environment.reload()
 
         assert.same({
-            {'refresh_services', 'dwarfui'},
             {'retire', 'dwarfui-ui-hotkeys'},
             {'retire', 'dwarfui-mood-popover'},
             {'retire', 'dwarfui-minecart-route-markers'},
             {'retire', 'dwarfui-unit-card-task-details'},
+            {'refresh_services', 'dwarfui'},
             {'clear_namespaces', 'dwarfui'},
             {'clear', 'devel/clear-script-env', 'dwarfui/consumer'},
             {'clear', 'devel/clear-script-env', 'dwarfui/module_registry'},
@@ -112,6 +112,46 @@ describe('dwarfui command', function()
             {'overlay_rescan'},
             {'validate', 'fresh'},
         }, events)
+    end)
+
+    it('clears feature-local state before an error from namespace removal',
+            function()
+        local events = {}
+        local overlay_db = {
+            ['dwarfui-minecart-route-markers.widget']={widget={
+                dwarfui_clear_local_state=function()
+                    table.insert(events, 'local')
+                end,
+                overlay_ondisable=function()
+                    error('service-dependent cleanup must not run')
+                end,
+            }},
+        }
+        local environment = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui.lua', {
+                globals={
+                    dfhack_flags={module=true},
+                    dfhack={internal={scripts={}}},
+                },
+                reqscript={
+                    ['dwarfui/services']={
+                        refresh=function() table.insert(events, 'refresh') end,
+                        clear_namespaces=function()
+                            table.insert(events, 'clear')
+                            error('stale namespace')
+                        end,
+                    },
+                },
+                require_modules={
+                    ['plugins.overlay']={
+                        get_state=function() return {db=overlay_db} end,
+                    },
+                },
+            })
+
+        assert.has_error(function() environment.teardown() end,
+            'stale namespace')
+        assert.same({'local', 'refresh', 'clear'}, events)
     end)
 
     it('validates DwarfUI modules without clearing them by default', function()
