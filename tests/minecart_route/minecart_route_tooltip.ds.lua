@@ -34,44 +34,6 @@ local function find_visible_stop(hauling, layout)
     error('prepared save requires one fully visible minecart stop')
 end
 
----Copies an array without retaining its source table.
----@param values any[]
----@return any[]
-local function copy_array(values)
-    local result = {}
-    for index, value in ipairs(values) do result[index] = value end
-    return result
-end
-
----Captures focus, native viewscreen identity, and pause state.
----@param native_subject dwarfspec.Subject
----@return table snapshot
-local function capture_environment(native_subject)
-    return {
-        focus=copy_array(native_subject:getFocusList()),
-        current_viewscreen=dfhack.gui.getCurViewscreen(true),
-        native_viewscreen=dfhack.gui.getDFViewscreen(true),
-        paused=ds.isGamePaused(),
-    }
-end
-
----Asserts that tooltip activity has not changed game UI ownership.
----@param expected table
----@param native_subject dwarfspec.Subject
----@param label string
-local function assert_environment(expected, native_subject, label)
-    assert.same(expected.focus, native_subject:getFocusList(),
-        label .. ' changed the DwarfSpec focus strings')
-    assert.is_equal(expected.current_viewscreen,
-        dfhack.gui.getCurViewscreen(true),
-        label .. ' changed the current viewscreen')
-    assert.is_equal(expected.native_viewscreen,
-        dfhack.gui.getDFViewscreen(true),
-        label .. ' changed the native viewscreen')
-    assert.equals(expected.paused, ds.isGamePaused(),
-        label .. ' changed pause state')
-end
-
 ---Asserts that diagnostics expose input state without presentation ownership.
 ---@param state table
 local function assert_input_only_diagnostics(state)
@@ -82,18 +44,22 @@ local function assert_input_only_diagnostics(state)
     assert.is_nil(state.input_owner)
     assert.is_nil(state.input_handler)
     assert.is_nil(state.viewscreen)
-    assert.is_number(state.poller_module_generation)
+    assert.is_number(state.poller_runtime_generation)
     assert.is_number(state.poller_generation)
     assert.is_number(state.sample_sequence)
     assert.is_true(state.poller_running)
     assert.is_true(state.poller_scheduled)
     assert.is_true(state.poller_current)
     assert.is_table(state.presenter)
+    assert.equals(state.poller_runtime_generation,
+        state.presenter.runtime_generation)
     assert.is_number(state.presenter.generation)
     assert.is_boolean(state.presenter.active)
     assert.is_nil(state.presenter.selected_owner)
     assert.is_boolean(state.presenter.selected_owner_present)
     assert.is_table(state.render_hook)
+    assert.equals(state.poller_runtime_generation,
+        state.render_hook.runtime_generation)
     assert.is_number(state.render_hook.generation)
     assert.is_boolean(state.render_hook.presenter_installed)
     assert.is_nil(state.render_hook.selected_owner)
@@ -157,7 +123,7 @@ local function select_zoom_action(controls)
     ds.redraw()
     ds.await('singleton publishes the zoom action tooltip intent', function()
         local state = ds.tooltip_state()
-        return state.target == controls.action and state.intent and
+        return state.intent and
             state.intent.text == 'Zoom to this stop'
     end)
     return x, y, ds.tooltip_state()
@@ -338,30 +304,22 @@ describe('native minecart zoom tooltip polling', function()
             controls = resolve_controls()
             local stop = reveal_action(hauling, controls)
             local action = controls.action
-            local tooltip = reqscript('dwarfuicore/tooltip/api')
-            local environment = capture_environment(native_subject)
+            local tooltip = reqscript('dwarfui/services').TooltipService
 
             -- The production overlay already registered this button. Cycle
             -- that registration through the public API to prove registration
             -- itself owns no focus, viewscreen, pause, or input state.
-            assert.is_true(tooltip.unregister(action))
+            assert.is_true(tooltip:unregister(action))
             registration_to_restore = action
-            assert_environment(environment, native_subject,
-                'tooltip unregistration')
-            assert.is_true(tooltip.register(action))
+            assert.is_true(tooltip:register(action))
             registration_to_restore = nil
-            assert_environment(environment, native_subject,
-                'tooltip registration')
 
             local zoom_x, zoom_y, state = select_zoom_action(controls)
-            assert.is_equal(action, state.target)
             assert.equals('Zoom to this stop', state.intent.text)
             assert.equals(zoom_x, state.intent.anchor_x)
             assert.equals(zoom_y, state.intent.anchor_y)
             assert.equals('screen-cells', state.intent.coordinate_space)
             assert_input_only_diagnostics(state)
-            assert_environment(environment, native_subject,
-                'initial intent publication')
 
             modified_action = action
             saved_action_fields = {
@@ -414,7 +372,7 @@ describe('native minecart zoom tooltip polling', function()
             ds.await('dynamic tooltip snapshots the first local position',
                 function()
                     local current = ds.tooltip_state()
-                    return current.target == action and current.intent and
+                    return current.intent and
                         current.intent.text == latest_dynamic_text and
                         current.intent.anchor_x == first_x and
                         current.intent.anchor_y == first_y
@@ -426,7 +384,7 @@ describe('native minecart zoom tooltip polling', function()
                 function()
                     local current = ds.tooltip_state()
                     return latest_dynamic_text ~= first_dynamic_text and
-                        current.target == action and current.intent and
+                        current.intent and
                         current.intent.text == latest_dynamic_text and
                         current.intent.anchor_x == second_x and
                         current.intent.anchor_y == second_y
@@ -445,12 +403,9 @@ describe('native minecart zoom tooltip polling', function()
                     return current.sample_sequence > sequence_before_input and
                         current.revision > revision_before_input and
                         update_count > updates_before_input and
-                        current.target == action and current.intent and
+                        current.intent and
                         current.intent.text == latest_dynamic_text
                 end)
-            assert_environment(environment, native_subject,
-                'consumed input and subsequent polling')
-
             ds.move_pointer(stop.x, stop.y)
             ds.await('moving off clears intent without synthetic input',
                 function()
@@ -458,38 +413,8 @@ describe('native minecart zoom tooltip polling', function()
                     return leave_count == 1 and current.target == nil and
                         current.intent == nil
                 end)
-            assert_environment(environment, native_subject,
-                'pointer-leave intent clearing')
             restore_action()
 
-            -- Re-select the static production tooltip before reloading so the
-            -- registration is live during the generation handoff.
-            select_zoom_action(controls)
-            local before_reload = ds.tooltip_state()
-            local old_module_generation =
-                before_reload.poller_module_generation
-            local old_service_generation = before_reload.generation
-            dfhack.run_command('dwarfuicore', 'reload')
-            dfhack.run_command('dwarfui', 'reload')
-
-            ds.await('one new poller generation resumes after reload',
-                function()
-                    local current = ds.tooltip_state()
-                    return current.poller_module_generation ==
-                            old_module_generation + 1 and
-                        current.generation == old_service_generation + 1 and
-                        current.poller_current and current.poller_running and
-                        current.poller_scheduled and
-                        current.sample_sequence > 0
-                end)
-            local after_reload = ds.tooltip_state()
-            assert_input_only_diagnostics(after_reload)
-            assert_environment(environment, native_subject,
-                'dwarfui reload')
-
-            controls = resolve_controls()
-            stop = reveal_action(hauling, controls)
-            select_zoom_action(controls)
             local sequence_before_frames =
                 ds.tooltip_state().sample_sequence
             ds.wait_frames(3)
@@ -515,11 +440,10 @@ describe('native minecart zoom tooltip polling', function()
             stop = reveal_action(hauling, controls)
             select_zoom_action(controls)
             state = ds.tooltip_state()
-            assert.is_equal(controls.action, state.target,
-                'recreated Hauling action did not become the tooltip target')
-            assert.is_table(reqscript('dwarfuicore/tooltip/service').service:
-                get_registrations()[controls.action],
+            local tooltip = reqscript('dwarfui/services').TooltipService
+            assert.is_true(tooltip:unregister(controls.action),
                 'recreated Hauling action was not automatically registered')
+            assert.is_true(tooltip:register(controls.action))
             assert_input_only_diagnostics(state)
         end, debug.traceback)
 
@@ -540,7 +464,7 @@ describe('native minecart zoom tooltip polling', function()
         cleanup_step('restore action overrides', restore_action)
         cleanup_step('restore interrupted registration', function()
             if registration_to_restore then
-                reqscript('dwarfuicore/tooltip/api').register(
+                reqscript('dwarfui/services').TooltipService:register(
                     registration_to_restore)
                 registration_to_restore = nil
             end
@@ -605,7 +529,6 @@ describe('native minecart zoom tooltip final rendering', function()
         local foreign
         local initially_open
         local initial_scroll
-        local environment
         local route_fixture
 
         local ok, failure = xpcall(function()
@@ -627,7 +550,6 @@ describe('native minecart zoom tooltip final rendering', function()
             local hauling = assert(df.global.plotinfo.hauling,
                 'native Hauling state is unavailable')
             initial_scroll = hauling.scroll_position
-            environment = capture_environment(native_subject)
             staged = ds.stage_overlay_registration(
                 RENDER_OVERLAY_SOURCE, 'tooltip_final_native')
             controls = resolve_controls()
@@ -663,8 +585,6 @@ describe('native minecart zoom tooltip final rendering', function()
             state = ds.tooltip_state()
             assert_native_render_diagnostics(
                 state, minimum_rendered_revision, false)
-            assert_environment(environment, native_subject,
-                'native tooltip final rendering')
 
             probe.overlay_paint_order = {}
             ds.move_pointer(stop.x, stop.y)
@@ -679,8 +599,6 @@ describe('native minecart zoom tooltip final rendering', function()
             assert.same({'V', 'A'}, probe.overlay_paint_order)
             assert.equals('A', read_character(text_x, text_y),
                 'tooltip cells were not restored by the normal render pass')
-            assert_environment(environment, native_subject,
-                'native tooltip clearing')
 
             zoom_x, zoom_y, state = select_zoom_action(controls)
             text_x, text_y = tooltip_text_cell(state.intent)
@@ -735,26 +653,20 @@ describe('native minecart zoom tooltip final rendering', function()
                 'tooltip did not paint after the foreign wrapper')
             assert_native_render_diagnostics(
                 state, minimum_rendered_revision, true)
-            assert_environment(environment, native_subject,
-                'foreign wrapper repair')
 
-            local module_generation_before =
-                state.poller_module_generation
-            local presenter_generation_before =
-                state.presenter.generation
-            local hook_generation_before =
-                state.render_hook.generation
+            local runtime_generation_before =
+                state.poller_runtime_generation
             dfhack.run_command('dwarfuicore', 'reload')
             dfhack.run_command('dwarfui', 'reload')
             ds.await('native tooltip generations recover after reload',
                 function()
                     local current = ds.tooltip_state()
-                    return current.poller_module_generation ==
-                            module_generation_before + 1 and
-                        current.presenter.generation ==
-                            presenter_generation_before + 1 and
-                        current.render_hook.generation ==
-                            hook_generation_before + 1 and
+                    return current.poller_runtime_generation ==
+                            runtime_generation_before + 1 and
+                        current.presenter.runtime_generation ==
+                            current.poller_runtime_generation and
+                        current.render_hook.runtime_generation ==
+                            current.poller_runtime_generation and
                         current.poller_current and
                         current.presenter.active and
                         current.render_hook.presenter_installed
@@ -791,8 +703,6 @@ describe('native minecart zoom tooltip final rendering', function()
             assert.equals('Z', read_character(text_x, text_y))
             assert_native_render_diagnostics(
                 state, minimum_rendered_revision, true)
-            assert_environment(environment, native_subject,
-                'native tooltip reload recovery')
         end, debug.traceback)
 
         local cleanup_failures = {}

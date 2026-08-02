@@ -20,12 +20,12 @@ enhancements.
 
 dependencies = {
     "lua >= 5.3",
-    "dwarfuicore >= 0.1.0",
+    "dwarfuicore >= 0.2.0",
 }
 
 test_dependencies = {
     "dwarfspec >= 0.2.0",
-    "dwarfuicore >= 0.1.0",
+    "dwarfuicore >= 0.2.0",
 }
 
 build = {

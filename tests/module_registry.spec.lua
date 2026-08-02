@@ -19,6 +19,7 @@ describe('DwarfUI feature module registry', function()
         end)
 
         local expected = {
+            'dwarfui/services',
             'dwarfui/widgets/asset_button',
             'dwarfui/widgets/hover_action_rail',
             'dwarfui/popover',
@@ -54,7 +55,7 @@ describe('DwarfUI feature module registry', function()
 
         assert.is_false(ok)
         assert.is_truthy(tostring(err):find(
-            'DwarfUI module dwarfui/widgets/asset_button is missing AssetButton',
+            'DwarfUI module dwarfui/services is missing clear_namespaces',
             1, true))
     end)
 
@@ -73,6 +74,7 @@ describe('DwarfUI feature module registry', function()
             'dwarfui/popover',
             'dwarfui/widgets/hover_action_rail',
             'dwarfui/widgets/asset_button',
+            'dwarfui/services',
         }, registry.get_script_names())
     end)
 end)

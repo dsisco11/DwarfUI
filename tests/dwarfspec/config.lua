@@ -32,6 +32,7 @@ local function snapshot_render_hook(diagnostics)
     local failure = diagnostics.last_failure
     return {
         api_version=diagnostics.api_version,
+        runtime_generation=diagnostics.runtime_generation,
         generation=diagnostics.generation,
         presenter_installed=diagnostics.presenter_installed,
         disabled_generation=diagnostics.disabled_generation,
@@ -77,6 +78,7 @@ end
 ---@return table
 local function snapshot_presenter(diagnostics)
     return {
+        runtime_generation=diagnostics.runtime_generation,
         generation=diagnostics.generation,
         active=diagnostics.active,
         current_intent_revision=diagnostics.current_intent_revision,
@@ -96,9 +98,11 @@ end
 ---Returns current input, presenter, and sanitized render-hook diagnostics.
 ---@return table
 local function tooltip_diagnostics()
-    local tooltip = reqscript('dwarfuicore/tooltip/api')
+    local registration = reqscript('dwarfuicore/tooltip/registration')
+    local runtime = reqscript('dwarfuicore/tooltip/runtime')
     local render_hook = reqscript('dwarfuicore/tooltip/render_hook')
-    local result = tooltip.get_diagnostics()
+    local result = registration.get_diagnostics('dwarfui')
+    result.presentation = runtime.presenter:get_diagnostics()
     result.presenter =
         snapshot_presenter(result.presentation)
     result.presentation = nil

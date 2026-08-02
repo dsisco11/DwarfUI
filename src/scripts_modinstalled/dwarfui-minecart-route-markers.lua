@@ -7,7 +7,7 @@ local guidm = require('gui.dwarfmode')
 local route_model = reqscript('dwarfui/minecart_route')
 local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
-local tooltip = reqscript('dwarfuicore/tooltip/api')
+local tooltip = reqscript('dwarfui/services').TooltipService
 local MarkerKind = route_model.MinecartRouteMarkerKind
 local PointerPolicy = reqscript('dwarfuicore/pointer').PointerPolicy
 
@@ -159,7 +159,7 @@ function MinecartRouteMarkersOverlay:init()
                 tooltip=STOCKS_RECENTER_TOOLTIP,
                 on_activate=activate,
             }
-            tooltip.register(button)
+            tooltip:register(button)
             return button
         end,
         activate=function(target) return self:activate_zoom_action(target.payload) end,
@@ -186,7 +186,7 @@ end
 ---Removes every exact-tile tooltip owned by this overlay.
 function MinecartRouteMarkersOverlay:clear_map_tooltips()
     for _, handle in pairs(self.map_tooltip_handles) do
-        tooltip.unregister_map_tile(handle)
+        tooltip:unregister_map_tile(handle)
     end
     self.map_tooltip_handles = {}
     self.map_tooltip_order = {}
@@ -216,7 +216,7 @@ function MinecartRouteMarkersOverlay:rebuild_map_tooltips(
         if marker.marker_kind == MarkerKind.SAME_Z and
                 type(marker.stop_id) == 'number' then
             self.map_tooltip_handles[marker.stop_id] =
-                tooltip.register_map_tile{
+                tooltip:register_map_tile{
                     owner=self,
                     pos=marker.world_pos,
                     tooltip=marker.label,
@@ -246,7 +246,7 @@ function MinecartRouteMarkersOverlay:sync_map_tooltips(route, markers)
         if marker.marker_kind == MarkerKind.SAME_Z and
                 type(marker.stop_id) == 'number' then
             local handle = self.map_tooltip_handles[marker.stop_id]
-            if not handle or not tooltip.update_map_tile(handle, {
+            if not handle or not tooltip:update_map_tile(handle, {
                     pos=marker.world_pos,
                     tooltip=marker.label,
                 }) then

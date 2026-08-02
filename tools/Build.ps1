@@ -6,7 +6,7 @@ param(
     [string] $DFHackRunner = $env:MOD_COMMAND_RUNNER,
     [string] $DFHackRoot = $env:DFHACK_ROOT,
     [string] $ReloadOutputPath,
-    [string] $EnvFile = '.env.local'
+    [string] $EnvFile = '.env'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -69,6 +69,17 @@ if ($LiveReload) {
 
     $runner = Resolve-DFHackRunner -RunnerPath $DFHackRunner `
         -DFHackRoot $DFHackRoot
+    Write-Host "Refreshing DFHack command environment: $($modInfo.Id)"
+    $clearOutput = @(& $runner devel/clear-script-env $modInfo.Id 2>&1) |
+        ForEach-Object { $_.ToString() }
+    $clearExitCode = $LASTEXITCODE
+    foreach ($line in $clearOutput) {
+        Write-Host $line
+    }
+    if ($clearExitCode -ne 0) {
+        throw "Could not refresh the '$($modInfo.Id)' command environment."
+    }
+
     Write-Host "Running DFHack command: $($modInfo.Id) reload"
     $reloadOutput = @(& $runner $modInfo.Id reload 2>&1) |
         ForEach-Object { $_.ToString() }

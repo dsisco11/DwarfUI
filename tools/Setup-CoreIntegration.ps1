@@ -134,10 +134,10 @@ Require-PackageFile -PackageRoot $corePackage `
     -RelativePath 'scripts_modinstalled/dwarfuicore/module_registry.lua' `
     -Label 'DwarfUICore package' | Out-Null
 Require-PackageFile -PackageRoot $corePackage `
-    -RelativePath 'scripts_modinstalled/dwarfuicore/tooltip/api.lua' `
+    -RelativePath 'scripts_modinstalled/dwarfuicore/services.lua' `
     -Label 'DwarfUICore package' | Out-Null
 Require-PackageFile -PackageRoot $corePackage `
-    -RelativePath 'scripts_modinstalled/dwarfuicore/context_menu/api.lua' `
+    -RelativePath 'scripts_modinstalled/dwarfuicore/service_provider/api.lua' `
     -Label 'DwarfUICore package' | Out-Null
 
 $sourceHash = (Get-FileHash -LiteralPath $coreSourceRootScript -Algorithm SHA256).Hash
@@ -174,6 +174,9 @@ $installedCoreScript = Require-PackageFile -PackageRoot $coreInstall `
 Require-PackageFile -PackageRoot $uiInstall `
     -RelativePath 'scripts_modinstalled/dwarfui.lua' `
     -Label 'Installed DwarfUI package' | Out-Null
+Require-PackageFile -PackageRoot $uiInstall `
+    -RelativePath 'scripts_modinstalled/dwarfui/services.lua' `
+    -Label 'Installed DwarfUI package' | Out-Null
 
 $coreCandidates = @(Get-ChildItem -LiteralPath $modsRoot -Recurse -File `
     -Filter 'dwarfuicore.lua')
@@ -190,12 +193,17 @@ $minecartScript = Require-PackageFile -PackageRoot $uiInstall `
     -RelativePath 'scripts_modinstalled/dwarfui-minecart-route-markers.lua' `
     -Label 'Installed DwarfUI package'
 if (-not (Get-Content -LiteralPath $minecartScript -Raw).Contains(
-        "reqscript('dwarfuicore/tooltip/api')")) {
-    throw 'Installed DwarfUI package does not import the intended DwarfUICore tooltip API.'
+        "reqscript('dwarfui/services').TooltipService")) {
+    throw 'Installed DwarfUI package does not import its namespace-bound tooltip service.'
 }
 
 $coreVersion = Get-ModInfoValue -InfoPath $coreSourceInfo `
     -Key 'DISPLAYED_VERSION'
+$uiRockspec = Join-Path $repositoryRoot 'dwarfui.rockspec'
+if (-not (Get-Content -LiteralPath $uiRockspec -Raw).Contains(
+        ('"dwarfuicore >= {0}"' -f $coreVersion))) {
+    throw "DwarfUI must require the provider-bearing DwarfUICore version $coreVersion."
+}
 $installedCoreVersion = Get-ModInfoValue -InfoPath (Join-Path $coreInstall 'info.txt') `
     -Key 'DISPLAYED_VERSION'
 if ($coreVersion -ne $installedCoreVersion) {

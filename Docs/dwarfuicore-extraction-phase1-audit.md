@@ -271,8 +271,13 @@ separate registries, separate packages, and the DwarfUI dependency direction.
 
 ## Explicit architecture deferrals
 
-The following belong to the unfinalized DwarfUICore service-provider proposal
-and must not be introduced during the split:
+This section records the boundary of the earlier repository split. The later
+service-provider work has since implemented these items in DwarfUICore and
+migrated DwarfUI through its `dwarfui` namespace; they are not current
+architecture deferrals.
+
+At that time, the following belonged to the unfinalized DwarfUICore
+service-provider proposal and were not introduced during the split:
 
 - `dwarfuicore.services` provider exports;
 - `ServiceProvider:new(contractVersion, consumerNamespace)`;

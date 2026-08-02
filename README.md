@@ -6,8 +6,8 @@ shared UI runtime.
 
 ## Dependency installation
 
-Install the DwarfUICore package before DwarfUI. DwarfUI currently requires
-`dwarfuicore >= 0.1.0`; neither the source tree nor the package contains a
+Install the DwarfUICore package before DwarfUI. DwarfUI requires
+`dwarfuicore >= 0.2.0`; neither the source tree nor the package contains a
 second copy of DwarfUICore.
 
 The DwarfUI feature tests require an explicit Core source checkout:
@@ -37,20 +37,23 @@ presentation infrastructure. DwarfUI uses those systems where a feature needs
 them. For example, minecart route markers obtain their tooltip behavior from
 DwarfUICore while DwarfUI owns the marker feature and its route actions.
 
-The old `dwarfui/tooltip/api` and `dwarfui/context_menu/api` module paths no
-longer exist. Consumers that need the current extracted compatibility APIs must
-load DwarfUICore directly:
+All DwarfUI entrypoints share exact contract major 1 through the stable
+`dwarfui` namespace:
 
 ```lua
-local tooltip = reqscript('dwarfuicore/tooltip/api')
-local context_menu = reqscript('dwarfuicore/context_menu/api')
+local services = reqscript('dwarfui/services')
+local tooltip = services.TooltipService
+local context_menu = services.ContextMenuService
 ```
+
+Independent plugins acquire their own namespace directly from
+`reqscript('dwarfuicore/services')`; they do not use DwarfUI's binding.
 
 ## Reload behavior
 
-`dwarfui reload` is an explicit development command for DwarfUI-owned modules.
-It does not reload DwarfUICore. Normal DwarfUI and DwarfUICore module loading
-does not perform a development reload or clear script environments.
+`dwarfui reload` explicitly clears and rebuilds only the `dwarfui` tooltip
+and context-menu namespaces and DwarfUI-owned modules. It does not reload
+DwarfUICore or clear registrations owned by another consumer namespace.
 
 ## Feature use
 
@@ -70,14 +73,12 @@ Run local checks from this repository root:
 Native Dwarf Fortress verification is a separate workflow from these source
 and package checks.
 
-## Future service-provider contract
+## Service-provider contract
 
-The proposed service-provider API is owned by
-[DwarfUICore](https://github.com/dsisco11/DwarfUICore/blob/main/Docs/service-provider-api-proposal.md).
-It is not implemented by the repository split: provider classes, consumer
-namespaces, composite identities, exact contract-version negotiation,
-immutable handles, and collision rules are all future design work. DwarfUI
-does not maintain a second copy of that proposal.
+DwarfUICore owns the provider contract and the one process-wide runtime.
+DwarfUI is a namespace-bound consumer and performs explicit namespace cleanup
+for reload and teardown. API objects do not own registrations, so collecting a
+cached service object is not a cleanup mechanism.
 
-Migrating independent consumer plugins to DwarfUICore is separate future work;
-no consumer plugins were changed as part of this split.
+Migrating independent consumer plugins remains separate work; no independent
+plugin is migrated through DwarfUI.

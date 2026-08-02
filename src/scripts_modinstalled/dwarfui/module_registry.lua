@@ -10,6 +10,10 @@
 ---@type dwarfui.ModuleSpec[]
 MODULES = {
     {
+        name='dwarfui/services',
+        contract='clear_namespaces',
+    },
+    {
         name='dwarfui/widgets/asset_button',
         contract='AssetButton',
         contract_type='table',

@@ -35,10 +35,12 @@ describe('DwarfSpec tooltip diagnostics adapter', function()
             registration_count=1,
             target=target,
             intent=intent,
+            poller_runtime_generation=12,
             poller_generation=7,
         }
         local hook_diagnostics = {
             api_version=1,
+            runtime_generation=12,
             generation=8,
             presenter_installed=true,
             disabled=false,
@@ -79,6 +81,7 @@ describe('DwarfSpec tooltip diagnostics adapter', function()
             screen_hook_count=1,
         }
         local presenter_diagnostics = {
+            runtime_generation=12,
             generation=8,
             active=true,
             current_intent_revision=11,
@@ -93,15 +96,22 @@ describe('DwarfSpec tooltip diagnostics adapter', function()
         }
         local _, config = module_loader.load(repo_root, CONFIG_PATH, {
             reqscript={
-                ['dwarfuicore/tooltip/api']={
-                    get_diagnostics=function()
+                ['dwarfuicore/tooltip/registration']={
+                    get_diagnostics=function(namespace)
+                        assert.equals('dwarfui', namespace)
                         local copy = {}
                         for key, value in pairs(registration_diagnostics) do
                             copy[key] = value
                         end
-                        copy.presentation = presenter_diagnostics
                         return copy
                     end,
+                },
+                ['dwarfuicore/tooltip/runtime']={
+                    presenter={
+                        get_diagnostics=function()
+                            return presenter_diagnostics
+                        end,
+                    },
                 },
                 ['dwarfuicore/tooltip/render_hook']={
                     manager={
@@ -117,9 +127,11 @@ describe('DwarfSpec tooltip diagnostics adapter', function()
         assert.is_equal(target, result.target)
         assert.is_equal(intent, result.intent)
         assert.equals(7, result.poller_generation)
+        assert.equals(12, result.presenter.runtime_generation)
         assert.equals(8, result.presenter.generation)
         assert.is_true(result.presenter.selected_owner_present)
         assert.equals(8, result.render_hook.generation)
+        assert.equals(12, result.render_hook.runtime_generation)
         assert.is_true(result.render_hook.selected_owner_present)
         assert.is_true(result.render_hook.overlay.owner_present)
         assert.is_true(result.render_hook.screens[1].owner_present)

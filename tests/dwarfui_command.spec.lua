@@ -39,6 +39,15 @@ describe('dwarfui command', function()
             scripts['/scripts/' .. name .. '.lua'] = {generation='old'}
         end
         local overlay_db = {}
+        local services = {
+            refresh=function()
+                table.insert(events, {'refresh_services', 'dwarfui'})
+            end,
+            clear_namespaces=function()
+                table.insert(events, {'clear_namespaces', 'dwarfui'})
+                return true
+            end,
+        }
         for _, script in ipairs({
                 'dwarfui-ui-hotkeys', 'dwarfui-mood-popover',
                 'dwarfui-minecart-route-markers',
@@ -71,6 +80,7 @@ describe('dwarfui command', function()
                 },
                 reqscript=setmetatable({}, {__index=function(_, name)
                     if name == 'dwarfui/module_registry' then return registry end
+                    if name == 'dwarfui/services' then return services end
                     return {generation='fresh'}
                 end}),
                 require_modules={
@@ -86,10 +96,12 @@ describe('dwarfui command', function()
         environment.reload()
 
         assert.same({
+            {'refresh_services', 'dwarfui'},
             {'retire', 'dwarfui-ui-hotkeys'},
             {'retire', 'dwarfui-mood-popover'},
             {'retire', 'dwarfui-minecart-route-markers'},
             {'retire', 'dwarfui-unit-card-task-details'},
+            {'clear_namespaces', 'dwarfui'},
             {'clear', 'devel/clear-script-env', 'dwarfui/consumer'},
             {'clear', 'devel/clear-script-env', 'dwarfui/module_registry'},
             {'run', 'dwarfui/module_registry'},

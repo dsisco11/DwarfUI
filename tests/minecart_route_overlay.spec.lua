@@ -92,11 +92,11 @@ local function load_overlay(state)
         project=function() return state.markers end,
     }
     local tooltip = {
-        register=function(widget)
+        register=function(_, widget)
             state.tooltip_registrations = state.tooltip_registrations or {}
             table.insert(state.tooltip_registrations, widget)
         end,
-        register_map_tile=function(options)
+        register_map_tile=function(_, options)
             state.map_tooltip_sequence =
                 (state.map_tooltip_sequence or 0) + 1
             local handle = {sequence=state.map_tooltip_sequence}
@@ -112,7 +112,7 @@ local function load_overlay(state)
             }
             return handle
         end,
-        update_map_tile=function(handle, update)
+        update_map_tile=function(_, handle, update)
             local record = state.map_tooltips and
                 state.map_tooltips[handle] or nil
             if not record then return false end
@@ -124,7 +124,7 @@ local function load_overlay(state)
             record.tooltip = update.tooltip
             return true
         end,
-        unregister_map_tile=function(handle)
+        unregister_map_tile=function(_, handle)
             local record = state.map_tooltips and
                 state.map_tooltips[handle] or nil
             if not record then return false end
@@ -221,7 +221,7 @@ local function load_overlay(state)
                 },
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
-                ['dwarfuicore/tooltip/api']=tooltip,
+                ['dwarfui/services']={TooltipService=tooltip},
                 ['dwarfuicore/pointer']={PointerPolicy=PointerPolicy},
             },
         })

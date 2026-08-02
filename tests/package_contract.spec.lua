@@ -33,8 +33,8 @@ describe('DwarfUI package contract', function()
     it('declares DwarfUICore as an explicit package dependency', function()
         local rockspec = read_file('dwarfui.rockspec')
 
-        assert.is_truthy(rockspec:find('"dwarfuicore >= 0.1.0"', 1, true))
-        local _, occurrences = rockspec:gsub('"dwarfuicore >= 0.1.0"', '')
+        assert.is_truthy(rockspec:find('"dwarfuicore >= 0.2.0"', 1, true))
+        local _, occurrences = rockspec:gsub('"dwarfuicore >= 0.2.0"', '')
         assert.equals(2, occurrences)
     end)
 
@@ -42,6 +42,7 @@ describe('DwarfUI package contract', function()
         local expected = {
             'src/scripts_modinstalled/dwarfui.lua',
             'src/scripts_modinstalled/dwarfui/module_registry.lua',
+            'src/scripts_modinstalled/dwarfui/services.lua',
             'src/scripts_modinstalled/dwarfui/widgets/asset_button.lua',
             'src/scripts_modinstalled/dwarfui/widgets/hover_action_rail.lua',
             'src/scripts_modinstalled/dwarfui/popover.lua',
@@ -78,7 +79,7 @@ describe('DwarfUI package contract', function()
             'src/scripts_modinstalled/dwarfui/widgets/asset_button.lua')
 
         assert.is_truthy(minecart_overlay:find(
-            "reqscript('dwarfuicore/tooltip/api')", 1, true))
+            "reqscript('dwarfui/services').TooltipService", 1, true))
         assert.is_truthy(minecart_overlay:find(
             "reqscript('dwarfuicore/pointer')", 1, true))
         assert.is_truthy(minecart_model:find(
@@ -93,16 +94,18 @@ describe('DwarfUI package contract', function()
         assert.is_nil(root:find("dwarfuicore reload", 1, true))
         assert.is_nil(root:find("dwarfuicore/tooltip", 1, true))
         assert.is_nil(root:find("dwarfuicore/context_menu", 1, true))
+        assert.is_truthy(root:find('services.refresh()', 1, true))
+        assert.is_truthy(root:find('services.clear_namespaces()', 1, true))
     end)
 
     it('exposes only the Core public API definitions to LuaLS', function()
         local settings = read_file('.luarc.json')
 
         assert.is_truthy(settings:find(
-            '../DwarfUICore/src/scripts_modinstalled/dwarfuicore/tooltip/api.lua',
+            '../DwarfUICore/src/scripts_modinstalled/dwarfuicore/services.lua',
             1, true))
         assert.is_truthy(settings:find(
-            '../DwarfUICore/src/scripts_modinstalled/dwarfuicore/context_menu/api.lua',
+            '../DwarfUICore/src/scripts_modinstalled/dwarfuicore/service_provider/api.lua',
             1, true))
         assert.is_nil(settings:find(
             '../DwarfUICore/src/scripts_modinstalled/dwarfuicore/tooltip/service.lua',

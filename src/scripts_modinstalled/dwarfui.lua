@@ -18,12 +18,24 @@ Usage
 ]====]
 
 local MODULE_REGISTRY_SCRIPT = 'dwarfui/module_registry'
+local SERVICES_SCRIPT = 'dwarfui/services'
 local OVERLAY_SCRIPTS = {
     'dwarfui-ui-hotkeys',
     'dwarfui-mood-popover',
     'dwarfui-minecart-route-markers',
     'dwarfui-unit-card-task-details',
 }
+
+---Returns whether an overlay teardown failed only because Core was reloaded.
+---@param failure any
+---@return boolean stale
+local function is_stale_api_failure(failure)
+    local text = tostring(failure)
+    return text:find(
+        'DwarfUICore TooltipServiceApi: [STALE_API]', 1, true) ~= nil or
+        text:find(
+            'DwarfUICore ContextMenuServiceApi: [STALE_API]', 1, true) ~= nil
+end
 
 ---Retires every current DwarfUI overlay before DFHack discards its registry.
 local function retire_overlays()
@@ -33,7 +45,10 @@ local function retire_overlays()
         for name, entry in pairs(db) do
             if name:sub(1, #prefix) == prefix and
                     entry.widget.overlay_ondisable then
-                entry.widget.overlay_ondisable()
+                local ok, failure = pcall(entry.widget.overlay_ondisable)
+                if not ok and not is_stale_api_failure(failure) then
+                    error(failure, 0)
+                end
             end
         end
     end
@@ -76,9 +91,13 @@ function initialize()
     return load_module_registry().load_all(reqscript)
 end
 
----Retires every DwarfUI-owned overlay before an explicit development reload.
+---Retires overlays and clears both DwarfUI-owned service namespaces.
+---@return boolean changed
 function teardown()
+    local services = reqscript(SERVICES_SCRIPT)
+    services.refresh()
     retire_overlays()
+    return services.clear_namespaces()
 end
 
 ---Rebuilds DwarfUI-owned modules and overlays without reloading DwarfUICore.
