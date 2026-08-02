@@ -6,6 +6,8 @@ local generic_overlay = reqscript('dwarfui/hotkeys/overlay')
 local fortress_main = reqscript('dwarfui/hotkeys/groups/fortress_main')
 local fortress_bottom_middle =
     reqscript('dwarfui/hotkeys/groups/fortress_bottom_middle')
+local fortress_bottom_right =
+    reqscript('dwarfui/hotkeys/groups/fortress_bottom_right')
 
 ---@class dwarfui.UiMenuHotkeysOverlay: dwarfui.HotkeyGroupOverlay
 ---@field model_builder fun(): dwarfui.HotkeyGroupModel
@@ -65,7 +67,37 @@ function UiBottomMiddleHotkeysOverlay:init()
     UiBottomMiddleHotkeysOverlay.super.init(self)
 end
 
+---@class dwarfui.UiBottomRightHotkeysOverlay: dwarfui.HotkeyGroupOverlay
+---@field model_builder fun(): dwarfui.HotkeyGroupModel
+UiBottomRightHotkeysOverlay = defclass(UiBottomRightHotkeysOverlay,
+    generic_overlay.HotkeyGroupOverlay)
+UiBottomRightHotkeysOverlay.ATTRS{
+    desc='Shows hotkey labels on the fortress bottom-right buttons.',
+    version='1',
+    default_enabled=true,
+    default_pos={x=1, y=1},
+    viewscreens='dwarfmode/Default',
+    hotspot=true,
+    fullscreen=false,
+    full_interface=true,
+    frame={l=0, t=0, w=1, h=1},
+    overlay_onupdate_max_freq_seconds=0,
+    label_anchor_kind=generic_overlay.HotkeyLabelAnchor.BOTTOM_RIGHT,
+    label_pen=COLOR_WHITE,
+    label_inset_x=0,
+    label_inset_y=0,
+    model_builder=function()
+        return fortress_bottom_right.FortressBottomRightGroup.create_model()
+    end,
+}
+
+---Constructs the bottom-right overlay using its reusable fortress group.
+function UiBottomRightHotkeysOverlay:init()
+    UiBottomRightHotkeysOverlay.super.init(self)
+end
+
 OVERLAY_WIDGETS = {
     ui_hotkeys=UiMenuHotkeysOverlay,
     bottom_middle_hotkeys=UiBottomMiddleHotkeysOverlay,
+    bottom_right_hotkeys=UiBottomRightHotkeysOverlay,
 }

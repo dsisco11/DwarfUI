@@ -52,6 +52,7 @@ describe('DwarfUI package contract', function()
             'src/scripts_modinstalled/dwarfui/hotkeys/model.lua',
             'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua',
             'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_middle.lua',
+            'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_right.lua',
             'src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua',
             'src/scripts_modinstalled/dwarfui/mood_popover.lua',
             'src/scripts_modinstalled/dwarfui/minecart_route.lua',
