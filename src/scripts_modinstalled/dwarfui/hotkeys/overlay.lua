@@ -107,12 +107,19 @@ function HotkeyGroupOverlay:render_button_label(dc, button, group_bounds)
     dc:seek(x, y):string(button.label, self.label_pen)
 end
 
----Synchronizes and paints all currently resolved labels.
+---Synchronizes the snapshot and renders through the resolved widget frame.
 ---@param dc gui.Painter
 function HotkeyGroupOverlay:render(dc)
     self:sync_snapshot()
-    self:apply_snapshot_frame(self.frame_parent_rect)
+    if self:apply_snapshot_frame(self.frame_parent_rect) and self.frame_parent_rect then
+        self:updateLayout(self.frame_parent_rect)
+    end
     HotkeyGroupOverlay.super.render(self, dc)
+end
+
+---Paints all resolved labels through the frame-local body painter.
+---@param dc gui.Painter
+function HotkeyGroupOverlay:onRenderBody(dc)
     local bounds = self.latest_snapshot and self.latest_snapshot.bounds
     if not bounds then return end
     for _, button in ipairs(self.latest_snapshot.buttons or {}) do

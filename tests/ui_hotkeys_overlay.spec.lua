@@ -24,6 +24,36 @@ end
 local function load_overlay(state)
     local widgets = widget_harness.widgets()
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
+
+    ---Renders a test overlay body through a frame-local painter.
+    ---@param dc table
+    function OverlayWidget:render(dc)
+        local overlay_widget = self
+        local body_dc = {strings=dc.strings}
+
+        ---Sets a frame-local cursor and records its screen-space position.
+        ---@param x integer
+        ---@param y integer
+        ---@return table
+        function body_dc:seek(x, y)
+            self.x = x + overlay_widget.frame_body.x1
+            self.y = y + overlay_widget.frame_body.y1
+            return self
+        end
+
+        ---Records text written through the frame-local painter.
+        ---@param value string
+        ---@param pen any
+        ---@return table
+        function body_dc:string(value, pen)
+            table.insert(self.strings, {
+                x=self.x, y=self.y, text=value, pen=pen,
+            })
+            return self
+        end
+
+        self:onRenderBody(body_dc)
+    end
     local _, immutable_enum = module_loader.load(dwarfuicore_root,
         'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
     local geometry_environment = module_loader.load(repo_root,
@@ -129,7 +159,30 @@ describe('DwarfUI UI hotkeys overlay', function()
 
         assert.is_true(state.snapshot_reads >= 1)
         assert.equals(1, #dc.strings)
-        assert.same({x=5, y=0, text='u', pen='white'}, dc.strings[1])
+        assert.same({x=15, y=20, text='u', pen='white'}, dc.strings[1])
+    end)
+
+    it('updates the host frame before rendering a newly resolved bottom group',
+            function()
+        local state = {
+            snapshot={
+                active=true,
+                layout_signature='80x25|bottom-group',
+                buttons={
+                    {bounds={x1=10, y1=20, x2=15, y2=22}, label='u'},
+                },
+                bounds={x1=10, y1=20, x2=15, y2=22},
+            },
+        }
+        local overlay = load_overlay(state)
+        overlay:updateLayout(widget_harness.rect(0, 0, 80, 25))
+
+        overlay:render(painter())
+
+        assert.equals(10, overlay.frame_rect.x1)
+        assert.equals(20, overlay.frame_rect.y1)
+        assert.equals(6, overlay.frame_rect.width)
+        assert.equals(3, overlay.frame_rect.height)
     end)
 
     it('resamples both on update and on render to track layout drift',
