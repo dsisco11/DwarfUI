@@ -172,7 +172,7 @@ describe('DwarfUI UI hotkeys overlay', function()
 
         assert.is_true(state.snapshot_reads >= 1)
         assert.equals(1, #dc.strings)
-        assert.same({x=15, y=20, text='u', pen='white'}, dc.strings[1])
+        assert.same({x=15, y=22, text='u', pen='white'}, dc.strings[1])
     end)
 
     it('updates the host frame before rendering a newly resolved bottom group',

@@ -33,7 +33,7 @@ HotkeyGroupOverlay.ATTRS{
     frame={l=0, t=0, w=1, h=1},
     overlay_onupdate_max_freq_seconds=0,
     model_builder=DEFAULT_NIL,
-    label_anchor_kind=HotkeyLabelAnchor.TOP_RIGHT,
+    label_anchor_kind=HotkeyLabelAnchor.BOTTOM_RIGHT,
     label_pen=COLOR_WHITE,
     label_inset_x=0,
     label_inset_y=0,

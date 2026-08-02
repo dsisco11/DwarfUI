@@ -60,18 +60,17 @@ end
 
 describe('DwarfUI bounded hotkey overlay', function()
     it('fits to group bounds and paints screen geometry in local coordinates', function()
-        local Overlay, anchor = load_overlay()
+        local Overlay = load_overlay()
         local state = {snapshot=snapshot('one', 10, 20, {'u', 'p'})}
         local instance = Overlay{
             model_builder=function() return {build_snapshot=function() return state.snapshot end} end,
-            label_anchor_kind=anchor.TOP_RIGHT,
         }
         instance:preUpdateLayout(widget_harness.rect(0, 0, 80, 25))
         assert.same({l=10, t=20, w=8, h=4}, instance.frame)
         local dc = painter()
         instance:onRenderBody(dc)
-        assert.same({x=3, y=0, text='u', pen='white'}, dc.strings[1])
-        assert.same({x=7, y=0, text='p', pen='white'}, dc.strings[2])
+        assert.same({x=3, y=3, text='u', pen='white'}, dc.strings[1])
+        assert.same({x=7, y=3, text='p', pen='white'}, dc.strings[2])
         assert.is_false(instance:onInput({_MOUSE_L=true}))
     end)
 
