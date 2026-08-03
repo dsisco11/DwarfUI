@@ -146,15 +146,15 @@
     - Focused specs for each new module and the migrated concrete group.
     - No tests that depend on OS-level mouse movement.
 
-☐ [Phase 8 - Reload, Registry, Packaging, and Documentation] Integrate the reusable subsystem into the project lifecycle.
-    ☐ Register new modules in `dwarfui/module_registry.lua` in dependency order before their consumers.
-    ☐ Update module-order and reload-retirement tests for all new scripts.
-    ☐ Update package contracts and isolated-load fixtures for every new production module.
-    ☐ Confirm the rockspec and published archive include the complete reusable subsystem and concrete fortress group.
-    ☐ Document how to define and register a new hotkey group.
-    ☐ Document when to use native structures, widget traversal, rendered signatures, or a custom provider.
-    ☐ Document coordinate-space, ambiguity, caching, and failure-isolation requirements.
-    ☐ Include a minimal second-group example that demonstrates reuse without copying the fortress toolbar implementation.
+✔ [Phase 8 - Reload, Registry, Packaging, and Documentation] Integrate the reusable subsystem into the project lifecycle. @done(26-08-02 07:31)
+    ✔ Register new modules in `dwarfui/module_registry.lua` in dependency order before their consumers. @done(26-08-02 07:31)
+    ✔ Update module-order and reload-retirement tests for all new scripts. @done(26-08-02 07:31)
+    ✔ Update package contracts and isolated-load fixtures for every new production module. @done(26-08-02 07:31)
+    ✔ Confirm the rockspec and published archive include the complete reusable subsystem and concrete fortress group. @done(26-08-02 07:31)
+    ✔ Document how to define and register a new hotkey group. @done(26-08-02 07:31)
+    ✔ Document when to use native structures, widget traversal, rendered signatures, or a custom provider. @done(26-08-02 07:31)
+    ✔ Document coordinate-space, ambiguity, caching, and failure-isolation requirements. @done(26-08-02 07:31)
+    ✔ Include a minimal second-group example that demonstrates reuse without copying the fortress toolbar implementation. @done(26-08-02 07:31)
     Deliverables:
     - Reload-managed and packaged reusable hotkey subsystem.
     - Extension guide for future native hotkey button groups.

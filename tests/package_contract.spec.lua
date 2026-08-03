@@ -54,6 +54,7 @@ describe('DwarfUI package contract', function()
             'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_middle.lua',
             'src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_right.lua',
             'src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua',
+            'src/scripts_modinstalled/dwarfui-ui-hotkeys.lua',
             'src/scripts_modinstalled/dwarfui/mood_popover.lua',
             'src/scripts_modinstalled/dwarfui/minecart_route.lua',
             'src/scripts_modinstalled/dwarfui/unit_card_task.lua',
@@ -70,6 +71,76 @@ describe('DwarfUI package contract', function()
                 'src/scripts_modinstalled/dwarfui/pointer.lua',
                 'src/scripts_modinstalled/dwarfui/widget_extensions.lua'}) do
             assert.is_false(file_exists(removed))
+        end
+    end)
+
+    it('pairs every reusable hotkey module with an isolated-load spec', function()
+        local fixtures = {
+            ['src/scripts_modinstalled/dwarfui/hotkeys/geometry.lua']=
+                'tests/hotkey_geometry.spec.lua',
+            ['src/scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua']=
+                'tests/hotkey_layout_provider.spec.lua',
+            ['src/scripts_modinstalled/dwarfui/hotkeys/model.lua']=
+                'tests/hotkey_model.spec.lua',
+            ['src/scripts_modinstalled/dwarfui/hotkeys/overlay.lua']=
+                'tests/hotkey_overlay.spec.lua',
+            ['src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua']=
+                'tests/fortress_main_hotkeys.spec.lua',
+            ['src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_middle.lua']=
+                'tests/fortress_bottom_middle_hotkeys.spec.lua',
+            ['src/scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_right.lua']=
+                'tests/fortress_bottom_right_hotkeys.spec.lua',
+        }
+        for module_path, fixture_path in pairs(fixtures) do
+            assert.is_true(file_exists(module_path), module_path)
+            assert.is_true(file_exists(fixture_path), fixture_path)
+            assert.is_truthy(read_file(fixture_path):find(
+                module_path, 1, true), fixture_path)
+        end
+    end)
+
+    it('publishes and verifies the complete hotkey source subsystem', function()
+        local rockspec = read_file('dwarfui.rockspec')
+        local publish = read_file('tools/Publish.ps1')
+        local verifier = read_file('tools/VerifyPackage.ps1')
+
+        assert.is_truthy(rockspec:find(
+            'git+https://github.com/dsisco11/DwarfUI.git', 1, true))
+        assert.is_truthy(publish:find("[string] $SourceDir = 'src'", 1, true))
+        for _, relative_path in ipairs({
+                'scripts_modinstalled/dwarfui/hotkeys/geometry.lua',
+                'scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua',
+                'scripts_modinstalled/dwarfui/hotkeys/model.lua',
+                'scripts_modinstalled/dwarfui/hotkeys/overlay.lua',
+                'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua',
+                'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_middle.lua',
+                'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_right.lua',
+                'scripts_modinstalled/dwarfui-ui-hotkeys.lua'}) do
+            assert.is_truthy(verifier:find(relative_path, 1, true),
+                relative_path)
+        end
+    end)
+
+    it('documents the reusable hotkey extension and provider contracts', function()
+        local readme = read_file('README.md')
+        local guide = read_file('Docs/reusable-hotkey-groups.md')
+
+        assert.is_truthy(readme:find(
+            'Docs/reusable-hotkey-groups.md', 1, true))
+        for _, required_text in ipairs({
+                '## Define and register a group',
+                'Native structure',
+                'Widget traversal',
+                'Rendered signature',
+                'Custom provider',
+                'inclusive screen coordinates',
+                'signature_data',
+                '`AMBIGUOUS`',
+                'failure must not affect another group',
+                '## Minimal second-group example',
+                'OVERLAY_WIDGETS = {status_hotkeys=StatusHotkeysOverlay}'}) do
+            assert.is_truthy(guide:find(required_text, 1, true),
+                required_text)
         end
     end)
 

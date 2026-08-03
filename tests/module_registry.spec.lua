@@ -81,4 +81,24 @@ describe('DwarfUI feature module registry', function()
             'dwarfui/services',
         }, registry.get_script_names())
     end)
+
+    it('orders reusable hotkey dependencies before every consumer', function()
+        local positions = {}
+        for index, spec in ipairs(registry.MODULES) do
+            positions[spec.name] = index
+        end
+
+        local geometry = positions['dwarfui/hotkeys/geometry']
+        local provider = positions['dwarfui/hotkeys/layout_provider']
+        local model = positions['dwarfui/hotkeys/model']
+        assert.is_true(geometry < provider)
+        assert.is_true(provider < model)
+        assert.is_true(geometry < positions['dwarfui/hotkeys/overlay'])
+        for _, group in ipairs({
+                'dwarfui/hotkeys/groups/fortress_main',
+                'dwarfui/hotkeys/groups/fortress_bottom_middle',
+                'dwarfui/hotkeys/groups/fortress_bottom_right'}) do
+            assert.is_true(model < positions[group])
+        end
+    end)
 end)

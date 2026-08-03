@@ -95,6 +95,22 @@ if (-not ($sourceManifest.RelativePath -contains 'info.txt')) {
 if (-not ($sourceManifest.RelativePath | Where-Object { $_ -like 'scripts_modinstalled/*' })) {
     throw 'Source must contain at least one file under scripts_modinstalled/.'
 }
+$requiredHotkeyPaths = @(
+    'scripts_modinstalled/dwarfui/hotkeys/geometry.lua',
+    'scripts_modinstalled/dwarfui/hotkeys/layout_provider.lua',
+    'scripts_modinstalled/dwarfui/hotkeys/model.lua',
+    'scripts_modinstalled/dwarfui/hotkeys/overlay.lua',
+    'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_main.lua',
+    'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_middle.lua',
+    'scripts_modinstalled/dwarfui/hotkeys/groups/fortress_bottom_right.lua',
+    'scripts_modinstalled/dwarfui-ui-hotkeys.lua'
+)
+$missingHotkeyPaths = @($requiredHotkeyPaths | Where-Object {
+    $sourceManifest.RelativePath -notcontains $_
+})
+if ($missingHotkeyPaths.Count -gt 0) {
+    throw "Source is missing required reusable hotkey files: $($missingHotkeyPaths -join ', ')."
+}
 
 Assert-MatchesSource -Expected $sourceManifest `
     -Actual (Get-Manifest -Root $expandedDirectoryPath) `

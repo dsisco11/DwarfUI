@@ -73,6 +73,13 @@ Run local checks from this repository root:
 Native Dwarf Fortress verification is a separate workflow from these source
 and package checks.
 
+## Reusable hotkey groups
+
+See [Docs/reusable-hotkey-groups.md](Docs/reusable-hotkey-groups.md) for the
+group-definition and overlay-registration workflow, provider selection,
+coordinate and caching rules, failure isolation, and a minimal second-group
+example.
+
 ## Service-provider contract
 
 DwarfUICore owns the provider contract and the one process-wide runtime.
