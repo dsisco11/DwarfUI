@@ -153,7 +153,11 @@ describe('DwarfUI package contract', function()
             'src/scripts_modinstalled/dwarfui/widgets/asset_button.lua')
 
         assert.is_truthy(minecart_overlay:find(
-            "reqscript('dwarfui/services').TooltipService", 1, true))
+            "reqscript('dwarfui/services')", 1, true))
+        assert.is_truthy(minecart_overlay:find(
+            'local tooltip = services.TooltipService', 1, true))
+        assert.is_truthy(minecart_overlay:find(
+            'local context_menu = services.ContextMenuService', 1, true))
         assert.is_truthy(minecart_overlay:find(
             "reqscript('dwarfuicore/pointer')", 1, true))
         assert.is_truthy(minecart_model:find(

@@ -134,6 +134,37 @@ local function load_overlay(state)
             return true
         end,
     }
+    local context_menu = {
+        register_map_tile=function(_, options)
+            state.map_context_menu_sequence =
+                (state.map_context_menu_sequence or 0) + 1
+            local handle = {sequence=state.map_context_menu_sequence}
+            state.map_context_menus = state.map_context_menus or {}
+            state.map_context_menus[handle] = {
+                owner=options.owner,
+                pos={x=options.pos.x, y=options.pos.y, z=options.pos.z},
+                definition=options.definition,
+            }
+            return handle
+        end,
+        update_map_tile=function(_, handle, update)
+            local record = state.map_context_menus and
+                state.map_context_menus[handle] or nil
+            if not record then return false end
+            record.pos = {x=update.pos.x, y=update.pos.y, z=update.pos.z}
+            record.definition = update.definition
+            return true
+        end,
+        unregister_map_tile=function(_, handle)
+            local record = state.map_context_menus and
+                state.map_context_menus[handle] or nil
+            if not record then return false end
+            state.map_context_menus[handle] = nil
+            state.map_context_menu_removals =
+                (state.map_context_menu_removals or 0) + 1
+            return true
+        end,
+    }
     local _, asset_button = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/widgets/asset_button.lua', {
             globals={
@@ -197,6 +228,10 @@ local function load_overlay(state)
             },
             require_modules={
                 ['plugins.overlay']={OverlayWidget=OverlayWidget},
+                ['gui.dialogs']={showMessage=function(title, message)
+                    state.alerts = state.alerts or {}
+                    table.insert(state.alerts, {title=title, message=message})
+                end},
                 ['gui.dwarfmode']={
                     Viewport={get=function() return state.viewport end},
                     getPanelLayout=function()
@@ -221,7 +256,8 @@ local function load_overlay(state)
                 },
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
-                ['dwarfui/services']={TooltipService=tooltip},
+                ['dwarfui/services']={TooltipService=tooltip,
+                    ContextMenuService=context_menu},
                 ['dwarfuicore/pointer']={PointerPolicy=PointerPolicy},
             },
         })
@@ -289,6 +325,15 @@ local function map_tooltip_count(state)
     return count
 end
 
+---Counts active map context-menu records in a test state.
+---@param state table
+---@return integer
+local function map_context_menu_count(state)
+    local count = 0
+    for _ in pairs(state.map_context_menus or {}) do count = count + 1 end
+    return count
+end
+
 describe('DwarfUI minecart route markers overlay', function()
     it('declares a fullscreen Hauling overlay and returns false for ordinary input',
             function()
@@ -300,7 +345,8 @@ describe('DwarfUI minecart route markers overlay', function()
         local overlay, selection = load_overlay(state)
 
         assert.is_true(overlay.fullscreen)
-        assert.equals('dwarfmode/Hauling', overlay.viewscreens)
+        assert.same({'dwarfmode/Hauling', 'dwarfuicore/context-menu'},
+            overlay.viewscreens)
         assert.is_false(overlay:onInput({_MOUSE_L=true}))
         assert.equals(8, selection.selected_route_id)
         assert.same({'dwarfmode/Hauling'}, selection.input.focus)
@@ -374,6 +420,39 @@ describe('DwarfUI minecart route markers overlay', function()
             'the adjacent label cell must not become a map target')
     end)
 
+    it('offers relocation for same-z stop indicators and reports it unavailable',
+            function()
+        local route = {id=8}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local off_z = marker(81, MarkerKind.ABOVE, 'Upper',
+            {x=18, y=29, z=5})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z, off_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+
+        overlay:render(painter())
+
+        assert.equals(1, map_context_menu_count(state))
+        local handle = overlay.map_context_menu_handles[80]
+        local registration = state.map_context_menus[handle]
+        assert.same({x=17, y=29, z=4}, registration.pos)
+        assert.is_equal(overlay, registration.owner)
+        assert.equals('Relocate / Change location',
+            registration.definition.entries[1].label)
+        assert.is_nil(overlay.map_context_menu_handles[81])
+
+        registration.definition.entries[1].on_select({})
+
+        assert.same({{
+            title='Relocate / Change location', message='Not yet implemented.',
+        }}, state.alerts)
+    end)
+
     it('clears local route state without consulting the tooltip service', function()
         local route = {id=8}
         local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
@@ -387,6 +466,7 @@ describe('DwarfUI minecart route markers overlay', function()
         selection.selected_route_id = route.id
         instance:render(painter())
         assert.equals(1, map_tooltip_count(state))
+        assert.equals(1, map_context_menu_count(state))
 
         instance:clear_local_state()
 
@@ -394,6 +474,8 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals(0, #instance.map_tooltip_order)
         assert.is_nil(instance.map_tooltip_route_id)
         assert.equals(1, map_tooltip_count(state),
+            'root namespace clearing owns deferred registration removal')
+        assert.equals(1, map_context_menu_count(state),
             'root namespace clearing owns deferred registration removal')
     end)
 
@@ -415,7 +497,9 @@ describe('DwarfUI minecart route markers overlay', function()
         instance.overlay_ondisable()
 
         assert.equals(0, map_tooltip_count(state))
+        assert.equals(0, map_context_menu_count(state))
         assert.equals(1, state.map_tooltip_removals)
+        assert.equals(1, state.map_context_menu_removals)
         assert.is_nil(instance.selection.selected_route_id)
     end)
 
@@ -572,6 +656,27 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals(0, map_tooltip_count(state))
         assert.same({overlay.stop_rail.action_widgets[1]},
             state.tooltip_registrations)
+    end)
+
+    it('keeps route-stop registrations while their context menu covers Hauling',
+            function()
+        local route = {id=8}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+        overlay:render(painter())
+
+        state.focus = {'dwarfuicore/context-menu'}
+        overlay:overlay_onupdate()
+
+        assert.equals(route.id, selection.selected_route_id)
+        assert.equals(1, map_context_menu_count(state))
     end)
 
     it('shows one left-side hover rail only for a current stop entry',

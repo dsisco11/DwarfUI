@@ -4,14 +4,18 @@
 
 local overlay = require('plugins.overlay')
 local guidm = require('gui.dwarfmode')
+local dialogs = require('gui.dialogs')
 local route_model = reqscript('dwarfui/minecart_route')
 local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
-local tooltip = reqscript('dwarfui/services').TooltipService
+local services = reqscript('dwarfui/services')
+local tooltip = services.TooltipService
+local context_menu = services.ContextMenuService
 local MarkerKind = route_model.MinecartRouteMarkerKind
 local PointerPolicy = reqscript('dwarfuicore/pointer').PointerPolicy
 
 local HAULING_FOCUS = 'dwarfmode/Hauling'
+local CONTEXT_MENU_FOCUS = 'dwarfuicore/context-menu'
 local ZOOM_ACTION_ID = 'recenter'
 -- Preserve the native menu cells behind the action while making the rail's
 -- background policy explicit for future actions or frame styles.
@@ -49,11 +53,20 @@ local STOCKS_RECENTER_PENS = {
     {transparent_pen(0), transparent_pen(0), transparent_pen(0)},
 }
 local STOCKS_RECENTER_TOOLTIP = 'Zoom to this stop'
+local RELOCATE_STOP_LABEL = 'Relocate / Change location'
+local RELOCATE_STOP_MESSAGE = 'Not yet implemented.'
 
 ---Returns the active native Hauling state.
 ---@return df.hauling_handlerst|nil
 local function get_hauling()
     return df.global.plotinfo and df.global.plotinfo.hauling or nil
+end
+
+---Returns whether Core's context-menu presentation temporarily covers Hauling.
+---@param focus string[]
+---@return boolean
+local function is_context_menu_focus(focus)
+    return type(focus) == 'table' and focus[1] == CONTEXT_MENU_FOCUS
 end
 
 ---Returns whether a screen cell belongs to a native graphics-backed panel.
@@ -116,6 +129,9 @@ end
 ---@field map_tooltip_handles table<integer, dwarfui.MapTileTooltipRegistration>
 ---@field map_tooltip_order integer[]
 ---@field map_tooltip_route_id integer|nil
+---@field map_context_menu_handles table<integer, dwarfuicore.ContextMenuMapHandle>
+---@field map_context_menu_order integer[]
+---@field map_context_menu_route_id integer|nil
 ---@field dwarfui_clear_local_state fun()
 MinecartRouteMarkersOverlay = defclass(MinecartRouteMarkersOverlay,
     overlay.OverlayWidget)
@@ -123,7 +139,7 @@ MinecartRouteMarkersOverlay.ATTRS{
     desc='Marks the stops of a selected Minecart Route on the fortress map.',
     version='1',
     default_enabled=true,
-    viewscreens=HAULING_FOCUS,
+    viewscreens={HAULING_FOCUS, CONTEXT_MENU_FOCUS},
     hotspot=true,
     -- Clear context-owned state on the first overlay update after focus leaves
     -- Hauling instead of inheriting the five-second update throttle.
@@ -145,6 +161,9 @@ function MinecartRouteMarkersOverlay:init()
     self.map_tooltip_handles = {}
     self.map_tooltip_order = {}
     self.map_tooltip_route_id = nil
+    self.map_context_menu_handles = {}
+    self.map_context_menu_order = {}
+    self.map_context_menu_route_id = nil
     self.layout = route_model.MinecartRouteMenuLayout{}
     self.selection = route_model.MinecartRouteSelection{layout=self.layout}
     self.projection = route_model.MinecartRouteMarkerProjection{}
@@ -187,6 +206,22 @@ function MinecartRouteMarkersOverlay:init()
     self.overlay_ondisable = function() self:clear_overlay_state() end
 end
 
+---Creates the context-menu definition for one route-stop map indicator.
+---@return dwarfuicore.ContextMenuDefinition
+function MinecartRouteMarkersOverlay:create_stop_context_menu_definition()
+    return {
+        entries={
+            {
+                label=RELOCATE_STOP_LABEL,
+                on_select=function()
+                    dialogs.showMessage(RELOCATE_STOP_LABEL,
+                        RELOCATE_STOP_MESSAGE)
+                end,
+            },
+        },
+    }
+end
+
 ---Clears local references to every exact-tile tooltip owned by this overlay.
 ---@return table<integer, dwarfui.MapTileTooltipRegistration> handles
 function MinecartRouteMarkersOverlay:clear_map_tooltip_state()
@@ -210,6 +245,29 @@ function MinecartRouteMarkersOverlay:clear_map_tooltips()
     self:unregister_map_tooltips(self:clear_map_tooltip_state())
 end
 
+---Clears local references to every exact-tile context-menu registration.
+---@return table<integer, dwarfuicore.ContextMenuMapHandle> handles
+function MinecartRouteMarkersOverlay:clear_map_context_menu_state()
+    local handles = self.map_context_menu_handles
+    self.map_context_menu_handles = {}
+    self.map_context_menu_order = {}
+    self.map_context_menu_route_id = nil
+    return handles
+end
+
+---Removes exact-tile context-menu registrations without retaining local state.
+---@param handles table<integer, dwarfuicore.ContextMenuMapHandle>
+function MinecartRouteMarkersOverlay:unregister_map_context_menus(handles)
+    for _, handle in pairs(handles) do
+        context_menu:unregister_map_tile(handle)
+    end
+end
+
+---Clears local references and unregisters every exact-tile context-menu.
+function MinecartRouteMarkersOverlay:clear_map_context_menus()
+    self:unregister_map_context_menus(self:clear_map_context_menu_state())
+end
+
 ---Returns whether the registered same-z stop order matches fresh descriptors.
 ---@param stop_ids integer[]
 ---@return boolean
@@ -217,6 +275,17 @@ function MinecartRouteMarkersOverlay:has_map_tooltip_order(stop_ids)
     if #stop_ids ~= #self.map_tooltip_order then return false end
     for index, stop_id in ipairs(stop_ids) do
         if self.map_tooltip_order[index] ~= stop_id then return false end
+    end
+    return true
+end
+
+---Returns whether the registered context-menu order matches fresh descriptors.
+---@param stop_ids integer[]
+---@return boolean
+function MinecartRouteMarkersOverlay:has_map_context_menu_order(stop_ids)
+    if #stop_ids ~= #self.map_context_menu_order then return false end
+    for index, stop_id in ipairs(stop_ids) do
+        if self.map_context_menu_order[index] ~= stop_id then return false end
     end
     return true
 end
@@ -241,6 +310,28 @@ function MinecartRouteMarkersOverlay:rebuild_map_tooltips(
         end
     end
     self.map_tooltip_order = stop_ids
+end
+
+---Rebuilds exact-tile context menus in current route order.
+---@param route_id integer
+---@param markers dwarfui.MinecartRouteMarkerDescriptor[]
+---@param stop_ids integer[]
+function MinecartRouteMarkersOverlay:rebuild_map_context_menus(
+        route_id, markers, stop_ids)
+    self:clear_map_context_menus()
+    self.map_context_menu_route_id = route_id
+    for _, marker in ipairs(markers) do
+        if marker.marker_kind == MarkerKind.SAME_Z and
+                type(marker.stop_id) == 'number' then
+            self.map_context_menu_handles[marker.stop_id] =
+                context_menu:register_map_tile{
+                    owner=self,
+                    pos=marker.world_pos,
+                    definition=self:create_stop_context_menu_definition(),
+                }
+        end
+    end
+    self.map_context_menu_order = stop_ids
 end
 
 ---Synchronizes same-z marker tooltips from fresh selected-route descriptors.
@@ -274,24 +365,61 @@ function MinecartRouteMarkersOverlay:sync_map_tooltips(route, markers)
     end
 end
 
+---Synchronizes same-z stop context menus from fresh route descriptors.
+---@param route df.hauling_route
+---@param markers dwarfui.MinecartRouteMarkerDescriptor[]
+function MinecartRouteMarkersOverlay:sync_map_context_menus(route, markers)
+    local stop_ids = {}
+    for _, marker in ipairs(markers) do
+        if marker.marker_kind == MarkerKind.SAME_Z and
+                type(marker.stop_id) == 'number' then
+            table.insert(stop_ids, marker.stop_id)
+        end
+    end
+    if route.id ~= self.map_context_menu_route_id or
+            not self:has_map_context_menu_order(stop_ids) then
+        self:rebuild_map_context_menus(route.id, markers, stop_ids)
+        return
+    end
+    for _, marker in ipairs(markers) do
+        if marker.marker_kind == MarkerKind.SAME_Z and
+                type(marker.stop_id) == 'number' then
+            local handle = self.map_context_menu_handles[marker.stop_id]
+            if not handle or not context_menu:update_map_tile(handle, {
+                    pos=marker.world_pos,
+                    definition=self:create_stop_context_menu_definition(),
+                }) then
+                self:rebuild_map_context_menus(route.id, markers, stop_ids)
+                return
+            end
+        end
+    end
+end
+
 ---Clears selected-route state and map targets without mutating native data.
 function MinecartRouteMarkersOverlay:clear_selection()
     self.selection:clear()
     self:clear_map_tooltips()
+    self:clear_map_context_menus()
 end
 
 ---Clears selection and every pooled stop-row binding without accessing Core.
----@return table<integer, dwarfui.MapTileTooltipRegistration> handles
+---@return {tooltip: table<integer, dwarfui.MapTileTooltipRegistration>, context_menu: table<integer, dwarfuicore.ContextMenuMapHandle>} handles
 function MinecartRouteMarkersOverlay:clear_local_state()
     self.selection:clear()
-    local handles = self:clear_map_tooltip_state()
+    local handles = {
+        tooltip=self:clear_map_tooltip_state(),
+        context_menu=self:clear_map_context_menu_state(),
+    }
     self.stop_rail:clear()
     return handles
 end
 
----Clears local state and removes current explicit tooltip registrations.
+---Clears local state and removes current explicit map registrations.
 function MinecartRouteMarkersOverlay:clear_overlay_state()
-    self:unregister_map_tooltips(self:clear_local_state())
+    local handles = self:clear_local_state()
+    self:unregister_map_tooltips(handles.tooltip)
+    self:unregister_map_context_menus(handles.context_menu)
 end
 
 ---Expands the transparent hit-test and render host across the parent screen.
@@ -435,8 +563,10 @@ end
 ---@return df.hauling_route|nil
 function MinecartRouteMarkersOverlay:resolve_selected_route()
     local hauling = self.hauling_provider()
-    if not self.layout:is_supported_focus(self.focus_provider()) or
-            not hauling then
+    local focus = self.focus_provider()
+    local supports_route_context = self.layout:is_supported_focus(focus) or
+        (#self.map_context_menu_order > 0 and is_context_menu_focus(focus))
+    if not supports_route_context or not hauling then
         self:clear_selection()
         return nil
     end
@@ -489,10 +619,12 @@ function MinecartRouteMarkersOverlay:render(dc)
         self:render_selection_indicator(dc, hauling)
         local markers = self.projection:project(route, self.viewport_provider())
         self:sync_map_tooltips(route, markers)
+        self:sync_map_context_menus(route, markers)
         for _, marker in ipairs(markers) do self:render_marker(marker) end
         self:render_labels(dc, markers)
     else
         self:clear_map_tooltips()
+        self:clear_map_context_menus()
     end
     MinecartRouteMarkersOverlay.super.render(self, dc)
 end
@@ -517,6 +649,10 @@ end
 ---Clears selection when the Hauling screen closes or the world unloads.
 function MinecartRouteMarkersOverlay:overlay_onupdate()
     local hauling = self.hauling_provider()
+    if hauling and #self.map_context_menu_order > 0 and
+            is_context_menu_focus(self.focus_provider()) then
+        return
+    end
     if not self.layout:is_supported_focus(self.focus_provider()) or
             not hauling then
         self:clear_overlay_state()
@@ -524,6 +660,7 @@ function MinecartRouteMarkersOverlay:overlay_onupdate()
     end
     if not self.selection:resolve_selected_route(hauling.routes) then
         self:clear_map_tooltips()
+        self:clear_map_context_menus()
     end
 end
 
