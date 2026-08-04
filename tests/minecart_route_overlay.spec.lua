@@ -308,6 +308,7 @@ local function marker(stop_id, marker_kind, name, pos)
     return {
         stop_id=stop_id,
         marker_kind=marker_kind,
+        name=name,
         world_pos={x=pos.x, y=pos.y, z=pos.z},
         marker_pen={ch=9, fg='green', keep_lower=true},
         label=name ~= '' and name or '(unnamed)',
@@ -442,6 +443,7 @@ describe('DwarfUI minecart route markers overlay', function()
         local registration = state.map_context_menus[handle]
         assert.same({x=17, y=29, z=4}, registration.pos)
         assert.is_equal(overlay, registration.owner)
+        assert.equals('Route Stop: Depot', registration.definition.title)
         assert.equals('Relocate / Change location',
             registration.definition.entries[1].label)
         assert.is_nil(overlay.map_context_menu_handles[81])
@@ -524,12 +526,15 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals('(unnamed)',
             state.map_tooltips[second_handle].tooltip)
         first.world_pos = {x=18, y=30, z=4}
+        first.name = 'Renamed'
         first.label = 'Renamed'
         overlay:render(painter())
         assert.is_equal(first_handle, overlay.map_tooltip_handles[80])
         assert.same({x=18, y=30, z=4},
             state.map_tooltips[first_handle].pos)
         assert.equals('Renamed', state.map_tooltips[first_handle].tooltip)
+        assert.equals('Route Stop: Renamed', state.map_context_menus[
+            overlay.map_context_menu_handles[80]].definition.title)
 
         state.markers = {second, first}
         overlay:render(painter())

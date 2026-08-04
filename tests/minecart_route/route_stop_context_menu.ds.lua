@@ -178,8 +178,13 @@ describe('native route-stop context menu', function()
                 return ds.hasFocus('dfhack/lua/dwarfuicore/context-menu')
             end)
             ds.redraw()
-            assert.is_true(capture_contains_text(capture_screen(
-                'route_stop_context_menu'), 'Relocate / Change location'),
+            local menu_capture = capture_screen('route_stop_context_menu')
+            local stop_title = 'Route Stop: ' ..
+                (target.stop.name ~= '' and target.stop.name or '(unnamed)')
+            assert.is_true(capture_contains_text(menu_capture, stop_title),
+                'context menu did not render the route-stop title')
+            assert.is_true(capture_contains_text(
+                menu_capture, 'Relocate / Change location'),
                 'context menu did not render the relocation action')
 
             ds.input('SELECT')

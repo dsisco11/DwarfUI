@@ -53,6 +53,7 @@ local STOCKS_RECENTER_PENS = {
     {transparent_pen(0), transparent_pen(0), transparent_pen(0)},
 }
 local STOCKS_RECENTER_TOOLTIP = 'Zoom to this stop'
+local ROUTE_STOP_TITLE_PREFIX = 'Route Stop: '
 local RELOCATE_STOP_LABEL = 'Relocate / Change location'
 local RELOCATE_STOP_MESSAGE = 'Not yet implemented.'
 
@@ -207,9 +208,12 @@ function MinecartRouteMarkersOverlay:init()
 end
 
 ---Creates the context-menu definition for one route-stop map indicator.
+---@param stop_name string
 ---@return dwarfuicore.ContextMenuDefinition
-function MinecartRouteMarkersOverlay:create_stop_context_menu_definition()
+function MinecartRouteMarkersOverlay:create_stop_context_menu_definition(stop_name)
+    local display_name = stop_name ~= '' and stop_name or '(unnamed)'
     return {
+        title=ROUTE_STOP_TITLE_PREFIX .. display_name,
         entries={
             {
                 label=RELOCATE_STOP_LABEL,
@@ -327,7 +331,8 @@ function MinecartRouteMarkersOverlay:rebuild_map_context_menus(
                 context_menu:register_map_tile{
                     owner=self,
                     pos=marker.world_pos,
-                    definition=self:create_stop_context_menu_definition(),
+                    definition=self:create_stop_context_menu_definition(
+                        marker.name),
                 }
         end
     end
@@ -387,7 +392,8 @@ function MinecartRouteMarkersOverlay:sync_map_context_menus(route, markers)
             local handle = self.map_context_menu_handles[marker.stop_id]
             if not handle or not context_menu:update_map_tile(handle, {
                     pos=marker.world_pos,
-                    definition=self:create_stop_context_menu_definition(),
+                    definition=self:create_stop_context_menu_definition(
+                        marker.name),
                 }) then
                 self:rebuild_map_context_menus(route.id, markers, stop_ids)
                 return
