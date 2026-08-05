@@ -249,18 +249,24 @@ function MinecartRouteMarkersOverlay:create_stop_context_menu_definition(
                 label=RELOCATE_STOP_LABEL,
                 on_select=function()
                     local prompt_ok, prompt_error = pcall(function()
-                        services.UserPromptService:prompt_map_location{
+                            services.UserPromptService:prompt_map_location{
                             title=ROUTE_STOP_TITLE_PREFIX .. display_name,
                             message=RELOCATE_STOP_MESSAGE,
                             on_select=function(position)
-                                -- Validation only in this phase to keep future phase-3
-                                -- mutation changes explicit and scoped.
+                                if not position or type(position.x) ~= 'number' or
+                                        type(position.y) ~= 'number' or
+                                        type(position.z) ~= 'number' then
+                                    return
+                                end
+
                                 local hauling = get_hauling()
                                 local route = find_by_id(hauling and hauling.routes, route_id)
                                 local stop = route and find_by_id(route.stops, stop_id)
-                                if not route or not stop or not position then
+                                if not route or not stop then
                                     return
                                 end
+
+                                stop.pos = {x=position.x, y=position.y, z=position.z}
                             end,
                             on_cancel=function() end,
                         }
@@ -380,7 +386,7 @@ function MinecartRouteMarkersOverlay:rebuild_map_context_menus(
                     owner=self,
                     pos=marker.world_pos,
                     definition=self:create_stop_context_menu_definition(
-                        marker.name, route.id, marker.stop_id),
+                        marker.name, route_id, marker.stop_id),
                 }
         end
     end
@@ -435,17 +441,17 @@ function MinecartRouteMarkersOverlay:sync_map_context_menus(route, markers)
         return
     end
     for _, marker in ipairs(markers) do
-        if marker.marker_kind == MarkerKind.SAME_Z and
-                type(marker.stop_id) == 'number' then
-            local handle = self.map_context_menu_handles[marker.stop_id]
-            if not handle or not context_menu:update_map_tile(handle, {
-                    pos=marker.world_pos,
-                    definition=self:create_stop_context_menu_definition(
-                        marker.name, route.id, marker.stop_id),
-                }) then
-                self:rebuild_map_context_menus(route.id, markers, stop_ids)
-                return
-            end
+            if marker.marker_kind == MarkerKind.SAME_Z and
+                    type(marker.stop_id) == 'number' then
+                local handle = self.map_context_menu_handles[marker.stop_id]
+                if not handle or not context_menu:update_map_tile(handle, {
+                        pos=marker.world_pos,
+                        definition=self:create_stop_context_menu_definition(
+                            marker.name, route.id, marker.stop_id),
+                    }) then
+                    self:rebuild_map_context_menus(route.id, markers, stop_ids)
+                    return
+                end
         end
     end
 end

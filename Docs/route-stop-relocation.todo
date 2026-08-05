@@ -66,16 +66,16 @@ Completion criteria:
 Outcome: Confirmed left-click selection updates stop location; cancellation and stale-state paths do not mutate invalid
 targets.
 
-- [ ] In `on_select(position)` implement idempotent callback flow:
-  - [ ] Resolve current `df.global.plotinfo.hauling` fresh.
-  - [ ] Re-resolve route by id and stop by id under current state.
-  - [ ] Require route and stop identity match before writing.
-  - [ ] No-op on missing/invalid/`nil` input position.
-  - [ ] Write a detached copy of `{x, y, z}` to the matched stop position.
-- [ ] In `on_cancel`, return without any mutation and without side effects.
-- [ ] Preserve existing selection state where practical:
-  - [ ] Ensure relocation completion refreshes via existing selected-route overlay/render sync.
-  - [ ] Avoid introducing separate marker-selection mutation logic.
+- [x] In `on_select(position)` implement idempotent callback flow:
+  - [x] Resolve current `df.global.plotinfo.hauling` fresh.
+  - [x] Re-resolve route by id and stop by id under current state.
+  - [x] Require route and stop identity match before writing.
+  - [x] No-op on missing/invalid/`nil` input position.
+  - [x] Write a detached copy of `{x, y, z}` to the matched stop position.
+- [x] In `on_cancel`, return without any mutation and without side effects.
+- [x] Preserve existing selection state where practical:
+  - [x] Ensure relocation completion refreshes via existing selected-route overlay/render sync.
+  - [x] Avoid introducing separate marker-selection mutation logic.
 
 Completion criteria:
 

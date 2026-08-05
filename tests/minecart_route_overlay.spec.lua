@@ -431,7 +431,8 @@ describe('DwarfUI minecart route markers overlay', function()
 
     it('offers relocation for same-z stop indicators and invokes map prompt',
             function()
-        local route = {id=8}
+        local stop = {id=80, pos={x=17, y=29, z=4}}
+        local route = {id=8, stops={[0]=stop}}
         local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
             {x=17, y=29, z=4})
         local off_z = marker(81, MarkerKind.ABOVE, 'Upper',
@@ -439,7 +440,8 @@ describe('DwarfUI minecart route markers overlay', function()
         local state = {
             focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
             markers={same_z, off_z}, map_calls={}, reveals={}, viewport={},
-            hauling={routes={[0]=route}, view_routes={[0]=route}},
+            hauling={routes={[0]=route}, view_routes={[0]=route},
+                view_stops={[0]=stop}},
         }
         local overlay, selection = load_overlay(state)
         selection.selected_route_id = route.id
@@ -464,6 +466,85 @@ describe('DwarfUI minecart route markers overlay', function()
         assert.equals('Select a map tile for this stop.', request.message)
         assert.is_function(request.on_select)
         assert.is_function(request.on_cancel)
+    end)
+
+    it('writes a detached selected tile position to the matching stop',
+            function()
+        local stop = {id=80, pos={x=17, y=29, z=4}}
+        local route = {id=8, stops={[0]=stop}}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route},
+                view_stops={[0]=stop}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+
+        overlay:render(painter())
+        assert.equals(1, #(state.prompt_map_requests or {}))
+        local request = state.prompt_map_requests[1]
+        assert.is_function(request.on_select)
+
+        local input = {x=22, y=23, z=4}
+        request.on_select(input)
+        assert.is_equal(8, selection.selected_route_id,
+            'valid relocation should preserve route selection')
+        assert.same({x=22, y=23, z=4}, stop.pos)
+        assert.is_not.equal(input, stop.pos)
+        input.x = 99
+        assert.equals(22, stop.pos.x)
+    end)
+
+    it('ignores nil position and stale route/stop identity without mutating',
+            function()
+        local stop = {id=80, pos={x=17, y=29, z=4}}
+        local route = {id=8, stops={[0]=stop}}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route},
+                view_stops={[0]=stop}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+
+        overlay:render(painter())
+        local request = state.prompt_map_requests[1]
+        local snapshot = {x=stop.pos.x, y=stop.pos.y, z=stop.pos.z}
+        assert.has_no.errors(function() request.on_select(nil) end)
+        assert.same(snapshot, stop.pos)
+
+        route.id = 9
+        assert.has_no.errors(function()
+            request.on_select({x=30, y=31, z=4})
+        end)
+        assert.same(snapshot, stop.pos)
+        assert.equals('Route Stop: Depot', request.title)
+    end)
+
+    it('on_cancel leaves stop position untouched', function()
+        local stop = {id=80, pos={x=17, y=29, z=4}}
+        local route = {id=8, stops={[0]=stop}}
+        local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
+            {x=17, y=29, z=4})
+        local state = {
+            focus={'dwarfmode/Hauling'}, mouse_x=0, mouse_y=0,
+            markers={same_z}, map_calls={}, reveals={}, viewport={},
+            hauling={routes={[0]=route}, view_routes={[0]=route},
+                view_stops={[0]=stop}},
+        }
+        local overlay, selection = load_overlay(state)
+        selection.selected_route_id = route.id
+
+        overlay:render(painter())
+        local request = state.prompt_map_requests[1]
+        assert.has_no.errors(function() request.on_cancel() end)
+        assert.same({x=17, y=29, z=4}, stop.pos)
     end)
 
     it('clears local route state without consulting the tooltip service', function()
