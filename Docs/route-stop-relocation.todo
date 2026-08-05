@@ -88,16 +88,16 @@ Completion criteria:
 
 Outcome: Plan and tests explicitly cover unit, native, and project-tracking expectations without implementing behavior changes.
 
-- [ ] Update `tests/minecart_route_overlay.spec.lua` to mock `services.UserPromptService` and validate:
-  - [ ] `create_stop_context_menu_definition` wires relocation entry to prompt.
-  - [ ] `on_select` callback writes expected stop position.
-  - [ ] `on_cancel` does not mutate stop data.
-  - [ ] stale-id / missing-stop callback guards exist.
-- [ ] Update `tests/minecart_route/route_stop_context_menu.ds.lua` to validate end-to-end native relocation flow.
-  - [ ] Left-click path in prompt updates stop position and returns to Hauling menu.
-  - [ ] Right-click or `LEAVESCREEN` in prompt leaves stop unchanged and closes/returns cleanly.
-  - [ ] Existing "Zoom to this stop" and non-z marker behaviors remain represented.
-- [ ] Decide whether `Docs/project.todo` gets the route-stop status update in this plan or remains delegated to owner.
+- [x] Update `tests/minecart_route_overlay.spec.lua` to mock `services.UserPromptService` and validate:
+  - [x] `create_stop_context_menu_definition` wires relocation entry to prompt.
+  - [x] `on_select` callback writes expected stop position.
+  - [x] `on_cancel` does not mutate stop data.
+  - [x] stale-id / missing-stop callback guards exist.
+- [x] Update `tests/minecart_route/route_stop_context_menu.ds.lua` to validate end-to-end native relocation flow.
+  - [x] Left-click path in prompt updates stop position and returns to Hauling menu.
+  - [x] Right-click or `LEAVESCREEN` in prompt leaves stop unchanged and closes/returns cleanly.
+  - [x] Existing "Zoom to this stop" and non-z marker behaviors remain represented.
+- [x] Decide whether `Docs/project.todo` gets the route-stop status update in this plan or remains delegated to owner.
 
 Completion criteria:
 

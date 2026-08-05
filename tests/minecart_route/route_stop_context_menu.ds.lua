@@ -2,6 +2,7 @@
 
 local MinecartRouteFixture = require(
     'tests.minecart_route.support.route_fixture')
+local prompt_service = reqscript('dwarfuicore/user_prompt/service').service
 local context_menu_service = reqscript('dwarfuicore/context_menu/service').service
 local DetectionKind = reqscript('dwarfuicore/context_menu/target_detector').
     ContextMenuDetectionKind
@@ -50,6 +51,14 @@ local function copy_coord(pos)
     return {x=pos.x, y=pos.y, z=pos.z}
 end
 
+---Returns whether two world coordinates are equal.
+---@param left {x: integer, y: integer, z: integer}
+---@param right {x: integer, y: integer, z: integer}
+---@return boolean
+local function same_coord(left, right)
+    return left.x == right.x and left.y == right.y and left.z == right.z
+end
+
 ---Returns whether a complete string appears in a captured screen row.
 ---@param capture dwarfspec.ScreenCapture
 ---@param text string
@@ -73,11 +82,84 @@ local function capture_screen(name)
     return ds.capture_screen(name, {max_width=width, max_height=height})
 end
 
+---Moves to a visible map tile different from `position` and returns it.
+---@param position {x: integer, y: integer, z: integer}
+---@return {x: integer, y: integer, z: integer}
+local function visible_relocation_tile(position)
+    local search = copy_coord(position)
+    for attempt=0,16 do
+        search.x = position.x + attempt + 1
+        search.y = position.y + attempt + 1
+        ds.move_pointer(search, ds.EPointerSpace.WORLD_TILE, {recenter=false})
+        ds.redraw()
+        local projected = dfhack.gui.getMousePos(true)
+        if projected ~= nil then
+            local candidate = copy_coord(projected)
+            if not same_coord(candidate, position) then
+                return candidate
+            end
+        end
+    end
+    error('no visible replacement tile was found for relocation')
+end
+
+---Opens the route-stop context menu at current stop and validates prompt entry text.
+---@param target {route: df.hauling_route, stop: df.hauling_stop, x: integer, y: integer}
+---@param overlay table
+local function open_route_stop_context_menu(target, overlay)
+    local overlay_handle = overlay and
+        overlay.map_context_menu_handles[target.stop.id]
+    assert.is_not_nil(overlay_handle,
+        'route-stop context-menu handle is unavailable')
+    local stop_pos = copy_coord(target.stop.pos)
+    ds.move_pointer(stop_pos, ds.EPointerSpace.WORLD_TILE, {recenter=false})
+    local sample = context_menu_service._sampler:capture()
+    assert.same(stop_pos, {
+        x=sample.map_x,
+        y=sample.map_y,
+        z=sample.map_z,
+    }, 'marker pointer did not resolve the native stop tile')
+    local detection = context_menu_service._detector:detect(sample)
+    assert.equals(DetectionKind.TARGET, detection.kind,
+        'registered route-stop marker did not win context-menu arbitration')
+    assert.is_equal(overlay_handle, detection.candidate.source,
+        'route-stop marker did not supply the detected context target')
+    assert.is_true(context_menu_service:handle_opening_input(
+        {_MOUSE_R=true}, InputTransport.NATIVE,
+        dfhack.gui.getCurViewscreen()),
+        'native context-menu opening transition rejected the marker')
+    local diagnostics = context_menu_service:get_diagnostics()
+    assert.is_true(diagnostics.started and diagnostics.hook.native_tracked
+        and diagnostics.hook.handler_installed,
+        'route-stop registration did not install native context input')
+
+    ds.redraw()
+    assert.is_true(context_menu_service:is_open())
+    ds.await('route-stop context menu opens', function()
+        return ds.hasFocus('dfhack/lua/dwarfuicore/context-menu')
+    end)
+    local screen = context_menu_service._state.presentation.screen
+    assert.is_true(screen:source_root_is_presented(
+        screen.session:get_source_root()),
+        'route-stop overlay source is not presented to the context menu')
+
+    local menu_capture = capture_screen('route_stop_context_menu')
+    local stop_title = 'Route Stop: ' ..
+        (target.stop.name ~= '' and target.stop.name or '(unnamed)')
+    assert.is_true(capture_contains_text(menu_capture, stop_title),
+        'route-stop context menu did not render the route-stop title')
+    assert.is_true(capture_contains_text(
+        menu_capture, 'Relocate / Change location'),
+        'route-stop context menu did not render the relocation action')
+end
+
 describe('native route-stop context menu', function()
-    it('opens relocation and reports that it is not yet implemented', function()
+    it('opens relocation prompt, updates on select, and cancels without mutation',
+            function()
         local native_subject
         local route_fixture
         local overlay
+        local overlay_source = {source='overlay', overlay=REGISTERED_WIDGET}
         local initially_open
         local initial_scroll
         local hauling_opened = false
@@ -100,7 +182,6 @@ describe('native route-stop context menu', function()
             local hauling = assert(df.global.plotinfo.hauling,
                 'native Hauling state is unavailable')
             initial_scroll = hauling.scroll_position
-            local overlay_source = {source='overlay', overlay=REGISTERED_WIDGET}
             local rail_subject
             ds.await('registered route overlay observes Hauling', function()
                 local rail_ok, rail = pcall(ds.get, 'stop_action_rail',
@@ -137,69 +218,45 @@ describe('native route-stop context menu', function()
                 function()
                     return overlay.map_context_menu_handles[target.stop.id] ~= nil
             end)
-
-            local pos = copy_coord(target.stop.pos)
-            ds.move_pointer(pos, ds.EPointerSpace.WORLD_TILE, {recenter=false})
-            local map_handle = overlay.map_context_menu_handles[target.stop.id]
-            local sample = context_menu_service._sampler:capture()
-            assert.same(pos, {
-                x=sample.map_x,
-                y=sample.map_y,
-                z=sample.map_z,
-            }, 'marker pointer did not resolve the native stop tile')
-            local detection = context_menu_service._detector:detect(sample)
-            assert.equals(DetectionKind.TARGET, detection.kind,
-                'registered route-stop marker did not win context-menu arbitration')
-            assert.is_equal(map_handle, detection.candidate.source,
-                'route-stop marker did not supply the detected context target')
-            local diagnostics = context_menu_service:get_diagnostics()
-            assert.is_true(diagnostics.started and diagnostics.hook.native_tracked
-                and diagnostics.hook.handler_installed,
-                'route-stop registration did not install native context input')
-            assert.is_true(context_menu_service:handle_opening_input(
-                {_MOUSE_R=true}, InputTransport.NATIVE,
-                dfhack.gui.getCurViewscreen()),
-                'native context-menu opening transition rejected the marker')
-            local screen = context_menu_service._state.presentation.screen
-            assert.is_true(screen:source_root_is_presented(
-                screen.session:get_source_root()),
-                'route-stop overlay source is not presented to the context menu')
-            assert.is_not_nil(map_projection.project_visible(pos),
+            assert.is_not_nil(map_projection.project_visible(target.stop.pos),
                 'route-stop map position is no longer visible to the context menu')
             ds.redraw()
-            assert.is_true(context_menu_service:is_open(),
-                ('route-stop context menu closed before rendering: close=%s invalid=%s')
-                    :format(
-                        tostring(context_menu_service:get_diagnostics()
-                            .last_close_reason),
-                        tostring(context_menu_service:get_diagnostics()
-                            .last_invalid_reason)))
-            ds.await('route-stop context menu opens', function()
-                return ds.hasFocus('dfhack/lua/dwarfuicore/context-menu')
-            end)
-            ds.redraw()
-            local menu_capture = capture_screen('route_stop_context_menu')
-            local stop_title = 'Route Stop: ' ..
-                (target.stop.name ~= '' and target.stop.name or '(unnamed)')
-            assert.is_true(capture_contains_text(menu_capture, stop_title),
-                'context menu did not render the route-stop title')
-            assert.is_true(capture_contains_text(
-                menu_capture, 'Relocate / Change location'),
-                'context menu did not render the relocation action')
+            open_route_stop_context_menu(target, overlay)
 
             ds.input('SELECT')
-            ds.await('relocation alert opens', function()
-                return ds.hasFocus('dfhack/lua/MessageBox')
+            ds.await('relocation prompt opens', function()
+                return prompt_service:has_active_prompt()
             end)
             ds.redraw()
-            assert.is_true(capture_contains_text(capture_screen(
-                'route_stop_relocation_alert'), 'Not yet implemented.'),
-                'relocation alert did not render its placeholder message')
-
-            ds.input('LEAVESCREEN')
-            ds.await('relocation alert closes to Hauling', function()
+            local original_pos = copy_coord(target.stop.pos)
+            local relocated_pos = visible_relocation_tile(target.stop.pos)
+            ds.mouseInput(ds.EMouseButton.LEFT)
+            ds.await('relocation prompt closes after selection', function()
+                return not prompt_service:has_active_prompt()
+            end)
+            ds.await('relocation prompt returns to hauling', function()
                 return ds.hasFocus('dwarfmode/Hauling')
             end)
+            assert.is_false(same_coord(target.stop.pos, original_pos),
+                'route stop position was not updated')
+            assert.is_true(same_coord(relocated_pos, target.stop.pos),
+                'route stop position was not set to selected relocation tile')
+
+            open_route_stop_context_menu(target, overlay)
+            local canceled_pos = copy_coord(target.stop.pos)
+            ds.input('SELECT')
+            ds.await('relocation cancel prompt opens', function()
+                return prompt_service:has_active_prompt()
+            end)
+            ds.mouseInput(ds.EMouseButton.RIGHT)
+            ds.await('relocation prompt cancels', function()
+                return not prompt_service:has_active_prompt()
+            end)
+            ds.await('relocation cancel returns to hauling', function()
+                return ds.hasFocus('dwarfmode/Hauling')
+            end)
+            assert.is_true(same_coord(canceled_pos, target.stop.pos),
+                'route stop position changed during cancel flow')
         end, debug.traceback)
 
         if native_subject and hauling_opened and
@@ -213,6 +270,12 @@ describe('native route-stop context menu', function()
             route_fixture.hauling.scroll_position = initial_scroll
         end
         MinecartRouteFixture.destroy(route_fixture)
+        if prompt_service and prompt_service:has_active_prompt() then
+            ds.input('LEAVESCREEN')
+            ds.await('relocation prompt closes on cleanup', function()
+                return not prompt_service:has_active_prompt()
+            end)
+        end
         if native_subject and not initially_open and ds.hasFocus('dwarfmode/Hauling') then
             ds.input('LEAVESCREEN')
             ds.await('test Hauling menu closes', function()
