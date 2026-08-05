@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 describe('DwarfUI service bindings', function()
-    it('acquires both exact-major APIs under the DwarfUI namespace', function()
+    it('acquires all exact-major APIs under the DwarfUI namespace', function()
         local calls = {}
 
         ---Creates a provider double that records each acquisition.
@@ -29,6 +29,7 @@ describe('DwarfUI service bindings', function()
                     ['dwarfuicore/services']={
                         TooltipServiceProvider=provider('tooltip'),
                         ContextMenuServiceProvider=provider('context-menu'),
+                        UserPromptServiceProvider=provider('user-prompt'),
                     },
                 },
             })
@@ -36,18 +37,23 @@ describe('DwarfUI service bindings', function()
         assert.same({
             {'tooltip', 1, 'dwarfui'},
             {'context-menu', 1, 'dwarfui'},
+            {'user-prompt', 1, 'dwarfui'},
         }, calls)
         assert.equals('tooltip', services.TooltipService.kind)
         assert.equals('context-menu', services.ContextMenuService.kind)
+        assert.equals('user-prompt', services.UserPromptService.kind)
         services.refresh()
         assert.is_true(services.clear_namespaces())
         assert.same({
             {'tooltip', 1, 'dwarfui'},
             {'context-menu', 1, 'dwarfui'},
+            {'user-prompt', 1, 'dwarfui'},
             {'tooltip', 1, 'dwarfui'},
             {'context-menu', 1, 'dwarfui'},
+            {'user-prompt', 1, 'dwarfui'},
             {'clear', 'tooltip'},
             {'clear', 'context-menu'},
+            {'clear', 'user-prompt'},
         }, calls)
     end)
 
@@ -70,6 +76,9 @@ describe('DwarfUI service bindings', function()
                         TooltipServiceProvider={
                             new=function() return make_api('tooltip') end,
                         },
+                        UserPromptServiceProvider={new=function()
+                            return make_api('user-prompt')
+                        end},
                         ContextMenuServiceProvider={
                             new=function()
                                 if fail_context then error('context unavailable') end
@@ -81,6 +90,7 @@ describe('DwarfUI service bindings', function()
             })
         local old_tooltip = services.TooltipService
         local old_context = services.ContextMenuService
+        local old_user_prompt = services.UserPromptService
         fail_context = true
 
         local ok = pcall(services.refresh)
@@ -88,6 +98,7 @@ describe('DwarfUI service bindings', function()
         assert.is_false(ok)
         assert.is_equal(old_tooltip, services.TooltipService)
         assert.is_equal(old_context, services.ContextMenuService)
+        assert.is_equal(old_user_prompt, services.UserPromptService)
     end)
 
     it('attempts both namespace removals before surfacing a removal failure',
@@ -109,12 +120,18 @@ describe('DwarfUI service bindings', function()
                                 return true
                             end}
                         end},
+                        UserPromptServiceProvider={new=function()
+                            return {clear_namespace=function()
+                                table.insert(calls, 'user-prompt')
+                                return true
+                            end}
+                        end},
                     },
                 },
             })
 
         assert.has_error(function() services.clear_namespaces() end,
             'stale tooltip API')
-        assert.same({'tooltip', 'context-menu'}, calls)
+        assert.same({'tooltip', 'context-menu', 'user-prompt'}, calls)
     end)
 end)

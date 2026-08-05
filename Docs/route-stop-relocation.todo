@@ -22,14 +22,14 @@ safely.
 Outcome: DwarfUI can acquire a namespace-bound UserPrompt API without changing existing service
 ownership contracts.
 
-- [ ] Extend `src/scripts_modinstalled/dwarfui/services.lua` to cache a `UserPromptService` API alongside
+- [x] Extend `src/scripts_modinstalled/dwarfui/services.lua` to cache a `UserPromptService` API alongside
   `TooltipService` and `ContextMenuService`.
-  - [ ] Add `UserPromptServiceProvider:new(CONTRACT_MAJOR, CONSUMER_NAMESPACE)` in `refresh()`.
-  - [ ] Add `UserPromptService` module field with the same immutability pattern as other APIs.
-  - [ ] Update `clear_namespaces()` to clear `UserPromptService` and propagate its result in the return value.
-  - [ ] Keep provider construction non-destructive and compatible with existing reload/retirement flow.
-- [ ] Update service-shim smoke expectation points (if any local notes/tests reference only two DwarfUI services).
-  - [ ] Verify the shim still initializes and clears namespaces cleanly under load and unload.
+- [x] Add `UserPromptServiceProvider:new(CONTRACT_MAJOR, CONSUMER_NAMESPACE)` in `refresh()`.
+- [x] Add `UserPromptService` module field with the same immutability pattern as other APIs.
+- [x] Update `clear_namespaces()` to clear `UserPromptService` and propagate its result in the return value.
+- [x] Keep provider construction non-destructive and compatible with existing reload/retirement flow.
+- [x] Update service-shim smoke expectation points (if any local notes/tests reference only two DwarfUI services).
+- [x] Verify the shim still initializes and clears namespaces cleanly under load and unload.
 
 Completion criteria:
 
