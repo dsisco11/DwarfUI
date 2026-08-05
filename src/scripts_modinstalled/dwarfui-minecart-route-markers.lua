@@ -4,7 +4,6 @@
 
 local overlay = require('plugins.overlay')
 local guidm = require('gui.dwarfmode')
-local dialogs = require('gui.dialogs')
 local route_model = reqscript('dwarfui/minecart_route')
 local AssetButton = reqscript('dwarfui/widgets/asset_button').AssetButton
 local rail_model = reqscript('dwarfui/widgets/hover_action_rail')
@@ -55,7 +54,35 @@ local STOCKS_RECENTER_PENS = {
 local STOCKS_RECENTER_TOOLTIP = 'Zoom to this stop'
 local ROUTE_STOP_TITLE_PREFIX = 'Route Stop: '
 local RELOCATE_STOP_LABEL = 'Relocate / Change location'
-local RELOCATE_STOP_MESSAGE = 'Not yet implemented.'
+local RELOCATE_STOP_MESSAGE = 'Select a map tile for this stop.'
+
+---Returns whether a Core prompt error is contention-related.
+---@param message any
+---@return boolean
+local function is_service_busy(message)
+    return type(message) == 'string' and
+        message:find('%[SERVICE_BUSY%]') ~= nil
+end
+
+---Iterates route vectors or Lua sequences by route or stop id.
+---@param list table|nil
+---@param id integer|nil
+---@return table|nil
+local function find_by_id(list, id)
+    if not list or type(id) ~= 'number' then return nil end
+    if list[0] ~= nil then
+        local index = 0
+        while list[index] ~= nil do
+            if list[index].id == id then return list[index] end
+            index = index + 1
+        end
+        return nil
+    end
+    for _, item in ipairs(list) do
+        if item.id == id then return item end
+    end
+    return nil
+end
 
 ---Returns the active native Hauling state.
 ---@return df.hauling_handlerst|nil
@@ -209,8 +236,11 @@ end
 
 ---Creates the context-menu definition for one route-stop map indicator.
 ---@param stop_name string
+---@param route_id integer
+---@param stop_id integer
 ---@return dwarfuicore.ContextMenuDefinition
-function MinecartRouteMarkersOverlay:create_stop_context_menu_definition(stop_name)
+function MinecartRouteMarkersOverlay:create_stop_context_menu_definition(
+        stop_name, route_id, stop_id)
     local display_name = stop_name ~= '' and stop_name or '(unnamed)'
     return {
         title=ROUTE_STOP_TITLE_PREFIX .. display_name,
@@ -218,8 +248,26 @@ function MinecartRouteMarkersOverlay:create_stop_context_menu_definition(stop_na
             {
                 label=RELOCATE_STOP_LABEL,
                 on_select=function()
-                    dialogs.showMessage(RELOCATE_STOP_LABEL,
-                        RELOCATE_STOP_MESSAGE)
+                    local prompt_ok, prompt_error = pcall(function()
+                        services.UserPromptService:prompt_map_location{
+                            title=ROUTE_STOP_TITLE_PREFIX .. display_name,
+                            message=RELOCATE_STOP_MESSAGE,
+                            on_select=function(position)
+                                -- Validation only in this phase to keep future phase-3
+                                -- mutation changes explicit and scoped.
+                                local hauling = get_hauling()
+                                local route = find_by_id(hauling and hauling.routes, route_id)
+                                local stop = route and find_by_id(route.stops, stop_id)
+                                if not route or not stop or not position then
+                                    return
+                                end
+                            end,
+                            on_cancel=function() end,
+                        }
+                    end)
+                    if not prompt_ok and not is_service_busy(prompt_error) then
+                        error(prompt_error, 0)
+                    end
                 end,
             },
         },
@@ -332,7 +380,7 @@ function MinecartRouteMarkersOverlay:rebuild_map_context_menus(
                     owner=self,
                     pos=marker.world_pos,
                     definition=self:create_stop_context_menu_definition(
-                        marker.name),
+                        marker.name, route.id, marker.stop_id),
                 }
         end
     end
@@ -393,7 +441,7 @@ function MinecartRouteMarkersOverlay:sync_map_context_menus(route, markers)
             if not handle or not context_menu:update_map_tile(handle, {
                     pos=marker.world_pos,
                     definition=self:create_stop_context_menu_definition(
-                        marker.name),
+                        marker.name, route.id, marker.stop_id),
                 }) then
                 self:rebuild_map_context_menus(route.id, markers, stop_ids)
                 return

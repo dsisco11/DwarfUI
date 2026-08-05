@@ -42,18 +42,18 @@ Completion criteria:
 Outcome: Route-stop context-menu entries remain stable but now request map-location input instead of showing a
 placeholder message.
 
-- [ ] Update `src/scripts_modinstalled/dwarfui-minecart-route-markers.lua`:
-  - [ ] Refactor `MinecartRouteMarkersOverlay:create_stop_context_menu_definition` to remove direct `dialogs.showMessage`
+- [x] Update `src/scripts_modinstalled/dwarfui-minecart-route-markers.lua`:
+  - [x] Refactor `MinecartRouteMarkersOverlay:create_stop_context_menu_definition` to remove direct `dialogs.showMessage`
     for relocation.
-  - [ ] Add an `on_select` callback registration that calls
+  - [x] Add an `on_select` callback registration that calls
     `services.UserPromptService:prompt_map_location(...)`.
-  - [ ] Pass `title` and `message` strings that preserve user intent.
-- [ ] Capture immutable route/stop identity in the context-menu action handler scope so callback updates are
+  - [x] Pass `title` and `message` strings that preserve user intent.
+- [x] Capture immutable route/stop identity in the context-menu action handler scope so callback updates are
   route-scoped and not bound to stale pointer objects.
-  - [ ] Validate captured IDs are still present and matching before attempting to mutate any native data.
-- [ ] Add explicit `SERVICE_BUSY` handling:
-  - [ ] If `prompt_map_location` fails with active prompt contention, return no-op and preserve overlay state.
-  - [ ] Keep menu interaction behavior consistent for other stops while active prompt is denied.
+  - [x] Validate captured IDs are still present and matching before attempting to mutate any native data.
+- [x] Add explicit `SERVICE_BUSY` handling:
+  - [x] If `prompt_map_location` fails with active prompt contention, return no-op and preserve overlay state.
+  - [x] Keep menu interaction behavior consistent for other stops while active prompt is denied.
 
 Completion criteria:
 

@@ -228,10 +228,6 @@ local function load_overlay(state)
             },
             require_modules={
                 ['plugins.overlay']={OverlayWidget=OverlayWidget},
-                ['gui.dialogs']={showMessage=function(title, message)
-                    state.alerts = state.alerts or {}
-                    table.insert(state.alerts, {title=title, message=message})
-                end},
                 ['gui.dwarfmode']={
                     Viewport={get=function() return state.viewport end},
                     getPanelLayout=function()
@@ -257,7 +253,19 @@ local function load_overlay(state)
                 ['dwarfui/widgets/asset_button']=asset_button,
                 ['dwarfui/widgets/hover_action_rail']=hover_action_rail,
                 ['dwarfui/services']={TooltipService=tooltip,
-                    ContextMenuService=context_menu},
+                    ContextMenuService=context_menu, UserPromptService={
+                        prompt_map_location=function(_, options)
+                            state.prompt_map_requests = state.prompt_map_requests or {}
+                            local request = {
+                                title=options.title,
+                                message=options.message,
+                                on_select=options.on_select,
+                                on_cancel=options.on_cancel,
+                            }
+                            table.insert(state.prompt_map_requests, request)
+                            return request
+                        end,
+                    }},
                 ['dwarfuicore/pointer']={PointerPolicy=PointerPolicy},
             },
         })
@@ -421,7 +429,7 @@ describe('DwarfUI minecart route markers overlay', function()
             'the adjacent label cell must not become a map target')
     end)
 
-    it('offers relocation for same-z stop indicators and reports it unavailable',
+    it('offers relocation for same-z stop indicators and invokes map prompt',
             function()
         local route = {id=8}
         local same_z = marker(80, MarkerKind.SAME_Z, 'Depot',
@@ -450,9 +458,12 @@ describe('DwarfUI minecart route markers overlay', function()
 
         registration.definition.entries[1].on_select({})
 
-        assert.same({{
-            title='Relocate / Change location', message='Not yet implemented.',
-        }}, state.alerts)
+        assert.equals(1, #(state.prompt_map_requests or {}))
+        local request = state.prompt_map_requests[1]
+        assert.equals('Route Stop: Depot', request.title)
+        assert.equals('Select a map tile for this stop.', request.message)
+        assert.is_function(request.on_select)
+        assert.is_function(request.on_cancel)
     end)
 
     it('clears local route state without consulting the tooltip service', function()
